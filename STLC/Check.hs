@@ -11,6 +11,12 @@ type Env = [(Id,Type)]
 
 typeOf :: Env -> Expr -> Maybe Type
 
+-- Base values
+typeOf _ True = return Bool 
+typeOf _ False = return Bool 
+
+typeOf _ UnitV = return Unit
+
 --   (x:T) in Gamma
 --   Gamma |- x : T
 typeOf ctxt (Var x) = do
@@ -37,9 +43,8 @@ typeOf ctxt (Abs x t e) = do
     s <- typeOf ((x,t):ctxt) e
     return $ Fun t s
 
-typeOf _ True = return Bool 
-typeOf _ False = return Bool 
-
+-- Gamma |- e1 : Bool   Gamma |- e2 : T     Gamma |- e3 : T
+-- Gamma |- if e1 e2 e3 : T
 typeOf ctxt (If e1 e2 e3) = do
     t1 <- typeOf ctxt e1
     case t1 of 
@@ -49,6 +54,17 @@ typeOf ctxt (If e1 e2 e3) = do
             if (t2==t3) then return t2 
                         else Nothing 
         _ -> Nothing
+
+-- Simple Extensions
+
+-- Gamma |- t1 : Unit   Gamma |- t2 : T
+-- Gamma |- t1;t2 : T
+typeOf ctxt (Seqnc e1 e2) = do
+    t1 <- typeOf ctxt e1
+    case t1 of
+        Unit -> typeOf ctxt e2
+        _ -> Nothing
+
    
 
 check :: Expr -> Maybe Type
