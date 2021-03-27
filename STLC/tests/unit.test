@@ -1,0 +1,4 @@
+check UnitV
+check (Seqnc UnitV False)
+check (Seqnc (App (Abs "x" Unit (Var "x")) UnitV) False)
+check (Seqnc (App (Abs "x" Unit (Var "x")) UnitV) (Abs "x" Unit True))
