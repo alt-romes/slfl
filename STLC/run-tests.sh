@@ -1,4 +1,4 @@
-tests=( "unit" "ascript" )
+tests=( "unit" "ascript" "letin" )
 for t in "${tests[@]}"
 do
     diff -b tests/$t.correct <(ghci Check.hs < tests/$t.test | grep *Check | sed 's/*Check> //') ||

@@ -75,6 +75,14 @@ typeOf ctxt (Ascript e1 t2) = do
     if (t1 == t2) then return t2
     else Nothing
 
+-- Let
+-- Gamma |- t1 : T1     Gamma, t1 : T1 |- t2 : T2
+-- Gamma |- let x=t1 in t2 : T2
+typeOf ctxt (LetIn x e1 e2) = do
+    t1 <- typeOf ctxt e1
+    typeOf ((x,t1):ctxt) e2
+
+
 
 check :: Expr -> Maybe Type
 check = typeOf []

@@ -16,6 +16,7 @@ data Expr
     | UnitV -- Unit value
     | Seqnc Expr Expr -- t1;t2, evaluate t1 to unit followed by t2 = (\x : Unit . t2) t1
     | Ascript Expr Type
+    | LetIn Id Expr Expr
 
 
 -- data Values ??? (Abs Id Type Expr, UnitV)
