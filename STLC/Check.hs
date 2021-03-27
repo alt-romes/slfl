@@ -57,6 +57,7 @@ typeOf ctxt (If e1 e2 e3) = do
 
 -- Simple Extensions
 
+-- Unit
 -- Gamma |- t1 : Unit   Gamma |- t2 : T
 -- Gamma |- t1;t2 : T
 typeOf ctxt (Seqnc e1 e2) = do
@@ -65,7 +66,15 @@ typeOf ctxt (Seqnc e1 e2) = do
         Unit -> typeOf ctxt e2
         _ -> Nothing
 
-   
+
+-- Ascription
+-- Gamma |- t1 : T
+-- Gamma |- t1 as T : T
+typeOf ctxt (Ascript e1 t2) = do
+    t1 <- typeOf ctxt e1
+    if (t1 == t2) then return t2
+    else Nothing
+
 
 check :: Expr -> Maybe Type
 check = typeOf []

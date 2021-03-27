@@ -1,7 +1,6 @@
 Just Unit
-Just Bool
+Nothing
 Just Unit
 Nothing
 Just Bool
-Just (Unit -> Bool)
 Leaving GHCi.
