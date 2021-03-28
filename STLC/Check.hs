@@ -118,5 +118,24 @@ typeOf ctxt (Second e1) = do
         _ -> Nothing
 
 
+-- Tuple; {t1,t2,t3,...}
+-- for each i, Gamma |- ti : Ti
+-- Gamma |- {ti...} : {Ti...}
+typeOf ctxt (TupleV l) =
+    let typelist = catMaybes $ map (\x -> typeOf ctxt x) l in
+    if ((length typelist) == (length l)) then
+        return $ Tuple typelist
+    else
+        Nothing
+
+-- Project; t.i
+-- Gamma |- t1 : {Ti...}
+-- Gamma |- t1.j : Tj
+typeOf ctxt (Project i e1) = do
+    t1 <- typeOf ctxt e1
+    case t1 of
+        (Tuple l) -> return (l !! i)
+        _ -> Nothing
+
 check :: Expr -> Maybe Type
 check = typeOf []

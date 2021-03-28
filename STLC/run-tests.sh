@@ -23,7 +23,7 @@ testing-docs
 
 
 # Define tests to run here
-tests=( "unit" "ascript" "letin" "pair" )
+tests=( "unit" "ascript" "letin" "pair" "tuple" )
 
 # Define command to run tests here
 run_command() {
