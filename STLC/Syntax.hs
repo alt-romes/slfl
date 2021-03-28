@@ -17,6 +17,9 @@ data Expr
     | Seqnc Expr Expr -- t1;t2, evaluate t1 to unit followed by t2 = (\x : Unit . t2) t1
     | Ascript Expr Type
     | LetIn Id Expr Expr
+    | PairV Expr Expr -- Pair value
+    | First Expr
+    | Second Expr
 
 
 -- data Values ??? (Abs Id Type Expr, UnitV)
@@ -27,10 +30,11 @@ data Type
     | Bool
     | A             -- base type
     | Unit
+    | Pair Type Type -- T1 x T2
     deriving (Eq)
 
 instance (Show Type) where 
     show Bool = "Bool"
     show (Fun t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
     show Unit = "Unit"
-
+    show (Pair t1 t2) = "(" ++ show t1 ++ " x " ++ show t2 ++ ")"
