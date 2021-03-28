@@ -12,6 +12,8 @@ data Expr
     | Abs Id Type Expr -- lambda x:T . E
     | True
     | False
+    | Zero
+    | Succ Expr
     | If Expr Expr Expr 
     | UnitV -- Unit value
     | Seqnc Expr Expr -- t1;t2, evaluate t1 to unit followed by t2 = (\x : Unit . t2) t1
@@ -30,6 +32,7 @@ data Expr
 data Type 
     = Fun Type Type -- T1 -> T2 
     | Bool
+    | Nat
     | A             -- base type
     | Unit
     | Pair Type Type -- T1 x T2
@@ -43,3 +46,4 @@ instance (Show Type) where
     show (Pair t1 t2) = "(" ++ show t1 ++ " x " ++ show t2 ++ ")"
     show (Tuple []) = "()"
     show (Tuple (x:xs)) = "( " ++ (show x) ++ (concat ((map (\x -> " x " ++ (show x)) xs))) ++ " )"
+    show Nat = "Nat"

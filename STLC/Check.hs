@@ -18,12 +18,22 @@ typeOf _ False = return Bool
 
 typeOf _ UnitV = return Unit
 
+typeOf ctxt (Zero) = return Nat
+
 
 --   (x:T) in Gamma
 --   Gamma |- x : T
 typeOf ctxt (Var x) = do
      t <- lookup x ctxt
      return t
+
+-- Gamma |- t1 : Nat
+-- Gamma |- Succ t1 : Nat
+typeOf ctxt (Succ e1) = do
+    t1 <- typeOf ctxt e1
+    case t1 of
+        Nat -> return Nat
+        _ -> Nothing
  
 
 -- Gamma |- E1 : T -> S   Gamma |- E2 : T
@@ -35,7 +45,6 @@ typeOf ctxt (App e1 e2) = do
             t2 <- typeOf ctxt e2 
             if (t2 == t) then return s 
                          else Nothing 
-
         _ -> Nothing
 
 
@@ -128,6 +137,7 @@ typeOf ctxt (TupleV l) =
     else
         Nothing
 
+
 -- Project; t.i
 -- Gamma |- t1 : {Ti...}
 -- Gamma |- t1.j : Tj
@@ -136,6 +146,8 @@ typeOf ctxt (Project i e1) = do
     case t1 of
         (Tuple l) -> return (l !! i)
         _ -> Nothing
+
+
 
 check :: Expr -> Maybe Type
 check = typeOf []
