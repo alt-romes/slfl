@@ -38,6 +38,9 @@ eval ctxt (If e1 e2 e3) = if e1 == Syntax.True then eval ctxt e2 else eval ctxt 
 
 eval ctxt (Seqnc e1 e2) = eval ctxt e2
 
+eval ctxt (Ascript e1 t2) = eval ctxt e1
+
+
 evalTyped :: Expr -> String
 evalTyped e = if isJust (check e) then
                   maybe "Eval error." show (eval [] e)
