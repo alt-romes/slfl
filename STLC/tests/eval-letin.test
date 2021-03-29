@@ -1,0 +1,4 @@
+evalTyped $ LetIn "x" True (If (Var "x") True False)
+evalTyped $ LetIn "x" False (If (Var "x") True False)
+evalTyped (App (Abs "x" Bool (LetIn "x" (Var "x") (If (Var "x") True False))) True)
+evalTyped (App (Abs "x" Bool (LetIn "x" (Var "x") (If (Var "x") True False))) False)
