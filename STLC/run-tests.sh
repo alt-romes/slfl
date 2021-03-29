@@ -22,8 +22,8 @@ $ ./run-tests.sh
 testing-docs
 
 
-# Define tests to run here
-tests=( "unit" "ascript" "letin" "pair" "tuple" "nat" )
+# Define tests to run here #TODO: use directory search
+tests=( "unit" "ascript" "letin" "pair" "tuple" "nat" "eval-base" "eval-if" )
 
 # Define command to run tests here
 run_command() {

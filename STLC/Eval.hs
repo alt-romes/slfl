@@ -34,6 +34,8 @@ eval ctxt (App e1 e2) = if isValue e1 == Syntax.True then
                             s <- eval ctxt e1
                             eval ctxt (App s e2)
 
+eval ctxt (If e1 e2 e3) = if e1 == Syntax.True then eval ctxt e2 else eval ctxt e3
+
 
 evalTyped :: Expr -> String
 evalTyped e = if isJust (check e) then
