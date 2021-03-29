@@ -2,6 +2,7 @@
 
 module Syntax where 
 
+import Data.List
 import Prelude hiding (True,False,Bool)
 
 type Id = String
@@ -33,7 +34,6 @@ data Type
     = Fun Type Type -- T1 -> T2 
     | Bool
     | Nat
-    | A             -- base type
     | Unit
     | Pair Type Type -- T1 x T2
     | Tuple [Type] -- T1 x T2 x T3 x T4 ...
@@ -44,6 +44,5 @@ instance (Show Type) where
     show (Fun t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
     show Unit = "Unit"
     show (Pair t1 t2) = "(" ++ show t1 ++ " x " ++ show t2 ++ ")"
-    show (Tuple []) = "()"
-    show (Tuple (x:xs)) = "( " ++ show x ++ concatMap (\x -> " x " ++ show x) xs ++ " )"
+    show (Tuple l) = "( " ++ intercalate " x " (map show l) ++ " )"
     show Nat = "Nat"

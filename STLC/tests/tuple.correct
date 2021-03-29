@@ -1,4 +1,4 @@
-Just ()
+Just (  )
 Just ( Bool )
 Just ( Bool x Unit x Bool x (Unit x Unit) )
 Just Bool
