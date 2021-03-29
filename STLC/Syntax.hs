@@ -12,10 +12,10 @@ data Expr
     | Abs Id Type Expr -- lambda x:T . E
     | True
     | False
+    | UnitV -- Unit value
     | Zero
     | Succ Expr
     | If Expr Expr Expr 
-    | UnitV -- Unit value
     | Seqnc Expr Expr -- t1;t2, evaluate t1 to unit followed by t2 = (\x : Unit . t2) t1
     | Ascript Expr Type
     | LetIn Id Expr Expr
@@ -25,8 +25,28 @@ data Expr
   -- Prof tem de rever os tuples, parece-me que a minha implementação pode não ser a melhor :)
     | TupleV [Expr]
     | Project Int Expr
+    deriving (Show, Eq)
 
--- data Values ??? (Abs Id Type Expr, UnitV)
+isValue :: Expr -> Expr
+isValue e =
+    case e of
+        False -> True
+        True -> True
+        UnitV -> True
+        Zero -> True
+        Succ _ -> True
+        Abs {} -> True
+        (PairV _ _) -> True
+        TupleV _ -> True
+        _ -> False
+
+
+-- data Value
+--     = Abs Id Type Expr
+--     | True
+--     | False
+--     | Zero
+--     | Succ Expr
 
     
 data Type 
@@ -39,6 +59,7 @@ data Type
     | Tuple [Type] -- T1 x T2 x T3 x T4 ...
     deriving (Eq)
 
+
 instance (Show Type) where 
     show Bool = "Bool"
     show (Fun t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
@@ -47,3 +68,4 @@ instance (Show Type) where
     show (Tuple []) = "()"
     show (Tuple (x:xs)) = "( " ++ show x ++ concatMap (\x -> " x " ++ show x) xs ++ " )"
     show Nat = "Nat"
+
