@@ -28,18 +28,19 @@ data Expr
     | Project Int Expr
     deriving (Show, Eq)
 
-isValue :: Expr -> Expr
-isValue e =
-    case e of
-        False -> True
-        True -> True
-        UnitV -> True
-        Zero -> True
-        Succ _ -> True
-        Abs {} -> True
-        (PairV _ _) -> True
-        TupleV _ -> True
-        _ -> False
+-- No longer used
+-- isValue :: Expr -> Prelude.Bool
+-- isValue e =
+--     case e of
+--         False -> Prelude.True
+--         True -> Prelude.True
+--         UnitV -> Prelude.True
+--         Zero -> Prelude.True
+--         Succ _ -> Prelude.True
+--         Abs {} -> Prelude.True
+--         (PairV _ _) -> Prelude.True
+--         TupleV _ -> Prelude.True
+--         _ -> Prelude.False
 
 
 -- data Value
