@@ -1,0 +1,9 @@
+check (PairV True False)
+check (PairV True UnitV)
+check (PairV UnitV UnitV)
+check $ First (PairV True UnitV)
+check $ Second (PairV True UnitV)
+check $ Second True
+check $ First UnitV
+check $ App (Abs "x" (Pair Bool Bool) (First $ Var "x")) (PairV True False)
+check $ App (Abs "x" (Pair Bool Unit) (Second $ Var "x")) (PairV True UnitV)
