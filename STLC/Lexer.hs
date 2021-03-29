@@ -17,6 +17,8 @@ module Lexer where
 
 type Token = String
 
+validTokens = ["True", "False", "Zero", "if", "then", "else", "{", "}", ".", "x", "y", "z", "succ"]
+
 lexer :: String -> [Token]
 
-lexer = words
+lexer s = filter (`elem` validTokens) (words s)

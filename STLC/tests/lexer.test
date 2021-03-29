@@ -1,1 +1,2 @@
 lexer "if True then True else False"
+lexer "teste de som if True then Else False else True"

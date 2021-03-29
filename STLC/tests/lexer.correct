@@ -1,2 +1,3 @@
 ["if","True","then","True","else","False"]
+["if","True","then","False","else","True"]
 Leaving GHCi.
