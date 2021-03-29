@@ -22,13 +22,15 @@ $ ./run-tests.sh
 testing-docs
 
 
-# Define tests to run here
-tests=( "unit" "ascript" "letin" "pair" "tuple" "nat" )
+# Define tests to run
+tests=()
+# Fill tests array
+while IFS='' read -r line; do tests+=("$line"); done < <(find tests -maxdepth 1 -name '*.test' | sed 's/tests\///' | sed 's/\.test//')
 
 # Define command to run tests here
 run_command() {
     test_name=$1
-    ghci Check.hs < tests/"$test_name".test | grep '\*Check' | sed 's/\*Check> //'
+    ghci Eval.hs < tests/"$test_name".test | grep '\*Eval' | sed 's/\*Eval> //'
 }
 
 if [ "$1" ]
@@ -48,14 +50,13 @@ fi
 
 if for t in "${tests[@]}"
 do
-    diff -b tests/"$t".correct <(run_command "$t") ||
-        (
-            echo "Test failed:"
-            echo tests/"$t"
+    echo "Running test: $t" &&
+        if ! (diff -b tests/"$t".correct <(run_command "$t")); then
+            echo "Test failed: $t" &&
             exit 1
-        )
+        fi
+
 done
 then
     echo "All tests passed"
 fi
-

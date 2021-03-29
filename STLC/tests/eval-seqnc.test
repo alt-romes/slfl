@@ -1,0 +1,5 @@
+evalTyped (Seqnc UnitV True)
+evalTyped (Seqnc UnitV False)
+evalTyped (Seqnc False UnitV)
+evalTyped (App (Abs "x" Bool (Seqnc UnitV (Var "x"))) False)
+evalTyped (App (Abs "x" Bool (Seqnc UnitV (Var "x"))) True)

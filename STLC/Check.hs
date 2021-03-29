@@ -18,7 +18,7 @@ typeOf _ False = return Bool
 
 typeOf _ UnitV = return Unit
 
-typeOf ctxt Zero = return Nat
+typeOf _ Zero = return Nat
 
 
 --   (x:T) in Gamma
