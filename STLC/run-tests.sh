@@ -28,7 +28,7 @@ tests=( "unit" "ascript" "letin" "pair" "tuple" "nat" )
 # Define command to run tests here
 run_command() {
     test_name=$1
-    ghci Check.hs < tests/"$test_name".test | grep '\*Check' | sed 's/\*Check> //'
+    ghci Eval.hs < tests/"$test_name".test | grep '\*Eval' | sed 's/\*Eval> //'
 }
 
 if [ "$1" ]

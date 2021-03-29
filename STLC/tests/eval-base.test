@@ -1,0 +1,14 @@
+evalTyped True
+evalTyped False
+evalTyped UnitV
+evalTyped Zero
+evalTyped $ Succ Zero
+evalTyped $ Succ $ Succ Zero
+evalTyped $ Succ $ Succ $ Succ Zero
+evalTyped (Abs "x" Bool (Var "x"))
+evalTyped (App (Abs "x" Bool (Var "x")) False)
+evalTyped (App (Abs "x" Nat (Succ (Var "x"))) Zero)
+evalTyped (App (Abs "x" Nat (Succ (Var "x"))) (Succ Zero))
+evalTyped (Var "x")
+evalTyped (App False True)
+evalTyped (App (Abs "x" Bool (Var "x")) UnitV)
