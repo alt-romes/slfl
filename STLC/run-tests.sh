@@ -22,8 +22,10 @@ $ ./run-tests.sh
 testing-docs
 
 
-# Define tests to run here #TODO: use directory search
-tests=( "unit" "ascript" "letin" "pair" "tuple" "nat" "eval-base" "eval-if" )
+# Define tests to run
+tests=()
+# Fill tests array
+while IFS='' read -r line; do tests+=("$line"); done < <(find tests -maxdepth 1 -name '*.test' | sed 's/tests\///' | sed 's/\.test//')
 
 # Define command to run tests here
 run_command() {
@@ -48,14 +50,13 @@ fi
 
 if for t in "${tests[@]}"
 do
-    diff -b tests/"$t".correct <(run_command "$t") ||
-        (
-            echo "Test failed:"
-            echo tests/"$t"
+    echo "Running test: $t" &&
+        if ! (diff -b tests/"$t".correct <(run_command "$t")); then
+            echo "Test failed: $t" &&
             exit 1
-        )
+        fi
+
 done
 then
     echo "All tests passed"
 fi
-

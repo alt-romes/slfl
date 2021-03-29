@@ -36,6 +36,8 @@ eval ctxt (App e1 e2) = if isValue e1 == Syntax.True then
 
 eval ctxt (If e1 e2 e3) = if e1 == Syntax.True then eval ctxt e2 else eval ctxt e3
 
+eval ctxt (Seqnc e1 e2) = eval ctxt e2
+
 evalTyped :: Expr -> String
 evalTyped e = if isJust (check e) then
                   maybe "Eval error." show (eval [] e)
