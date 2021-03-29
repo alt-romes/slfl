@@ -4,6 +4,7 @@ module Eval where
 import Data.Maybe
 import Prelude hiding (True,False,Bool)
 import Lexer
+import Parser
 import Syntax
 import Check
 
@@ -80,3 +81,10 @@ evalTyped e = if isJust (check e) then
                   maybe "Eval error." show (eval [] e)
               else
                   "Type error."
+
+
+evalProg :: String -> String
+evalProg e = evalTyped $ parseP e
+
+checkProg :: String -> Maybe Type
+checkProg e = check $ parseP e
