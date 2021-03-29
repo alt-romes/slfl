@@ -1,0 +1,1 @@
+lexer "if True then True else False"
