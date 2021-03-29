@@ -43,6 +43,24 @@ eval ctxt (LetIn x e1 e2) = do
     r1 <- eval ctxt e1
     eval ((x, r1):ctxt) e2
 
+eval ctxt (PairV e1 e2) = do
+    r1 <- eval ctxt e1
+    r2 <- eval ctxt e2
+    return $ PairV r1 r2
+
+eval ctxt (First e1) = do
+    r1 <- eval ctxt e1
+    case r1 of
+        (PairV e2 _) -> eval ctxt e2
+        _ -> Nothing
+            
+eval ctxt (Second e1) = do
+    r1 <- eval ctxt e1
+    case r1 of
+        (PairV _ e2) -> eval ctxt e2
+        _ -> Nothing
+
+
 evalTyped :: Expr -> String
 evalTyped e = if isJust (check e) then
                   maybe "Eval error." show (eval [] e)

@@ -1,0 +1,5 @@
+evalTyped $ PairV True UnitV
+evalTyped $ PairV True False
+evalTyped (App (Abs "x" (Pair Bool Unit) (Var "x")) (PairV False UnitV))
+evalTyped $ First (App (Abs "x" (Pair Bool Unit) (Var "x")) (PairV False UnitV))
+evalTyped $ Second (App (Abs "x" (Pair Bool Unit) (Var "x")) (PairV False UnitV))
