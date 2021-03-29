@@ -60,6 +60,19 @@ eval ctxt (Second e1) = do
         (PairV _ e2) -> eval ctxt e2
         _ -> Nothing
 
+eval ctxt (TupleV l) =
+    let valueslist = mapMaybe (eval ctxt) l in
+        if length valueslist == length l then
+            return $ TupleV valueslist
+        else
+            Nothing
+
+eval ctxt (Project i e1) = do
+    r1 <- eval ctxt e1
+    case r1 of
+        (TupleV l) -> return (l !! i)
+        _ -> Nothing
+
 
 evalTyped :: Expr -> String
 evalTyped e = if isJust (check e) then
