@@ -18,14 +18,12 @@ typeOf _ False = return Bool
 
 typeOf _ UnitV = return Unit
 
-typeOf ctxt (Zero) = return Nat
+typeOf ctxt Zero = return Nat
 
 
 --   (x:T) in Gamma
 --   Gamma |- x : T
-typeOf ctxt (Var x) = do
-     t <- lookup x ctxt
-     return t
+typeOf ctxt (Var x) = lookup x ctxt
 
 -- Gamma |- t1 : Nat
 -- Gamma |- Succ t1 : Nat
@@ -43,7 +41,7 @@ typeOf ctxt (App e1 e2) = do
     case t1 of 
         Fun t s -> do 
             t2 <- typeOf ctxt e2 
-            if (t2 == t) then return s 
+            if t2 == t then return s 
                          else Nothing 
         _ -> Nothing
 
@@ -64,7 +62,7 @@ typeOf ctxt (If e1 e2 e3) = do
         Bool -> do
             t2 <- typeOf ctxt e2 
             t3 <- typeOf ctxt e3
-            if (t2==t3) then return t2 
+            if t2==t3 then return t2 
                         else Nothing 
         _ -> Nothing
 
@@ -86,7 +84,7 @@ typeOf ctxt (Seqnc e1 e2) = do
 -- Gamma |- t1 as T : T
 typeOf ctxt (Ascript e1 t2) = do
     t1 <- typeOf ctxt e1
-    if (t1 == t2) then return t2
+    if t1 == t2 then return t2
     else Nothing
 
 
@@ -131,8 +129,8 @@ typeOf ctxt (Second e1) = do
 -- for each i, Gamma |- ti : Ti
 -- Gamma |- {ti...} : {Ti...}
 typeOf ctxt (TupleV l) =
-    let typelist = catMaybes $ map (\x -> typeOf ctxt x) l in
-    if ((length typelist) == (length l)) then
+    let typelist = mapMaybe (typeOf ctxt) l in
+    if length typelist == length l then
         return $ Tuple typelist
     else
         Nothing
@@ -146,7 +144,6 @@ typeOf ctxt (Project i e1) = do
     case t1 of
         (Tuple l) -> return (l !! i)
         _ -> Nothing
-
 
 
 check :: Expr -> Maybe Type

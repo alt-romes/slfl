@@ -45,5 +45,5 @@ instance (Show Type) where
     show Unit = "Unit"
     show (Pair t1 t2) = "(" ++ show t1 ++ " x " ++ show t2 ++ ")"
     show (Tuple []) = "()"
-    show (Tuple (x:xs)) = "( " ++ (show x) ++ (concat ((map (\x -> " x " ++ (show x)) xs))) ++ " )"
+    show (Tuple (x:xs)) = "( " ++ show x ++ concatMap (\x -> " x " ++ show x) xs ++ " )"
     show Nat = "Nat"
