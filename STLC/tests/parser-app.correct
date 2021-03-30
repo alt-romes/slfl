@@ -1,0 +1,4 @@
+App (Abs "x" Bool (Var "x")) True
+App True False
+App (Abs "x" Bool (If (Var "x") False True)) False
+Leaving GHCi.

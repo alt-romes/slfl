@@ -1,0 +1,3 @@
+parseP "!-> lambda x : Bool -> x true"
+parseP "!-> true false"
+parseP "!-> lambda x : Bool -> if x then false else true false"

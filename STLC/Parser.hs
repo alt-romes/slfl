@@ -34,6 +34,10 @@ parse ("lambda":xs) =
     (t1, xs2) <- parseType xs1
     (e1, xs3) <- parse xs2
     return (Abs id t1 e1, xs3)
+parse ("!->":xs) = do
+    (e1, xs1) <- parse xs
+    (e2, xs2) <- parse xs1
+    return (App e1 e2, xs2)
 
 
 parseType :: [Token] -> Maybe (Type, [Token])
