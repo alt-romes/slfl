@@ -150,5 +150,5 @@ typeOf ctxt (Project i e1) = do
 check :: Expr -> Maybe Type
 check = typeOf []
 
-checkProg :: String -> Maybe Type
-checkProg e = check $ parseP e
+checkP :: String -> Maybe Type
+checkP e = check $ parseP e

@@ -45,8 +45,18 @@ parse ("let":xs) =
 
 parseType :: [Token] -> Maybe (Type, [Token])
 parseType (":":xs) = parseType xs
-parseType ("Bool":xs) = return (Bool, xs)
-parseType ("Nat":xs) = return (Nat, xs)
+parseType ("Bool":xs) =
+    case xs of
+        ("-->":xs1) -> do
+            (t1, xs2) <- parseType xs1
+            return (Fun Bool t1, xs2)
+        _ -> return (Bool, xs)
+parseType ("Nat":xs) =
+    case xs of
+        ("-->":xs1) -> do
+            (t1, xs2) <- parseType xs1
+            return (Fun Nat t1, xs2)
+        _ -> return (Nat, xs)
 
 
 parseP :: String -> Expr

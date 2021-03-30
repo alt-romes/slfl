@@ -1,0 +1,5 @@
+Abs "x" (Bool -> Bool) (Var "x")
+Abs "x" (Nat -> Bool) (Var "x")
+Abs "x" (Nat -> (Nat -> Bool)) (Var "x")
+Abs "x" (Nat -> (Nat -> (Bool -> (Bool -> Nat)))) (Var "x")
+Leaving GHCi.

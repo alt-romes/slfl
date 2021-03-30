@@ -1,0 +1,4 @@
+evalP "!-> lambda x : Bool -> if x then false else true . false"
+evalP "!-> lambda x : Bool -> if x then false else true . true"
+evalP "!-> lambda x : Bool -> let y = if x then false else true in if y then false else true . false"
+evalP "!-> lambda x : Bool -> let y = if x then false else true in if y then false else true . true"

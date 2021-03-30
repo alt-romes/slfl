@@ -62,5 +62,5 @@ evalTyped e = if isJust (check e) then
                   "Type error."
 
 
-evalProg :: String -> String
-evalProg e = evalTyped $ parseP e
+evalP :: String -> String
+evalP e = evalTyped $ parseP e

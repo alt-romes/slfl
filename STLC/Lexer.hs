@@ -17,7 +17,7 @@ module Lexer where
 
 type Token = String
 
-validTokens = ["true", "false", "0", "if", "then", "else", "x", "y", "z", "succ", "lambda", "Bool", "Nat", "->", ":", "(", ")", "!->", "unit", ";->", ".", "let", "in", "="]
+validTokens = ["true", "false", "0", "if", "then", "else", "x", "y", "z", "succ", "lambda", "Bool", "Nat", "->", ":", "(", ")", "!->", "unit", ";->", ".", "let", "in", "=", "-->"]
 
 lexer :: String -> [Token]
 
