@@ -28,6 +28,19 @@ parse ("if":xs) = do
 parse ("x":xs) = return (Var "x", xs)
 parse ("y":xs) = return (Var "y", xs)
 parse ("z":xs) = return (Var "z", xs)
+parse ("->":xs) = parse xs
+parse ("lambda":xs) =
+    let (id:xs1) = xs in do
+    (t1, xs2) <- parseType xs1
+    (e1, xs3) <- parse xs2
+    return (Abs id t1 e1, xs3)
+
+
+parseType :: [Token] -> Maybe (Type, [Token])
+parseType (":":xs) = parseType xs
+parseType ("Bool":xs) = return (Bool, xs)
+parseType ("Nat":xs) = return (Nat, xs)
+
 
 parseP :: String -> Expr
 parseP s = maybe (error "Parsing error") fst (parse (lexer s))
