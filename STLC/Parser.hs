@@ -6,9 +6,12 @@ import Syntax
 
 parse :: [Token] -> Maybe (Expr, [Token])
 
-parse ("True":xs) = return (True, xs)
-parse ("False":xs) = return (False, xs)
-parse ("Zero":xs) = return (Zero, xs)
+parse ("true":xs) = return (True, xs)
+parse ("false":xs) = return (False, xs)
+parse ("0":xs) = return (Zero, xs)
+parse ("succ":xs) = do
+    (e1, xs1) <- parse xs
+    return (Succ e1, xs1)
 parse ("then":xs) = parse xs
 parse ("else":xs) = parse xs
 parse ("if":xs) = do
@@ -25,7 +28,6 @@ parse ("if":xs) = do
 parse ("x":xs) = return (Var "x", xs)
 parse ("y":xs) = return (Var "y", xs)
 parse ("z":xs) = return (Var "z", xs)
--- parse ("succ":xs) = return (Succ (parse xs), xs)
 
 parseP :: String -> Expr
 parseP s = maybe (error "Parsing error") fst (parse (lexer s))

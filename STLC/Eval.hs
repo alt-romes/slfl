@@ -64,6 +64,3 @@ evalTyped e = if isJust (check e) then
 
 evalProg :: String -> String
 evalProg e = evalTyped $ parseP e
-
-checkProg :: String -> Maybe Type
-checkProg e = check $ parseP e

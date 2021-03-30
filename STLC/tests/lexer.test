@@ -1,2 +1,2 @@
-lexer "if True then True else False"
-lexer "teste de som if True then Else False else True"
+lexer "if true then true else false"
+lexer "teste de som if true then false else true"

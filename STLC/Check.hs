@@ -5,6 +5,7 @@ import Data.Maybe
 import Prelude hiding (True,False,Bool)
 
 import Syntax 
+import Parser
 
 type Env = [(Id,Type)]
 
@@ -148,3 +149,6 @@ typeOf ctxt (Project i e1) = do
 
 check :: Expr -> Maybe Type
 check = typeOf []
+
+checkProg :: String -> Maybe Type
+checkProg e = check $ parseP e
