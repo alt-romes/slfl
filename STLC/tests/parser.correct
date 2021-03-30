@@ -1,0 +1,7 @@
+True
+Zero
+Var "y"
+If True False True
+If (Var "x") True False
+If (If True False True) False True
+Leaving GHCi.

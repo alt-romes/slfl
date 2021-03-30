@@ -1,0 +1,6 @@
+parseP "True"
+parseP "Zero"
+parseP "y"
+parseP "if True then False else True"
+parseP "if x then True else False"
+parseP "if if True then False else True then False else True"
