@@ -43,6 +43,7 @@ parse (";->":xs) = do
     (e1, xs1) <- parse xs
     (e2, xs2) <- parse xs1
     return (Seqnc e1 e2, xs2)
+parse (".":xs) = parse xs
 
 
 parseType :: [Token] -> Maybe (Type, [Token])
