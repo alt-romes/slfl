@@ -38,6 +38,11 @@ parse ("!->":xs) = do
     (e1, xs1) <- parse xs
     (e2, xs2) <- parse xs1
     return (App e1 e2, xs2)
+parse ("unit":xs) = return (UnitV, xs)
+parse (";->":xs) = do
+    (e1, xs1) <- parse xs
+    (e2, xs2) <- parse xs1
+    return (Seqnc e1 e2, xs2)
 
 
 parseType :: [Token] -> Maybe (Type, [Token])
