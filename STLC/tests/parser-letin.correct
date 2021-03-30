@@ -1,0 +1,4 @@
+LetIn "x" False False
+LetIn "x" (If (Var "y") True False) (Var "x")
+LetIn "x" (If (Var "y") True False) (Abs "y" Bool (Var "x"))
+Leaving GHCi.

@@ -12,19 +12,11 @@ parse ("0":xs) = return (Zero, xs)
 parse ("succ":xs) = do
     (e1, xs1) <- parse xs
     return (Succ e1, xs1)
-parse ("then":xs) = parse xs
-parse ("else":xs) = parse xs
 parse ("if":xs) = do
-    (e1, xs1) <- parse xs
-    if head xs1 == "then" then do
-        (e2, xs2) <- parse xs1
-        if head xs2 == "else" then do
-            (e3, xs3) <- parse xs2
-            return (If e1 e2 e3, xs3)
-        else
-            Nothing
-    else
-        Nothing
+    (e1, "then":xs1) <- parse xs
+    (e2, "else":xs2) <- parse xs1
+    (e3, xs3) <- parse xs2
+    return (If e1 e2 e3, xs3)
 parse ("x":xs) = return (Var "x", xs)
 parse ("y":xs) = return (Var "y", xs)
 parse ("z":xs) = return (Var "z", xs)
@@ -44,6 +36,11 @@ parse (";->":xs) = do
     (e2, xs2) <- parse xs1
     return (Seqnc e1 e2, xs2)
 parse (".":xs) = parse xs
+parse ("let":xs) = 
+    let (id:("=":xs1)) = xs in do
+    (e1, "in":xs2) <- parse xs1
+    (e2, xs3) <- parse xs2
+    return (LetIn id e1 e2, xs3)
 
 
 parseType :: [Token] -> Maybe (Type, [Token])

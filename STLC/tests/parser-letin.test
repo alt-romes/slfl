@@ -1,0 +1,3 @@
+parseP "let x = false in false"
+parseP "let x = if y then true else false in x"
+parseP "let x = if y then true else false in lambda y : Bool -> x"
