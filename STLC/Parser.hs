@@ -1,63 +1,88 @@
 module Parser where
 
 import Prelude hiding (True,False,Bool)
-import Lexer
 import Syntax
 
-parse :: [Token] -> Maybe (Expr, [Token])
+import Text.Parsec
+import Data.List (elemIndex)
+import Data.Either
 
-parse ("true":xs) = return (True, xs)
-parse ("false":xs) = return (False, xs)
-parse ("0":xs) = return (Zero, xs)
-parse ("succ":xs) = do
-    (e1, xs1) <- parse xs
-    return (Succ e1, xs1)
-parse ("if":xs) = do
-    (e1, "then":xs1) <- parse xs
-    (e2, "else":xs2) <- parse xs1
-    (e3, xs3) <- parse xs2
-    return (If e1 e2 e3, xs3)
-parse ("x":xs) = return (Var "x", xs)
-parse ("y":xs) = return (Var "y", xs)
-parse ("z":xs) = return (Var "z", xs)
-parse ("->":xs) = parse xs
-parse ("lambda":xs) =
-    let (id:xs1) = xs in do
-    (t1, xs2) <- parseType xs1
-    (e1, xs3) <- parse xs2
-    return (Abs id t1 e1, xs3)
-parse ("!->":xs) = do
-    (e1, xs1) <- parse xs
-    (e2, xs2) <- parse xs1
-    return (App e1 e2, xs2)
-parse ("unit":xs) = return (UnitV, xs)
-parse (";->":xs) = do
-    (e1, xs1) <- parse xs
-    (e2, xs2) <- parse xs1
-    return (Seqnc e1 e2, xs2)
-parse (".":xs) = parse xs
-parse ("let":xs) = 
-    let (id:("=":xs1)) = xs in do
-    (e1, "in":xs2) <- parse xs1
-    (e2, xs3) <- parse xs2
-    return (LetIn id e1 e2, xs3)
+-- References:
+-- https://mattwetmore.me/posts/parsing-combinators-with-parser-combinators
+
+type BoundContext = [String] -- Use for 
+type Parser = Parsec String BoundContext Expr
+-- Para os tipos não preciso de user state, o que ponho aqui na definição de tipo? Pus ao calhas, porque não interessa e wildcard não funciona...
+type TypeParser = Parsec String BoundContext Type
+
+parseName :: Parsec String u String
+parseName = many1 letter
+
+-- parseFunc :: TypeParser
+-- parseFunc = do
 
 
-parseType :: [Token] -> Maybe (Type, [Token])
-parseType (":":xs) = parseType xs
-parseType ("Bool":xs) =
-    case xs of
-        ("-->":xs1) -> do
-            (t1, xs2) <- parseType xs1
-            return (Fun Bool t1, xs2)
-        _ -> return (Bool, xs)
-parseType ("Nat":xs) =
-    case xs of
-        ("-->":xs1) -> do
-            (t1, xs2) <- parseType xs1
-            return (Fun Nat t1, xs2)
-        _ -> return (Nat, xs)
+parseBool :: TypeParser
+parseBool = do
+    string "Bool"
+    return Bool
 
+parseNat :: TypeParser
+parseNat = do
+    string "Nat"
+    return Bool
 
+parseType :: TypeParser
+parseType = 
+        -- parseFunc <|>
+        parseBool <|> parseNat
+
+-- Foi o LSP que sugeriu esta syntax, não a percebi completamente
+parseVar :: Parser
+parseVar = Var <$> parseName
+
+-- "Usar" quando passar a *locally nameless*
+-- parseVar :: Parser
+-- parseVar = do
+--     v <- parseName
+--     list <- getState
+--     findVar v list
+-- findVar :: String -> BoundContext -> Parser
+-- findVar v list =
+--     case elemIndex v list of
+--         Nothing -> fail $ "Variable " ++ v ++ " not bound"
+--         Just n -> return $ BVar n -- n is "distance in lambdas from bound lambda" or something similar
+
+parseAbs :: Parser
+parseAbs = do
+    char 'λ'
+    v <- parseName
+    space
+    string "of"
+    space
+    t <- parseType
+    modifyState (v :) -- modifies user state of parser (BoundContext) to add the bound variable
+    space
+    string "->"
+    space
+    term <- parseExpr
+    modifyState tail  -- modifies user state of parser to remove the bound variable
+    return $ Abs v t term
+
+parens :: Parsec String u a -> Parsec String u a
+parens = between (char '(') (char ')')
+
+parseNonApp :: Parser
+parseNonApp = parens parseExpr -- (M)
+           <|> parseAbs        -- λx.M
+           <|> parseVar        -- x
+
+-- Pedir walkthrough do prof
+parseExpr :: Parser
+parseExpr = chainl1 parseNonApp $ do
+              space
+              return App
+
+-- parseP :: String -> Either ParseError Expr
 parseP :: String -> Expr
-parseP s = maybe (error "Parsing error") fst (parse (lexer s))
+parseP s = fromRight (error "Parsing error") $ runParser parseExpr [] "untyped lambda-calculus" s

@@ -1,5 +1,3 @@
-
-
 module Syntax where 
 
 import Data.List
@@ -9,12 +7,12 @@ type Id = String
 
 data Expr 
     = Var Id -- x
-    | App Expr Expr -- E1 E2
-    | Abs Id Type Expr -- lambda x:T . E
     | True
     | False
     | UnitV -- Unit value
     | Zero
+    | Abs Id Type Expr -- lambda x:T . E
+    | App Expr Expr -- E1 E2
     | Succ Expr
     | If Expr Expr Expr 
     | Seqnc Expr Expr -- t1;t2, evaluate t1 to unit followed by t2 = (\x : Unit . t2) t1
@@ -23,10 +21,18 @@ data Expr
     | PairV Expr Expr -- Pair value
     | First Expr
     | Second Expr
-  -- Prof tem de rever os tuples, parece-me que a minha implementação pode não ser a melhor :)
     | TupleV [Expr]
     | Project Int Expr
     deriving (Show, Eq)
+
+data Type 
+    = Fun Type Type -- T1 -> T2 
+    | Bool
+    | Nat
+    | Unit
+    | Pair Type Type -- T1 x T2
+    | Tuple [Type] -- T1 x T2 x T3 x T4 ...
+    deriving (Eq)
 
 -- No longer used
 -- isValue :: Expr -> Prelude.Bool
@@ -49,17 +55,6 @@ data Expr
 --     | False
 --     | Zero
 --     | Succ Expr
-
-    
-data Type 
-    = Fun Type Type -- T1 -> T2 
-    | Bool
-    | Nat
-    | Unit
-    | Pair Type Type -- T1 x T2
-    | Tuple [Type] -- T1 x T2 x T3 x T4 ...
-    deriving (Eq)
-
 
 instance (Show Type) where 
     show Bool = "Bool"
