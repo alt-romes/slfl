@@ -1,3 +1,0 @@
-App (Abs "x" Bool (If (Var "x") False False)) True
-Seqnc UnitV (If (Var "x") (Var "x") (Var "y"))
-Leaving GHCi.

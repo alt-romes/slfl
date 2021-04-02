@@ -89,10 +89,10 @@ parseAbs = do
 -- Isto parece ter um problema, como "True" tem prioridade sobre Var "True", não dá para escrever
 -- variáveis com letra grande a começar com T (etc...) porque ele está à espera de True
 parseConstant :: Parser
-parseConstant =  do {string "True"; return True}
-             <|> do {string "False"; return False}
+parseConstant =  do {string "true"; return True}
+             <|> do {string "false"; return False}
              <|> do {string "0"; return Zero}
-             <|> do {string "unit"; return UnitV}
+             <|> do {string "()"; return UnitV}
 
 
 parseIf :: Parser
@@ -110,8 +110,7 @@ parseIf = do
     If e1 e2 <$> parseExpr
 
 parseNonApp :: Parser
-parseNonApp = 
-            parens parseExpr -- (M)
+parseNonApp =  parens parseExpr -- (M)
            <|> parseAbs        -- λx.M
            <|> parseConstant   -- constants
            <|> parseIf         -- if expr then expr else epxr
@@ -124,7 +123,7 @@ parseNonApp =
 parseExpr :: Parser
 parseExpr = chainl1 parseNonApp $ try $ do
                 space
-                notFollowedBy $ string "then"
+                notFollowedBy $ string "then" -- seria bom ter um array de reserved words, em vez disto
                 notFollowedBy $ string "else"
                 return App
                -- Need a way to parse reserved words first to make sure something like:

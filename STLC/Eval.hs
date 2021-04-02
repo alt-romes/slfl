@@ -1,4 +1,3 @@
-
 module Eval where 
 
 import Data.Maybe

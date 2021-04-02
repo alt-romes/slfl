@@ -1,2 +1,0 @@
-parseP "!-> lambda x : Bool -> if x then false else false . true"
-parseP ";-> unit . if x then x else y"

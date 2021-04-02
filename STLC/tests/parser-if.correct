@@ -1,7 +1,8 @@
 True
-Zero
-Var "y"
 If True False True
 If (Var "x") True False
 If (If True False True) False True
+If (App (Abs "x" Bool (Var "x")) True) False True
+Abs "x" Bool (If (Var "x") False True)
+App (Abs "x" Bool (If (Var "x") False True)) True
 Leaving GHCi.
