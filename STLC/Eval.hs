@@ -8,7 +8,6 @@ import Check
 
 type EEnv = ([Expr], [(Id,Expr)]) -- Eval env (boundctxt, freectxt)
 
-
 eval :: EEnv -> Expr -> Expr
 eval _ True = True
 eval _ False = False
