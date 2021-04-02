@@ -1,0 +1,5 @@
+evalTyped (If True True False)
+evalTyped (If False True False)
+evalTyped (App (Abs Bool (If (BVar 0) True False)) True)
+evalTyped (App (Abs Bool (If (BVar 0) True False)) False)
+evalTyped (App (Abs Bool (If (BVar 0) (PairV True UnitV) (PairV False UnitV))) UnitV)

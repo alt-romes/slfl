@@ -1,5 +1,0 @@
-evalTyped (If True True False)
-evalTyped (If False True False)
-evalTyped (App (Abs "x" Bool (If (Var "x") True False)) True)
-evalTyped (App (Abs "x" Bool (If (Var "x") True False)) False)
-evalTyped (App (Abs "x" Bool (If (Var "x") (PairV True UnitV) (PairV False UnitV))) UnitV)
