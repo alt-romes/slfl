@@ -3,7 +3,6 @@ module Eval where
 
 import Data.Maybe
 import Prelude hiding (True,False,Bool)
-import Lexer
 import Parser
 import Syntax
 import Check
