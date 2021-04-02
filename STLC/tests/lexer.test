@@ -1,2 +1,0 @@
-lexer "if true then true else false"
-lexer "teste de som if true then false else true"

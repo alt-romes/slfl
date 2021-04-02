@@ -1,6 +1,0 @@
-UnitV
-Seqnc UnitV False
-Seqnc True False
-Seqnc (If True False False) False
-Seqnc UnitV (If True False False)
-Leaving GHCi.

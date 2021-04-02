@@ -49,11 +49,6 @@ type Parser = Parsec String BoundContext Expr
 parens :: Parsec String u a -> Parsec String u a
 parens = between (char '(') (char ')')
 
-ignoreReserved :: Parsec String BoundContext String
-ignoreReserved =  string "then"
-
-reservedWords = ["then", "else"]
-
 -- Foi o LSP que sugeriu esta syntax, não a percebi completamente
 parseVar :: Parser
 parseVar = Var <$> parseName
@@ -72,7 +67,7 @@ parseVar = Var <$> parseName
 
 parseAbs :: Parser
 parseAbs = do
-    char 'λ'
+    char 'λ' <|> char '\\'
     v <- parseName
     space
     char ':'
@@ -89,11 +84,10 @@ parseAbs = do
 -- Isto parece ter um problema, como "True" tem prioridade sobre Var "True", não dá para escrever
 -- variáveis com letra grande a começar com T (etc...) porque ele está à espera de True
 parseConstant :: Parser
-parseConstant =  do {string "true"; return True}
+parseConstant =  try $ do {string "true"; return True}
              <|> do {string "false"; return False}
              <|> do {string "0"; return Zero}
              <|> do {string "()"; return UnitV}
-
 
 parseIf :: Parser
 parseIf = do
@@ -110,9 +104,9 @@ parseIf = do
     If e1 e2 <$> parseExpr
 
 parseNonApp :: Parser
-parseNonApp =  parens parseExpr -- (M)
+parseNonApp =  parseConstant   -- constants
+           <|> parens parseExpr -- (M)
            <|> parseAbs        -- λx.M
-           <|> parseConstant   -- constants
            <|> parseIf         -- if expr then expr else epxr
            <|> parseVar        -- x
 
@@ -125,9 +119,11 @@ parseExpr = chainl1 parseNonApp $ try $ do
                 space
                 notFollowedBy $ string "then" -- seria bom ter um array de reserved words, em vez disto
                 notFollowedBy $ string "else"
-                return App
-               -- Need a way to parse reserved words first to make sure something like:
-               -- "if" construct (or else if True then ...) isn't an (App True (Var "then") ...)
+                seqncSymbol <- optionMaybe $ do {char ';'; space}
+                case seqncSymbol of
+                    Just _ -> return Seqnc
+                    Nothing -> return App -- if no sequence symbol is found, it's a normal operator
+                    -- this could probably be done in a better way...
 
 parsePE :: String -> Either ParseError Expr
 parsePE = runParser parseExpr [] "untyped lambda-calculus"

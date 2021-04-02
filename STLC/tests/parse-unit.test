@@ -1,5 +1,0 @@
-parseP "unit"
-parseP ";-> unit false"
-parseP ";-> true false"
-parseP ";-> if true then false else false false"
-parseP ";-> unit if true then false else false"
