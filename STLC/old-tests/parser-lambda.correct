@@ -1,4 +1,0 @@
-Abs "x" Bool (Var "x")
-Abs "x" Bool (If (Var "x") True False)
-Abs "x" Bool (Abs "y" Nat (If (Var "x") (Succ (Var "y")) (Succ (Succ (Succ (Var "y"))))))
-Leaving GHCi.

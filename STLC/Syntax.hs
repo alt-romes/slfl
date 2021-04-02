@@ -6,12 +6,13 @@ import Prelude hiding (True,False,Bool)
 type Id = String
 
 data Expr 
-    = Var Id -- x
+    = BVar Int -- bound variable
+    | FVar Id -- free variable
     | True
     | False
     | UnitV -- Unit value
     | Zero
-    | Abs Id Type Expr -- lambda x:T . E
+    | Abs Type Expr -- lambda x:T . E
     | App Expr Expr -- E1 E2
     | Succ Expr
     | If Expr Expr Expr 
@@ -33,28 +34,6 @@ data Type
     | Pair Type Type -- T1 x T2
     | Tuple [Type] -- T1 x T2 x T3 x T4 ...
     deriving (Eq)
-
--- No longer used
--- isValue :: Expr -> Prelude.Bool
--- isValue e =
---     case e of
---         False -> Prelude.True
---         True -> Prelude.True
---         UnitV -> Prelude.True
---         Zero -> Prelude.True
---         Succ _ -> Prelude.True
---         Abs {} -> Prelude.True
---         (PairV _ _) -> Prelude.True
---         TupleV _ -> Prelude.True
---         _ -> Prelude.False
-
-
--- data Value
---     = Abs Id Type Expr
---     | True
---     | False
---     | Zero
---     | Succ Expr
 
 instance (Show Type) where 
     show Bool = "Bool"

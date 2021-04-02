@@ -49,21 +49,18 @@ type Parser = Parsec String BoundContext Expr
 parens :: Parsec String u a -> Parsec String u a
 parens = between (char '(') (char ')')
 
--- Foi o LSP que sugeriu esta syntax, não a percebi completamente
-parseVar :: Parser
-parseVar = Var <$> parseName
-
 -- "Usar" quando passar a *locally nameless*
--- parseVar :: Parser
--- parseVar = do
---     v <- parseName
---     list <- getState
---     findVar v list
--- findVar :: String -> BoundContext -> Parser
--- findVar v list =
---     case elemIndex v list of
---         Nothing -> fail $ "Variable " ++ v ++ " not bound"
---         Just n -> return $ BVar n -- n is "distance in lambdas from bound lambda" or something similar
+parseVar :: Parser
+parseVar = do
+    v <- parseName
+    list <- getState
+    findVar v list
+findVar :: String -> BoundContext -> Parser
+findVar v list =
+    case elemIndex v list of
+    -- Foi o LSP que sugeriu esta syntax (<$>), não a percebi completamente (percebi o que substitui :))
+        Just n -> return $ BVar n -- n is "distance in lambdas from bound lambda" or something similar
+        Nothing -> return $ FVar v
 
 parseAbs :: Parser
 parseAbs = do
@@ -79,10 +76,8 @@ parseAbs = do
     space
     term <- parseExpr
     modifyState tail  -- modifies user state of parser to remove the bound variable
-    return $ Abs v t term
+    return $ Abs t term
 
--- Isto parece ter um problema, como "True" tem prioridade sobre Var "True", não dá para escrever
--- variáveis com letra grande a começar com T (etc...) porque ele está à espera de True
 parseConstant :: Parser
 parseConstant =  try $ do {string "true"; return True}
              <|> do {string "false"; return False}
@@ -104,11 +99,11 @@ parseIf = do
     If e1 e2 <$> parseExpr
 
 parseNonApp :: Parser
-parseNonApp =  parseConstant   -- constants
+parseNonApp =  parseConstant    -- constants
            <|> parens parseExpr -- (M)
-           <|> parseAbs        -- λx.M
-           <|> parseIf         -- if expr then expr else epxr
-           <|> parseVar        -- x
+           <|> parseAbs         -- λx.M
+           <|> parseIf          -- if expr then expr else epxr
+           <|> parseVar    -- bound var (w Bruijn index)
 
 -- Pedir walkthrough do prof
 -- edit2: passei horas a tentar fazer com que o chainl1 não "comesse" o espaço para o "then" e o "else"
@@ -128,6 +123,5 @@ parseExpr = chainl1 parseNonApp $ try $ do
 parsePE :: String -> Either ParseError Expr
 parsePE = runParser parseExpr [] "untyped lambda-calculus"
 
--- parseP :: String -> Either ParseError Expr
 parseP :: String -> Expr
 parseP s = fromRight (error "Parsing error") $ runParser parseExpr [] "untyped lambda-calculus" s

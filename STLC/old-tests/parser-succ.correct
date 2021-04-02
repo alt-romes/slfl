@@ -1,5 +1,0 @@
-Zero
-Succ Zero
-Succ (Succ Zero)
-Succ (Succ (Succ (Succ (Succ Zero))))
-Leaving GHCi.

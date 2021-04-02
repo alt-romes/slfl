@@ -1,4 +1,0 @@
-parseP "lambda x : Bool --> Bool -> x"
-parseP "lambda x : Nat --> Bool -> x"
-parseP "lambda x : Nat --> Nat --> Bool -> x"
-parseP "lambda x : Nat --> Nat --> Bool --> Bool --> Nat -> x"

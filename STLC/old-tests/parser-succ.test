@@ -1,4 +1,0 @@
-parseP "0"
-parseP "succ 0"
-parseP "succ succ 0"
-parseP "succ succ succ succ succ 0"
