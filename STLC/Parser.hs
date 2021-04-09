@@ -225,4 +225,3 @@ parseExpr = parse (contents expr) "<stdin>"
 
 -- parseP :: String -> Expr
 -- parseP s = fromRight (error "Parsing error") $ runParser parseExpr [] "untyped lambda-calculus" s
-
