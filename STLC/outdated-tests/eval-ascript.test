@@ -1,8 +1,0 @@
-evalTyped $ Ascript True Bool
-evalTyped $ Ascript False Bool
-evalTyped $ Ascript UnitV Unit
-evalTyped $ Ascript UnitV Bool
-evalTyped (App (Abs "x" Bool (Ascript (Var "x") Bool)) True)
-evalTyped (App (Abs "x" Bool (Ascript (Var "x") Bool)) False)
-evalTyped (App (Abs "x" Unit (Ascript (Var "x") Bool)) UnitV)
-evalTyped (App (Abs "x" Unit (Ascript (Var "x") Unit)) UnitV)

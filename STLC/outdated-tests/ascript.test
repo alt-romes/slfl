@@ -1,5 +1,0 @@
-check (Ascript UnitV Unit)
-check (Ascript False Unit)
-check (Ascript (App (Abs "x" Bool (If True UnitV UnitV)) True) Unit)
-check (Ascript (App (Abs "x" Bool (If True True True)) True) Unit)
-check (Ascript (App (Abs "x" Bool (If True True True)) True) Bool)

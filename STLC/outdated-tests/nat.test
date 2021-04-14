@@ -1,7 +1,0 @@
-check Zero
-check $ Succ Zero
-check $ Succ $ Succ Zero
-check $ App (Abs "x" Nat (Succ (Var "x"))) Zero
-check $ App (Abs "x" Nat (Succ (Var "x"))) (Succ Zero)
-check $ Succ True
-check $ Succ UnitV
