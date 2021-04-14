@@ -12,7 +12,9 @@ data Expr
     | False
     | UnitV -- Unit value
     | Zero
+    | IsZero Expr
     | Abs Type Expr -- lambda x:T . E
+    | AbsN Id Type Expr -- named abstraction
     | App Expr Expr -- E1 E2
     | Succ Expr
     | If Expr Expr Expr 

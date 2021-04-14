@@ -1,5 +1,4 @@
-import Parser2
-
+import Parser
 
 import Control.Monad.Trans 
 import System.Console.Haskeline 
