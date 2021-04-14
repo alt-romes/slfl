@@ -1,0 +1,2 @@
+check (LetIn "x" True (If (FVar "x") UnitV UnitV))
+check (LetIn "x" UnitV (If (FVar "x") UnitV UnitV))

@@ -1,5 +1,5 @@
-evalTyped $ Project 0 (App (Abs "x" (Tuple [Bool,Unit]) (Var "x")) (TupleV [False,UnitV]))
-evalTyped $ Project 1 (App (Abs "x" (Tuple [Bool,Unit]) (Var "x")) (TupleV [False,UnitV]))
+evalTyped $ Project 0 (App (Abs (Tuple [Bool,Unit]) (BVar 0)) (TupleV [False,UnitV]))
+evalTyped $ Project 1 (App (Abs (Tuple [Bool,Unit]) (BVar 0)) (TupleV [False,UnitV]))
 evalTyped $ TupleV [(If True False True),UnitV]
 evalTyped $ TupleV [False,UnitV,False,UnitV]
 evalTyped $ Project 3 $ TupleV [False,UnitV,False,UnitV]

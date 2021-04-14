@@ -1,0 +1,8 @@
+True
+If True False True
+If (FVar "x") True False
+If (If True False True) False True
+If (App (Abs Bool (BVar 0)) True) False True
+Abs Bool (If (BVar 0) False True)
+App (Abs Bool (If (BVar 0) False True)) True
+Leaving GHCi.

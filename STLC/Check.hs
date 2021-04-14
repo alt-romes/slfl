@@ -5,8 +5,9 @@ import Data.Maybe
 import Prelude hiding (True,False,Bool)
 
 import Syntax 
+import Parser
 
-type Env = [(Id,Type)]
+type Env = ([Type], [(Id,Type)]) -- (BoundContext, FreeContext)
 
 
 typeOf :: Env -> Expr -> Maybe Type
@@ -23,7 +24,8 @@ typeOf _ Zero = return Nat
 
 --   (x:T) in Gamma
 --   Gamma |- x : T
-typeOf ctxt (Var x) = lookup x ctxt
+typeOf ctxt (BVar x) = return $ fst ctxt !! x -- Bound variable
+typeOf ctxt (FVar x) = lookup x (snd ctxt)    -- Free variable
 
 -- Gamma |- t1 : Nat
 -- Gamma |- Succ t1 : Nat
@@ -49,8 +51,8 @@ typeOf ctxt (App e1 e2) = do
 -- lambda x:T1 . lambda x:T2 . x :: T1 -> T2 -> T2
 -- Gamma , x:T |- E : S 
 -- Gamma |- lambda x:T . E : T -> S
-typeOf ctxt (Abs x t e) = do
-    s <- typeOf ((x,t):ctxt) e
+typeOf (boundctxt, freectxt) (Abs t e) = do
+    s <- typeOf (t:boundctxt, freectxt) e
     return $ Fun t s
 
 
@@ -91,9 +93,9 @@ typeOf ctxt (Ascript e1 t2) = do
 -- Let; let x=t1 in t2
 -- Gamma |- t1 : T1     Gamma, t1 : T1 |- t2 : T2
 -- Gamma |- let x=t1 in t2 : T2
-typeOf ctxt (LetIn x e1 e2) = do
-    t1 <- typeOf ctxt e1
-    typeOf ((x,t1):ctxt) e2
+typeOf (boundctxt, freectxt) (LetIn x e1 e2) = do
+    t1 <- typeOf (boundctxt, freectxt) e1
+    typeOf (boundctxt, (x,t1):freectxt) e2
 
 
 -- Pair; {t1, t2}
@@ -147,4 +149,7 @@ typeOf ctxt (Project i e1) = do
 
 
 check :: Expr -> Maybe Type
-check = typeOf []
+check = typeOf ([], [])
+
+checkP :: String -> Maybe Type
+checkP e = check $ parseP e

@@ -1,2 +1,0 @@
-check (LetIn "x" True (If (Var "x") UnitV UnitV))
-check (LetIn "x" UnitV (If (Var "x") UnitV UnitV))

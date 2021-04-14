@@ -1,0 +1,5 @@
+parseP "x"
+parseP "λx : Bool -> x"
+parseP "(λx : Bool -> x) true"
+parseP "λx : Bool -> x true"
+parseP "λx : Bool -> λy : Bool -> y x (true false)"

@@ -5,7 +5,7 @@
 "Succ Zero"
 "Succ (Succ Zero)"
 "Succ (Succ (Succ Zero))"
-"Abs \"x\" Bool (Var \"x\")"
+"Abs Bool (BVar 0)"
 "False"
 "Succ Zero"
 "Succ (Succ Zero)"
