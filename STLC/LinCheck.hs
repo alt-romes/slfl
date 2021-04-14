@@ -1,4 +1,4 @@
-
+module LinCheck where
 
 type Name = String 
 
