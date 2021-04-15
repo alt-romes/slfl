@@ -36,6 +36,9 @@ data CoreExpr
     | BangValue CoreExpr
     | LetBang CoreExpr CoreExpr
 
+    -- Non-canonical
+
+    -- Bool
     | Tru
     | Fls
 

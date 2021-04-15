@@ -9,13 +9,10 @@ import CoreSyntax
 
 data Expr
 
-    = BLVar Int             -- bound linear/restricted var
-    | BUVar Int             -- bound unrestricted var
-    -- TODO: assume free variables to be unrestricted? free variables in linear logic ??
-    -- | FVar String        -- free variable 
+    = Var String
 
     -- A -o B
-    | Abs Type Expr     -- \x:T -> M . with Bruijn indices
+    | Abs String Type Expr     -- \x:T -> M . with Bruijn indices
     | App Expr Expr     -- M N
 
     -- A (*) B
@@ -38,10 +35,14 @@ data Expr
 
     -- !A
     | BangValue Expr
-    | LetBang Expr Expr
+    | LetBang String Expr Expr
 
+    -- Non-canonical
+
+    -- Bool
     | Tru
     | Fls
 
     -- Added sugar :)
+    | IfThenElse Expr Expr Expr
     | LetIn String Expr Expr

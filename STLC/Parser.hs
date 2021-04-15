@@ -3,158 +3,20 @@ module Parser where
 import Prelude hiding (True,False,Bool)
 
 import Lexer
+import CoreSyntax
 import Syntax
 
 import Text.Parsec
 import Text.Parsec.String 
 import qualified Text.Parsec.Expr as Ex 
 
--- import Data.List (elemIndex)
--- import Data.Either
-
--- type BoundContext = [String] -- Use for 
-
-
-
--- --- Types
-
--- -- Para os tipos não preciso de user state, o que ponho aqui na definição de tipo? Pus ao calhas, porque não interessa e wildcard não funciona...
--- type TypeParser = Parsec String BoundContext Type
-
--- parseName :: Parsec String u String
--- parseName = many1 letter
-
--- -- parseTypeFunc :: TypeParser
--- -- parseTypeFunc = do
-
--- parseTypeBool :: TypeParser
--- parseTypeBool = do
---     string "Bool"
---     return Bool
-
--- parseTypeNat :: TypeParser
--- parseTypeNat = do
---     string "Nat"
---     return Bool
-
--- parseType :: TypeParser
--- parseType = 
---         -- parseFunc <|>
---         parseTypeBool <|> parseTypeNat
-
-
-
--- --- Expressions
-
--- -- type Parser = Parsec String BoundContext Expr
-
--- -- parens :: Parsec String u a -> Parsec String u a
--- -- parens = between (char '(') (char ')')
-
--- -- "Usar" quando passar a *locally nameless*
--- parseVar :: Parser
--- parseVar = do
---     v <- parseName
---     list <- getState
---     findVar v list
--- findVar :: String -> BoundContext -> Parser
--- findVar v list =
---     case elemIndex v list of
---     -- Foi o LSP que sugeriu esta syntax (<$>), não a percebi completamente (percebi o que substitui :))
---         Just n -> return $ BVar n -- n is "distance in lambdas from bound lambda" or something similar
---         Nothing -> return $ FVar v
-
--- parseAbs :: Parser
--- parseAbs = do
---     char 'λ' <|> char '\\'
---     v <- parseName
---     space
---     char ':'
---     space
---     t <- parseType
---     modifyState (v :) -- modifies user state of parser (BoundContext) to add the bound variable
---     space
---     string "->"
---     space
---     term <- parseExpr
---     modifyState tail  -- modifies user state of parser to remove the bound variable
---     return $ Abs t term
-
--- parseConstant :: Parser
--- parseConstant =  try $ do {string "true"; return True}
---              <|> do {string "false"; return False}
---              <|> do {string "0"; return Zero}
---              <|> do {string "()"; return UnitV}
-
--- parseIf :: Parser
--- parseIf = do
---     string "if"
---     space
---     e1 <- parseExpr
---     space
---     string "then"
---     space
---     e2 <- parseExpr
---     space
---     string "else"
---     space
---     If e1 e2 <$> parseExpr
-
--- parseNonApp :: Parser
--- parseNonApp =  parseConstant    -- constants
---            <|> parens parseExpr -- (M)
---            <|> parseAbs         -- λx.M
---            <|> parseIf          -- if expr then expr else epxr
---            <|> parseVar    -- bound var (w Bruijn index)
-
-
 
 -- Parsing Expressions
 
-
-
-unit :: Parser Expr 
-unit = reserved "()" >> return UnitV
-
-pair :: Parser Expr 
-pair = do 
-    reserved "("
-    e1 <- expr 
-    reservedOp ","
-    e2 <- expr 
-    reserved ")"
-    return $ PairV e1 e2 
-
-proj :: Parser Expr 
-proj = 
-    do 
-    reserved "fst"
-    First <$> expr
-    <|>
-    do 
-    reserved "snd"
-    Second <$> expr
-
 variable :: Parser Expr 
-variable = FVar <$> identifier
+variable = Var <$> identifier
 
-num :: Parser Expr 
-num =
-    (reserved "Z" >> return Zero)
-    <|> do 
-        reserved "succ"
-        Succ <$> expr
-
-isZero :: Parser Expr 
-isZero = do
-    reserved "isZero"
-    IsZero <$> expr
-
-bool :: Parser Expr 
-bool =  (reserved "True" >> return True)
-    <|> (reserved "False" >> return False)
-    <|> isZero 
-
+-- A -o B
 lambda :: Parser Expr 
 lambda = do 
     reservedOp "\\"
@@ -162,28 +24,177 @@ lambda = do
     reservedOp ":"
     t <- type' 
     reservedOp "."
-    AbsN x t <$> expr
+    Syntax.Abs x t <$> expr
 
+-- A (*) B
+tensor :: Parser Expr
+tensor = do
+    e1 <- expr
+    reservedOp "(*)"
+    Syntax.TensorValue e1 <$> expr
+
+lettensor :: Parser Expr
+lettensor = do
+    reserved "let"
+    n1 <- identifier
+    reservedOp "(*)"
+    n2 <- identifier
+    reservedOp "="
+    e1 <- expr
+    reserved "in"
+    Syntax.LetTensor n1 n2 e1 <$> expr
+
+-- 1
+unit :: Parser Expr 
+unit = reserved "<>" >> return Syntax.UnitValue
+
+letunit :: Parser Expr
+letunit = do
+    reserved "let"
+    reserved "<>"
+    reservedOp "="
+    e1 <- expr
+    reserved "in"
+    Syntax.LetUnit e1 <$> expr
+
+-- A & B
+with :: Parser Expr 
+with = do 
+    e1 <- expr 
+    reservedOp "&"
+    Syntax.WithValue e1 <$> expr
+
+proj :: Parser Expr 
+proj = 
+    do 
+    reserved "fst"
+    Syntax.Fst <$> expr
+    <|>
+    do 
+    reserved "snd"
+    Syntax.Snd <$> expr
+
+-- A (+) B
+plus :: Parser Expr
+plus =
+    do -- i.e:  inl True / Bool, inr <> / Bool
+    reserved "inl"
+    e1 <- expr
+    reservedOp "/" -- after the / comes the other type
+    t1 <- type'
+    return $ Syntax.InjL t1 e1
+    <|> 
+    do -- i.e:  inl Bool / True, inr Bool / <>
+    reserved "inr"
+    t1 <- type'
+    reservedOp "/" -- before the / comes the other type
+    Syntax.InjR t1 <$> expr
+
+caseplus = do
+    reserved "case"
+    e1 <- expr
+    reserved "of"
+    reserved "inl"
+    i1 <- identifier
+    reservedOp "=>"
+    e2 <- expr
+    reservedOp "|"
+    reserved "inr"
+    i2 <- identifier
+    reservedOp "=>"
+    Syntax.CaseOfPlus e1 i1 e2 i2 <$> expr
+
+
+-- !A
+bang :: Parser Expr
+bang = do
+    reserved "!"
+    Syntax.BangValue <$> expr
+
+letbang :: Parser Expr
+letbang = do
+    reserved "let"
+    reserved "!"
+    i1 <- identifier
+    reservedOp "="
+    e1 <- expr
+    reserved "in"
+    Syntax.LetBang i1 e1 <$> expr
+
+-- Bool
+bool :: Parser Expr 
+bool =  (reserved "True" >> return Syntax.Tru)
+    <|> (reserved "False" >> return Syntax.Fls)
+    -- <|> isZero 
+
+
+
+-- Parsing sugar expressions
+
+-- if M then N else P
 ite :: Parser Expr 
 ite = do
     reserved "if"
     cond <- expr 
-    reservedOp "then"
+    reserved "then"
     tr <- expr 
     reserved "else"
-    If cond tr <$> expr
+    IfThenElse cond tr <$> expr
+
+-- let x = M in N
+letin :: Parser Expr
+letin = do
+    reserved "let"
+    i1 <- identifier
+    reserved "="
+    e1 <- expr
+    reserved "in"
+    LetIn i1 e1 <$> expr
+
+
+-- num :: Parser Expr 
+-- num =
+--     (reserved "Z" >> return Zero)
+--     <|> do 
+--         reserved "succ"
+--         Succ <$> expr
+
+-- isZero :: Parser Expr 
+-- isZero = do
+--     reserved "isZero"
+--     IsZero <$> expr
+
+
+
 
 aexp :: Parser Expr 
 aexp = parens expr 
-     <|> ite 
-     <|> lambda 
-     <|> bool 
-     <|> isZero
-     <|> num 
      <|> variable
-     <|> proj 
-     <|> pair 
-     <|> unit 
+
+     <|> lambda 
+
+     <|> tensor
+     <|> lettensor
+
+     <|> unit
+     <|> letunit
+
+     <|> with
+     <|> proj
+
+     <|> plus
+     <|> caseplus
+
+     <|> bang
+     <|> letbang
+
+     <|> bool 
+
+     <|> ite 
+     <|> letin
+
+     -- <|> isZero
+     -- <|> num 
 
 expr :: Parser Expr 
 expr = aexp >>= \x -> 
@@ -191,7 +202,7 @@ expr = aexp >>= \x ->
 -- uma lista de expressões que vão ser associadas à esquerda uma a uma
 -- pelo fold ao x e sendo assim "Acumuladas" 
 -- para no final retornar a AST
-             (many1 aexp >>= \xs -> return (foldl App x xs))
+             (many1 aexp >>= \xs -> return (foldl Syntax.App x xs))
              <|> return x
 
 
@@ -201,18 +212,23 @@ ty :: Parser Type
 ty = tylit <|> parens type'
 
 tylit :: Parser Type 
-tylit =     (reservedOp "Bool" >> return Bool)
-        <|> (reservedOp "Nat"  >> return Nat )
-        <|> (reservedOp "Unit" >> return Unit)
+tylit =     (reservedOp "1" >> return Unit)
+        <|> (reservedOp "Bool" >> return Bool)
+        -- <|> (reservedOp "Nat"  >> return Nat )
 
 -- prof só tenho a dizer ...---...
+-- EDIT: agora já percebi um bocadinho mais +-
 type' :: Parser Type 
 type' = Ex.buildExpressionParser tyops ty
     where 
         infixOp x f = Ex.Infix (reservedOp x >> return f)
-        tyops = [ 
-            [infixOp "->" Fun Ex.AssocRight, infixOp "," Pair Ex.AssocLeft]
-                ]
+        tyops = [[
+            infixOp "-o" Fun Ex.AssocRight,
+            infixOp "(*)" Tensor Ex.AssocLeft,
+            infixOp "&" With Ex.AssocLeft,
+            infixOp "(+)" Plus Ex.AssocLeft
+            -- Prefix op ! ??
+            ]]
 
 
 -- Toplevel
