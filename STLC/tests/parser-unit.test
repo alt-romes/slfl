@@ -1,7 +1,0 @@
-parseP "()"
-parseP "() ; false"
-parseP "() ; (() ; ())"
-parseP "if () then false else (false ())"
-parseP "() ; ((if () then () else ()))"
-parseP "() ; ((false)) true"
-parseP "() ; ((false)) ; true"

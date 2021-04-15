@@ -1,0 +1,6 @@
+parseExpr "<a*b>"
+parseExpr "< a * b >"
+parseExpr "< a * <b*c> >"
+parseExpr "let x * y = <a*b> in c"
+parseExpr "let x * y = a in b"
+parseExpr "let x * y = a in <x*y>"

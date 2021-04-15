@@ -1,6 +1,6 @@
 module Parser where
 
-import Prelude hiding (True,False,Bool)
+import Prelude hiding (Bool)
 
 import Lexer
 import CoreSyntax
@@ -19,25 +19,28 @@ variable = Var <$> identifier
 -- A -o B
 lambda :: Parser Expr 
 lambda = do 
-    reservedOp "\\"
+    (reservedOp "\\" <|> reservedOp "λ")
     x <- identifier
     reservedOp ":"
     t <- type' 
-    reservedOp "."
+    reservedOp "->"
     Syntax.Abs x t <$> expr
 
 -- A (*) B
 tensor :: Parser Expr
 tensor = do
+    reservedOp "<"
     e1 <- expr
-    reservedOp "(*)"
-    Syntax.TensorValue e1 <$> expr
+    reservedOp "*"
+    e2 <- expr
+    reservedOp ">"
+    return $ Syntax.TensorValue e1 e2 
 
 lettensor :: Parser Expr
 lettensor = do
     reserved "let"
     n1 <- identifier
-    reservedOp "(*)"
+    reservedOp "*"
     n2 <- identifier
     reservedOp "="
     e1 <- expr
@@ -46,12 +49,12 @@ lettensor = do
 
 -- 1
 unit :: Parser Expr 
-unit = reserved "<>" >> return Syntax.UnitValue
+unit = reserved "<>" >> return Syntax.UnitValue -- TODO : <<><*><>> breaks...
 
 letunit :: Parser Expr
 letunit = do
     reserved "let"
-    reserved "<>"
+    reservedOp "_"
     reservedOp "="
     e1 <- expr
     reserved "in"
@@ -60,9 +63,12 @@ letunit = do
 -- A & B
 with :: Parser Expr 
 with = do 
+    reserved "<"
     e1 <- expr 
     reservedOp "&"
-    Syntax.WithValue e1 <$> expr
+    e2 <- expr
+    reserved ">"
+    return $ Syntax.WithValue e1 e2
 
 proj :: Parser Expr 
 proj = 
@@ -128,7 +134,6 @@ bool =  (reserved "True" >> return Syntax.Tru)
     -- <|> isZero 
 
 
-
 -- Parsing sugar expressions
 
 -- if M then N else P
@@ -166,10 +171,8 @@ letin = do
 
 
 
-
 aexp :: Parser Expr 
-aexp = parens expr 
-     <|> variable
+aexp =   parens expr 
 
      <|> lambda 
 
@@ -192,6 +195,8 @@ aexp = parens expr
 
      <|> ite 
      <|> letin
+
+     <|> variable
 
      -- <|> isZero
      -- <|> num 
@@ -235,6 +240,10 @@ type' = Ex.buildExpressionParser tyops ty
 
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"
+
+-- parsePE bool "True"
+parsePE :: Parser Expr -> String -> Either ParseError Expr
+parsePE p = parse p []
 
 -- parsePE :: String -> Either ParseError Expr
 -- parsePE = runParser parseExpr [] "untyped lambda-calculus"

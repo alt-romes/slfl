@@ -46,3 +46,5 @@ data Expr
     -- Added sugar :)
     | IfThenElse Expr Expr Expr
     | LetIn String Expr Expr
+
+    deriving (Show)

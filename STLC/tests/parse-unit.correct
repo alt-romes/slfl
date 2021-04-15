@@ -1,0 +1,6 @@
+Right UnitValue
+Right (TensorValue UnitValue UnitValue)
+Right (TensorValue UnitValue UnitValue)
+Right (TensorValue UnitValue UnitValue)
+Left "<stdin>" (line 1, column 3):
+Leaving GHCi.

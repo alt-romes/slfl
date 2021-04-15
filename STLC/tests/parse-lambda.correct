@@ -1,0 +1,10 @@
+Right (Abs "x" 1 (Var "x"))
+Right (Abs "x" 1 (Var "x"))
+Right (Abs "x" Bool (Var "x"))
+Right (Abs "x" Bool (Var "x"))
+Right (Abs "x" Bool (Var "x"))
+Right (Abs "x" Bool (Abs "y" 1 (Var "y")))
+Right (Abs "x" (Bool -o Bool) (Abs "y" 1 (Var "y")))
+Right (Abs "x" (Bool -o Bool) (Abs "y" 1 (App (Var "x") (Var "y"))))
+Right (Abs "x" (Bool -o Bool) (Abs "y" Bool (App (Var "x") (Var "y"))))
+Leaving GHCi.
