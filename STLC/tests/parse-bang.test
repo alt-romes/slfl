@@ -1,0 +1,2 @@
+parseExpr "!b"
+parseExpr "let !a = b in c"

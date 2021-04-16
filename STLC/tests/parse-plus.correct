@@ -1,0 +1,10 @@
+Right (InjL Bool (Var "A"))
+Right (InjL Bool (App (Var "a") (TensorValue (Var "a") (Var "b"))))
+Right (App (InjL Bool (Var "a")) (TensorValue (Var "a") (Var "b")))
+Right (InjL Bool (App (InjL Bool (Var "a")) (TensorValue (Var "a") (Var "b"))))
+Right (InjR Bool (App (InjL Bool (Var "a")) (TensorValue (Var "a") (Var "b"))))
+Right (InjR (Bool -o Bool) (Var "a"))
+Right (CaseOfPlus (Var "a") "b" (Var "c") "d" (Var "e"))
+Right (CaseOfPlus (Var "a") "b" (CaseOfPlus (Var "f") "g" (Var "h") "i" (Var "j")) "d" (Var "e"))
+Right (CaseOfPlus (InjL Bool (Var "a")) "b" (Var "c") "d" (Var "e"))
+Leaving GHCi.

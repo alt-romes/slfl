@@ -55,11 +55,11 @@ letunitpattern = do
 -- A & B
 with :: Parser Expr 
 with = do 
-    reserved "<"
+    reservedOp "<"
     e1 <- expr 
     reservedOp "&"
     e2 <- expr
-    reserved ">"
+    reservedOp ">"
     return $ Syntax.WithValue e1 e2
 
 proj :: Parser Expr 
@@ -75,17 +75,18 @@ proj =
 -- A (+) B
 plus :: Parser Expr
 plus =
-    do -- i.e:  inl True / Bool, inr <> / Bool
+    -- TODO: How to merge into 1 do block?
+    do
     reserved "inl"
     e1 <- expr
-    reservedOp "/" -- after the / comes the other type
+    reservedOp ":"
     t1 <- type'
     return $ Syntax.InjL t1 e1
     <|> 
-    do -- i.e:  inl Bool / True, inr Bool / <>
+    do
     reserved "inr"
     t1 <- type'
-    reservedOp "/" -- before the / comes the other type
+    reservedOp ":"
     Syntax.InjR t1 <$> expr
 
 caseplus = do
@@ -102,16 +103,15 @@ caseplus = do
     reservedOp "=>"
     Syntax.CaseOfPlus e1 i1 e2 i2 <$> expr
 
-
 -- !A
 bang :: Parser Expr
 bang = do
-    reserved "!"
+    reservedOp "!"
     Syntax.BangValue <$> expr
 
 letbangpattern :: Parser Pattern
 letbangpattern = do
-    reserved "!"
+    reservedOp "!"
     BangPattern <$> identifier
 
 -- Bool
@@ -175,9 +175,9 @@ aexp =   parens expr
 
      <|> lambda 
 
-     <|> tensor
+     <|> try tensor -- try tensor because "with" is also between "< >"... looks unclear - seria melhor outra opção :)
 
-     <|> unit
+     <|> unit -- not correctly parsing <<>*<>>
 
      <|> with
      <|> proj
