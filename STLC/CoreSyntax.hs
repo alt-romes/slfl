@@ -34,7 +34,7 @@ data CoreExpr
 
     -- !A
     | BangValue CoreExpr
-    | LetBang CoreExpr CoreExpr
+    | LetBang String CoreExpr CoreExpr
 
     -- Non-canonical
 

@@ -1,4 +1,9 @@
-module LinCheck where
+module TypeCheck where
+
+import CoreSyntax
+
+typecheck :: CoreExpr -> Type
+typecheck = error "hi"
 
 type Name = String 
 
