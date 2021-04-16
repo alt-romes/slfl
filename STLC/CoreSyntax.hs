@@ -7,8 +7,8 @@ data CoreExpr
 
     = BLVar Int             -- bound linear/restricted var
     | BUVar Int             -- bound unrestricted var
-    -- TODO: assume free variables to be unrestricted? free variables in linear logic ??
-    -- | FVar String        -- free variable 
+    | FLVar Int             -- free linear/restricted var
+    | FUVar Int             -- free unrestricted var
 
     -- A -o B
     | Abs Type CoreExpr     -- \x:T -> M . with Bruijn indices
@@ -38,6 +38,8 @@ data CoreExpr
 
     -- Non-canonical
 
+    | IfThenElse CoreExpr CoreExpr CoreExpr
+
     -- Bool
     | Tru
     | Fls
@@ -58,9 +60,9 @@ data Type
 
 instance (Show Type) where 
     show (Fun t1 t2) = "(" ++ show t1 ++ " -o " ++ show t2 ++ ")"
-    show (Tensor t1 t2) = show t1 ++ " (*) " ++ show t2
+    show (Tensor t1 t2) = show t1 ++ " * " ++ show t2
     show Unit = "1"
     show (With t1 t2) = show t1 ++ " & " ++ show t2
-    show (Plus t1 t2) = show t1 ++ " (+) " ++ show t2
+    show (Plus t1 t2) = show t1 ++ " + " ++ show t2
     show (Bang t1) = "!" ++ show t1
     show Bool = "Bool"

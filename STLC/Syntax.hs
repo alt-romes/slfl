@@ -39,12 +39,21 @@ data Expr
 
     -- Non-canonical
 
+    | IfThenElse Expr Expr Expr
+
     -- Bool
     | Tru
     | Fls
 
     -- Added sugar :)
-    | IfThenElse Expr Expr Expr
     | LetIn String Expr Expr
 
     deriving (Show)
+
+
+data Pattern
+    = TensorPattern String String
+    | UnitPattern
+    | BangPattern String
+    
+    | VanillaPattern String

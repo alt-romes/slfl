@@ -10,6 +10,7 @@ import Text.Parsec
 import Text.Parsec.String 
 import qualified Text.Parsec.Expr as Ex 
 
+import Debug.Trace
 
 -- Parsing Expressions
 
@@ -19,7 +20,7 @@ variable = Var <$> identifier
 -- A -o B
 lambda :: Parser Expr 
 lambda = do 
-    (reservedOp "\\" <|> reservedOp "λ")
+    reservedOp "\\" <|> reservedOp "λ"
     x <- identifier
     reservedOp ":"
     t <- type' 
@@ -36,29 +37,20 @@ tensor = do
     reservedOp ">"
     return $ Syntax.TensorValue e1 e2 
 
-lettensor :: Parser Expr
-lettensor = do
-    reserved "let"
-    n1 <- identifier
+lettensorpattern :: Parser Pattern
+lettensorpattern = do
+    i1 <- identifier
     reservedOp "*"
-    n2 <- identifier
-    reservedOp "="
-    e1 <- expr
-    reserved "in"
-    Syntax.LetTensor n1 n2 e1 <$> expr
+    TensorPattern i1 <$> identifier
 
 -- 1
 unit :: Parser Expr 
 unit = reserved "<>" >> return Syntax.UnitValue -- TODO : <<><*><>> breaks...
 
-letunit :: Parser Expr
-letunit = do
-    reserved "let"
-    reservedOp "_"
-    reservedOp "="
-    e1 <- expr
-    reserved "in"
-    Syntax.LetUnit e1 <$> expr
+letunitpattern :: Parser Pattern
+letunitpattern = do
+    reserved "_"
+    return UnitPattern
 
 -- A & B
 with :: Parser Expr 
@@ -117,24 +109,34 @@ bang = do
     reserved "!"
     Syntax.BangValue <$> expr
 
-letbang :: Parser Expr
-letbang = do
-    reserved "let"
+letbangpattern :: Parser Pattern
+letbangpattern = do
     reserved "!"
-    i1 <- identifier
-    reservedOp "="
-    e1 <- expr
-    reserved "in"
-    Syntax.LetBang i1 e1 <$> expr
+    BangPattern <$> identifier
 
 -- Bool
 bool :: Parser Expr 
-bool =  (reserved "True" >> return Syntax.Tru)
-    <|> (reserved "False" >> return Syntax.Fls)
+bool = (reserved "True" >> return Syntax.Tru)
+   <|> (reserved "False" >> return Syntax.Fls)
     -- <|> isZero 
 
+letexp :: Parser Expr
+letexp = do
+    reserved "let"
+    pat <- letpattern
+    reserved "="
+    e1 <- expr
+    reserved "in"
+    e2 <- expr
+    case pat of
+        TensorPattern i1 i2 -> return $ Syntax.LetTensor i1 i2 e1 e2
+        UnitPattern -> return $ Syntax.LetUnit e1 e2
+        BangPattern i1 -> return $ Syntax.LetBang i1 e1 e2
+        VanillaPattern i1 -> return $ Syntax.LetIn i1 e1 e2
 
--- Parsing sugar expressions
+letpattern :: Parser Pattern
+letpattern = do
+    try lettensorpattern <|> try letunitpattern <|> try letbangpattern <|> letinpattern
 
 -- if M then N else P
 ite :: Parser Expr 
@@ -144,17 +146,14 @@ ite = do
     reserved "then"
     tr <- expr 
     reserved "else"
-    IfThenElse cond tr <$> expr
+    Syntax.IfThenElse cond tr <$> expr
+
+
+-- Parsing sugar expressions
 
 -- let x = M in N
-letin :: Parser Expr
-letin = do
-    reserved "let"
-    i1 <- identifier
-    reserved "="
-    e1 <- expr
-    reserved "in"
-    LetIn i1 e1 <$> expr
+letinpattern :: Parser Pattern
+letinpattern = VanillaPattern <$> identifier
 
 
 -- num :: Parser Expr 
@@ -177,10 +176,8 @@ aexp =   parens expr
      <|> lambda 
 
      <|> tensor
-     <|> lettensor
 
      <|> unit
-     <|> letunit
 
      <|> with
      <|> proj
@@ -189,12 +186,12 @@ aexp =   parens expr
      <|> caseplus
 
      <|> bang
-     <|> letbang
+
+     <|> letexp
 
      <|> bool 
 
      <|> ite 
-     <|> letin
 
      <|> variable
 
