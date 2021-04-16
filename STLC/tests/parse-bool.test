@@ -1,0 +1,4 @@
+parseExpr "True"
+parseExpr "False"
+parseExpr "False True"
+parseExpr "if True then False else True"

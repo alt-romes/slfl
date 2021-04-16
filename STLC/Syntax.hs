@@ -3,9 +3,6 @@ module Syntax where
 import Prelude hiding (Bool)
 import CoreSyntax
 
--- References
--- https://www.microsoft.com/en-us/research/wp-content/uploads/2016/11/trees-that-grow.pdf
--- como não me repetir ao definir a sugared e desugared AST ? :)
 
 data Expr
 
