@@ -1,0 +1,7 @@
+TensorValue (FLVar "a") (FLVar "b")
+TensorValue (FLVar "a") (FLVar "b")
+TensorValue (FLVar "a") (TensorValue (FLVar "b") (FLVar "c"))
+LetTensor "x" "y" (TensorValue (FLVar "a") (FLVar "b")) (FLVar "c")
+LetTensor "x" "y" (FLVar "a") (FLVar "b")
+LetTensor "x" "y" (FLVar "a") (TensorValue (FLVar "x") (FLVar "y"))
+Leaving GHCi.

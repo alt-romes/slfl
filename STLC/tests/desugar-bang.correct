@@ -1,0 +1,3 @@
+BangValue (FLVar "b")
+LetBang "a" (FLVar "b") (FLVar "c")
+Leaving GHCi.

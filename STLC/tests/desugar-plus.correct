@@ -1,0 +1,10 @@
+InjL Bool (FLVar "A")
+InjL Bool (App (FLVar "a") (TensorValue (FLVar "a") (FLVar "b")))
+App (InjL Bool (FLVar "a")) (TensorValue (FLVar "a") (FLVar "b"))
+InjL Bool (App (InjL Bool (FLVar "a")) (TensorValue (FLVar "a") (FLVar "b")))
+InjR Bool (App (InjL Bool (FLVar "a")) (TensorValue (FLVar "a") (FLVar "b")))
+InjR (Bool -o Bool) (FLVar "a")
+CaseOfPlus (FLVar "a") "b" (FLVar "c") "d" (FLVar "e")
+CaseOfPlus (FLVar "a") "b" (CaseOfPlus (FLVar "f") "g" (FLVar "h") "i" (FLVar "j")) "d" (FLVar "e")
+CaseOfPlus (InjL Bool (FLVar "a")) "b" (FLVar "c") "d" (FLVar "e")
+Leaving GHCi.

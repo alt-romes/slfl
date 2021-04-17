@@ -4,35 +4,37 @@ import CoreSyntax
 import Syntax
 import TypeCheck
 
-desugar :: Expr -> CoreExpr
+type Ctxt = [(String, Int)]
 
--- desugar (Var id)
+desugar :: Desugar.Ctxt -> Expr -> CoreExpr
 
--- desugar (Abs id t e) =
--- desugar (App e1 e2)
+desugar ctxt (Var id) = maybe (FLVar id) BLVar (lookup id ctxt)
 
-desugar (Syntax.TensorValue e1 e2) = CoreSyntax.TensorValue (desugar e1) (desugar e2)
-desugar (Syntax.LetTensor i1 i2 e1 e2) = CoreSyntax.LetTensor i1 i2 (desugar e1) (desugar e2)
+desugar ctxt (Syntax.Abs id t e) = CoreSyntax.Abs t (desugar ((id, length ctxt):ctxt) e)
+desugar ctxt (Syntax.App e1 e2) = CoreSyntax.App (desugar ctxt e1) (desugar ctxt e2)
 
-desugar Syntax.UnitValue = CoreSyntax.UnitValue
-desugar (Syntax.LetUnit e1 e2) = CoreSyntax.LetUnit (desugar e1) (desugar e2)
+desugar ctxt (Syntax.TensorValue e1 e2) = CoreSyntax.TensorValue (desugar ctxt e1) (desugar ctxt e2)
+desugar ctxt (Syntax.LetTensor i1 i2 e1 e2) = CoreSyntax.LetTensor i1 i2 (desugar ctxt e1) (desugar ctxt e2)
 
-desugar (Syntax.WithValue e1 e2) = CoreSyntax.WithValue (desugar e1) (desugar e2)
-desugar (Syntax.Fst e) = CoreSyntax.Fst $ desugar e
-desugar (Syntax.Snd e) = CoreSyntax.Snd $ desugar e
+desugar ctxt Syntax.UnitValue = CoreSyntax.UnitValue
+desugar ctxt (Syntax.LetUnit e1 e2) = CoreSyntax.LetUnit (desugar ctxt e1) (desugar ctxt e2)
 
-desugar (Syntax.InjL t e) = CoreSyntax.InjL t $ desugar e
-desugar (Syntax.InjR t e) = CoreSyntax.InjR t $ desugar e
-desugar (Syntax.CaseOfPlus ep i1 e1 i2 e2) = CoreSyntax.CaseOfPlus (desugar ep) i1 (desugar e1) i2 (desugar e2)
+desugar ctxt (Syntax.WithValue e1 e2) = CoreSyntax.WithValue (desugar ctxt e1) (desugar ctxt e2)
+desugar ctxt (Syntax.Fst e) = CoreSyntax.Fst $ desugar ctxt e
+desugar ctxt (Syntax.Snd e) = CoreSyntax.Snd $ desugar ctxt e
 
-desugar (Syntax.BangValue e) = CoreSyntax.BangValue $ desugar e
-desugar (Syntax.LetBang id e1 e2) = CoreSyntax.LetBang id (desugar e1) (desugar e2)
+desugar ctxt (Syntax.InjL t e) = CoreSyntax.InjL t $ desugar ctxt e
+desugar ctxt (Syntax.InjR t e) = CoreSyntax.InjR t $ desugar ctxt e
+desugar ctxt (Syntax.CaseOfPlus ep i1 e1 i2 e2) = CoreSyntax.CaseOfPlus (desugar ctxt ep) i1 (desugar ctxt e1) i2 (desugar ctxt e2)
 
-desugar (Syntax.IfThenElse e1 e2 e3) = CoreSyntax.IfThenElse (desugar e1) (desugar e2) (desugar e3)
+desugar ctxt (Syntax.BangValue e) = CoreSyntax.BangValue $ desugar ctxt e
+desugar ctxt (Syntax.LetBang id e1 e2) = CoreSyntax.LetBang id (desugar ctxt e1) (desugar ctxt e2)
 
-desugar Syntax.Tru = CoreSyntax.Tru
-desugar Syntax.Fls = CoreSyntax.Fls
+desugar ctxt (Syntax.IfThenElse e1 e2 e3) = CoreSyntax.IfThenElse (desugar ctxt e1) (desugar ctxt e2) (desugar ctxt e3)
 
-desugar (LetIn id e1 e2) =
-    let des1 = desugar e1 in
-        CoreSyntax.App (desugar $ Syntax.Abs id (typecheck des1) e2) des1
+desugar ctxt Syntax.Tru = CoreSyntax.Tru
+desugar ctxt Syntax.Fls = CoreSyntax.Fls
+
+desugar ctxt (LetIn id e1 e2) =
+    let des1 = desugar ctxt e1 in
+        CoreSyntax.App (desugar ctxt $ Syntax.Abs id (typecheck des1) e2) des1

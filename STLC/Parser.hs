@@ -10,6 +10,7 @@ import Text.Parsec
 import Text.Parsec.String 
 import qualified Text.Parsec.Expr as Ex 
 
+import Data.Either
 import Debug.Trace
 
 -- Parsing Expressions
@@ -238,12 +239,5 @@ type' = Ex.buildExpressionParser tyops ty
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"
 
--- parsePE bool "True"
-parsePE :: Parser Expr -> String -> Either ParseError Expr
-parsePE p = parse p []
-
--- parsePE :: String -> Either ParseError Expr
--- parsePE = runParser parseExpr [] "untyped lambda-calculus"
-
--- parseP :: String -> Expr
--- parseP s = fromRight (error "Parsing error") $ runParser parseExpr [] "untyped lambda-calculus" s
+rightParseExpr :: String -> Expr
+rightParseExpr s = fromRight (error "error parsing") $ parseExpr s

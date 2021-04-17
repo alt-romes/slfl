@@ -7,8 +7,8 @@ data CoreExpr
 
     = BLVar Int             -- bound linear/restricted var
     | BUVar Int             -- bound unrestricted var
-    | FLVar Int             -- free linear/restricted var
-    | FUVar Int             -- free unrestricted var
+    | FLVar String          -- free linear/restricted var
+    | FUVar String          -- free unrestricted var
 
     -- A -o B
     | Abs Type CoreExpr     -- \x:T -> M . with Bruijn indices
@@ -43,6 +43,7 @@ data CoreExpr
     -- Bool
     | Tru
     | Fls
+    deriving (Show)
 
 
 data Type

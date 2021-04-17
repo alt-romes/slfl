@@ -1,0 +1,6 @@
+pdesugar "<a*b>"
+pdesugar "< a * b >"
+pdesugar "< a * <b*c> >"
+pdesugar "let x * y = <a*b> in c"
+pdesugar "let x * y = a in b"
+pdesugar "let x * y = a in <x*y>"
