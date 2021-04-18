@@ -1,9 +1,10 @@
 import CoreSyntax
 import Parser
 import Desugar
-import Control.Monad.Reader
+import LinearSequentCheck
 
 import Data.Either
+import Control.Monad.Reader
 
 import Control.Monad.Trans 
 import System.Console.Haskeline 
@@ -30,3 +31,6 @@ main = runInputT defaultSettings loop
 
 pdesugar :: String -> CoreExpr
 pdesugar s = runReader (desugar $ rightParseExpr s) []
+
+pcheck :: String -> Type
+pcheck s = typecheck $ pdesugar s

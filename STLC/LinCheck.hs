@@ -7,7 +7,7 @@ type Ctxt = [(String,Type)]
 -- Delta |- M : A 
 -- DeltaI / DeltaO |- M : A
  
-check :: Ctxt -> CoreExpr -> Maybe (Type , Ctxt) 
+check :: Ctxt -> CoreExpr -> Maybe (Type , Ctxt)
 
 -- Delta1 |- e1 : A     Delta2 |- e2 : B
 ------------------------------------------
@@ -38,7 +38,9 @@ check ctx (TensorValue e1 e2) = do
 --     case m of
 --         Nothing -> Just (Fun t1 t2 , ctx1)
 --         _ -> Nothing
-    
+
+
+
 
 
 -------------------------
@@ -116,9 +118,6 @@ check ctx (LetTensor x y e1 e2) = do
 check ctx (LetUnit e1 e2) = do
     (Unit, ctx1) <- check ctx e1 
     check ctx1 e2 
-    
-
-
 
 
 
@@ -136,6 +135,7 @@ check ctx (LetUnit e1 e2) = do
 
 check ctxt Tru = return (Bool, ctxt)
 check ctxt Fls = return (Bool, ctxt)
+
 
 
 -- top level
