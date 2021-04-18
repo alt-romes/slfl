@@ -16,7 +16,7 @@ data CoreExpr
 
     -- A (*) B
     | TensorValue CoreExpr CoreExpr
-    | LetTensor String String CoreExpr CoreExpr
+    | LetTensor CoreExpr CoreExpr
 
     -- 1
     | UnitValue
@@ -30,11 +30,11 @@ data CoreExpr
     -- A (+) B
     | InjL Type CoreExpr    -- inr:A M : A (+) typeof M
     | InjR Type CoreExpr    -- inl:B M : typeof M (+) A
-    | CaseOfPlus CoreExpr String CoreExpr String CoreExpr -- case M of inl x => N | inr y => P : C
+    | CaseOfPlus CoreExpr CoreExpr CoreExpr -- case M of inl x => N | inr y => P : C
 
     -- !A
     | BangValue CoreExpr
-    | LetBang String CoreExpr CoreExpr
+    | LetBang CoreExpr CoreExpr
 
     -- Non-canonical
 

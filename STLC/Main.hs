@@ -1,6 +1,7 @@
 import CoreSyntax
 import Parser
 import Desugar
+import Control.Monad.Reader
 
 import Data.Either
 
@@ -28,4 +29,4 @@ main = runInputT defaultSettings loop
 -- run as module
 
 pdesugar :: String -> CoreExpr
-pdesugar s = desugar [] $ rightParseExpr s
+pdesugar s = runReader (desugar $ rightParseExpr s) []
