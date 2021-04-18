@@ -1,2 +1,2 @@
 pdesugar "!b"
-pdesugar "let !a = b in c"
+pdesugar "let !a = b in c a"
