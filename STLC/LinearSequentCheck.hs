@@ -48,15 +48,14 @@ sequentcheck gam del (BangValue e) = do
 --     (t2, gam2, del2) <- sequentcheck gam (t1:bdel, fdel) e
 --     return (Fun t1 t2, gam2, del2)
 
+--  hypothesis - correto ?
 sequentcheck gam del Tru = return (Bool, del)
 sequentcheck gam del Fls = return (Bool, del)
-
 
 
 -- focuscheck :: Ctxt -> Ctxt -> Ctxt -> Bool -> CoreExpr -> Maybe (Type, Ctxt, Ctxt, Ctxt)
 
 -- focuscheck cgam cdel comg (TensorValue e1 e2) True = Nothing
-
 
 
 -- top level
