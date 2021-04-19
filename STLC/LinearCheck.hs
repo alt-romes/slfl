@@ -1,4 +1,4 @@
-module LinearSequentCheck where
+module LinearCheck where
 
 import CoreSyntax
 

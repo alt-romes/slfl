@@ -2,12 +2,9 @@ module Desugar where
 
 import CoreSyntax
 import Syntax
-import LinearSequentCheck
+import LinearCheck 
 
 import Control.Monad.Reader
-
-type Name = String
-type Index = Int
 
 
 -- Acho que seria bom falarmos sobre isto mais um bocado professor,

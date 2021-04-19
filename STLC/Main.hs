@@ -1,7 +1,7 @@
 import CoreSyntax
 import Parser
 import Desugar
-import LinearSequentCheck
+import LinearCheck
 
 import Data.Either
 import Control.Monad.Reader
