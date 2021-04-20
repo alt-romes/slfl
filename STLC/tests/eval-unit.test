@@ -1,5 +1,0 @@
-evalTyped (Seqnc UnitV True)
-evalTyped (Seqnc UnitV False)
-evalTyped (Seqnc False UnitV)
-evalTyped (App (Abs Bool (Seqnc UnitV (BVar 0))) False)
-evalTyped (App (Abs Bool (Seqnc UnitV (BVar 0))) True)

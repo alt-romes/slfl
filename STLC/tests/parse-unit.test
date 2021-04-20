@@ -1,0 +1,7 @@
+parseExpr "<>"
+parseExpr "< <> * <> >"
+parseExpr "< <> * <>>"
+parseExpr "< <>* <>>"
+parseExpr "<<>*<>>"
+parseExpr "let _ = a in b"
+parseExpr "let _ = let _ = c in d in b"

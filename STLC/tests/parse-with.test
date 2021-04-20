@@ -1,0 +1,8 @@
+parseExpr "<a&b>"
+parseExpr "< a & b >"
+parseExpr "< a&b >"
+parseExpr "fst <a&b>"
+parseExpr "fst (fst a fst a)"
+parseExpr "fst (fst a) fst a"
+parseExpr "snd (fst a) snd a"
+parseExpr "snd (snd a) snd a"

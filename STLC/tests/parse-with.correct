@@ -1,0 +1,9 @@
+Right (WithValue (Var "a") (Var "b"))
+Right (WithValue (Var "a") (Var "b"))
+Right (WithValue (Var "a") (Var "b"))
+Right (Fst (WithValue (Var "a") (Var "b")))
+Right (Fst (Fst (App (Var "a") (Fst (Var "a")))))
+Right (Fst (App (Fst (Var "a")) (Fst (Var "a"))))
+Right (Snd (App (Fst (Var "a")) (Snd (Var "a"))))
+Right (Snd (App (Snd (Var "a")) (Snd (Var "a"))))
+Leaving GHCi.

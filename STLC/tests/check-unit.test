@@ -1,6 +1,0 @@
-check UnitV
-check (Seqnc UnitV False)
-check (Seqnc UnitV UnitV)
-check (Seqnc False False)
-check (Seqnc (App (Abs Unit (BVar 0)) UnitV) False)
-check (Seqnc (App (Abs Unit (BVar 0)) UnitV) (Abs Unit True))

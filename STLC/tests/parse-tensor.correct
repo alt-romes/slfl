@@ -1,0 +1,7 @@
+Right (TensorValue (Var "a") (Var "b"))
+Right (TensorValue (Var "a") (Var "b"))
+Right (TensorValue (Var "a") (TensorValue (Var "b") (Var "c")))
+Right (LetTensor "x" "y" (TensorValue (Var "a") (Var "b")) (Var "c"))
+Right (LetTensor "x" "y" (Var "a") (Var "b"))
+Right (LetTensor "x" "y" (Var "a") (TensorValue (Var "x") (Var "y")))
+Leaving GHCi.

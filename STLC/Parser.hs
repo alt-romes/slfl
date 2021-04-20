@@ -1,189 +1,204 @@
 module Parser where
 
-import Prelude hiding (True,False,Bool)
+import Prelude hiding (Bool)
 
 import Lexer
+import CoreSyntax
 import Syntax
 
 import Text.Parsec
 import Text.Parsec.String 
 import qualified Text.Parsec.Expr as Ex 
 
--- import Data.List (elemIndex)
--- import Data.Either
-
--- type BoundContext = [String] -- Use for 
-
-
-
--- --- Types
-
--- -- Para os tipos não preciso de user state, o que ponho aqui na definição de tipo? Pus ao calhas, porque não interessa e wildcard não funciona...
--- type TypeParser = Parsec String BoundContext Type
-
--- parseName :: Parsec String u String
--- parseName = many1 letter
-
--- -- parseTypeFunc :: TypeParser
--- -- parseTypeFunc = do
-
--- parseTypeBool :: TypeParser
--- parseTypeBool = do
---     string "Bool"
---     return Bool
-
--- parseTypeNat :: TypeParser
--- parseTypeNat = do
---     string "Nat"
---     return Bool
-
--- parseType :: TypeParser
--- parseType = 
---         -- parseFunc <|>
---         parseTypeBool <|> parseTypeNat
-
-
-
--- --- Expressions
-
--- -- type Parser = Parsec String BoundContext Expr
-
--- -- parens :: Parsec String u a -> Parsec String u a
--- -- parens = between (char '(') (char ')')
-
--- -- "Usar" quando passar a *locally nameless*
--- parseVar :: Parser
--- parseVar = do
---     v <- parseName
---     list <- getState
---     findVar v list
--- findVar :: String -> BoundContext -> Parser
--- findVar v list =
---     case elemIndex v list of
---     -- Foi o LSP que sugeriu esta syntax (<$>), não a percebi completamente (percebi o que substitui :))
---         Just n -> return $ BVar n -- n is "distance in lambdas from bound lambda" or something similar
---         Nothing -> return $ FVar v
-
--- parseAbs :: Parser
--- parseAbs = do
---     char 'λ' <|> char '\\'
---     v <- parseName
---     space
---     char ':'
---     space
---     t <- parseType
---     modifyState (v :) -- modifies user state of parser (BoundContext) to add the bound variable
---     space
---     string "->"
---     space
---     term <- parseExpr
---     modifyState tail  -- modifies user state of parser to remove the bound variable
---     return $ Abs t term
-
--- parseConstant :: Parser
--- parseConstant =  try $ do {string "true"; return True}
---              <|> do {string "false"; return False}
---              <|> do {string "0"; return Zero}
---              <|> do {string "()"; return UnitV}
-
--- parseIf :: Parser
--- parseIf = do
---     string "if"
---     space
---     e1 <- parseExpr
---     space
---     string "then"
---     space
---     e2 <- parseExpr
---     space
---     string "else"
---     space
---     If e1 e2 <$> parseExpr
-
--- parseNonApp :: Parser
--- parseNonApp =  parseConstant    -- constants
---            <|> parens parseExpr -- (M)
---            <|> parseAbs         -- λx.M
---            <|> parseIf          -- if expr then expr else epxr
---            <|> parseVar    -- bound var (w Bruijn index)
-
-
+import Data.Either
+import Debug.Trace
 
 -- Parsing Expressions
 
+variable :: Parser Expr 
+variable = Var <$> identifier
 
+-- A -o B
+lambda :: Parser Expr 
+lambda = do 
+    reservedOp "\\" <|> reservedOp "λ"
+    x <- identifier
+    reservedOp ":"
+    t <- type' 
+    reservedOp "->"
+    Syntax.Abs x t <$> expr
 
+-- A (*) B
+tensor :: Parser Expr
+tensor = do
+    reservedOp "<"
+    e1 <- expr
+    reservedOp "*"
+    e2 <- expr
+    reservedOp ">"
+    return $ Syntax.TensorValue e1 e2 
+
+lettensorpattern :: Parser Pattern
+lettensorpattern = do
+    i1 <- identifier
+    reservedOp "*"
+    TensorPattern i1 <$> identifier
+
+-- 1
 unit :: Parser Expr 
-unit = reserved "()" >> return UnitV
+unit = reserved "<>" >> return Syntax.UnitValue -- TODO : <<><*><>> breaks...
 
-pair :: Parser Expr 
-pair = do 
-    reserved "("
+letunitpattern :: Parser Pattern
+letunitpattern = do
+    reserved "_"
+    return UnitPattern
+
+-- A & B
+with :: Parser Expr 
+with = do 
+    reservedOp "<"
     e1 <- expr 
-    reservedOp ","
-    e2 <- expr 
-    reserved ")"
-    return $ PairV e1 e2 
+    reservedOp "&"
+    e2 <- expr
+    reservedOp ">"
+    return $ Syntax.WithValue e1 e2
 
 proj :: Parser Expr 
 proj = 
     do 
     reserved "fst"
-    First <$> expr
+    Syntax.Fst <$> expr
     <|>
     do 
     reserved "snd"
-    Second <$> expr
+    Syntax.Snd <$> expr
 
-variable :: Parser Expr 
-variable = FVar <$> identifier
-
-num :: Parser Expr 
-num =
-    (reserved "Z" >> return Zero)
-    <|> do 
-        reserved "succ"
-        Succ <$> expr
-
-isZero :: Parser Expr 
-isZero = do
-    reserved "isZero"
-    IsZero <$> expr
-
-bool :: Parser Expr 
-bool =  (reserved "True" >> return True)
-    <|> (reserved "False" >> return False)
-    <|> isZero 
-
-lambda :: Parser Expr 
-lambda = do 
-    reservedOp "\\"
-    x <- identifier
+-- A (+) B
+plus :: Parser Expr
+plus =
+    -- TODO: How to merge into 1 do block?
+    do
+    reserved "inl"
+    e1 <- expr
     reservedOp ":"
-    t <- type' 
-    reservedOp "."
-    AbsN x t <$> expr
+    t1 <- type'
+    return $ Syntax.InjL t1 e1
+    <|> 
+    do
+    reserved "inr"
+    t1 <- type'
+    reservedOp ":"
+    Syntax.InjR t1 <$> expr
 
+caseplus = do
+    reserved "case"
+    e1 <- expr
+    reserved "of"
+    reserved "inl"
+    i1 <- identifier
+    reservedOp "=>"
+    e2 <- expr
+    reservedOp "|"
+    reserved "inr"
+    i2 <- identifier
+    reservedOp "=>"
+    Syntax.CaseOfPlus e1 i1 e2 i2 <$> expr
+
+-- !A
+bang :: Parser Expr
+bang = do
+    reservedOp "!"
+    Syntax.BangValue <$> expr
+
+letbangpattern :: Parser Pattern
+letbangpattern = do
+    reservedOp "!"
+    BangPattern <$> identifier
+
+-- Bool
+bool :: Parser Expr 
+bool = (reserved "True" >> return Syntax.Tru)
+   <|> (reserved "False" >> return Syntax.Fls)
+    -- <|> isZero 
+
+letexp :: Parser Expr
+letexp = do
+    reserved "let"
+    pat <- letpattern
+    reserved "="
+    e1 <- expr
+    reserved "in"
+    e2 <- expr
+    case pat of
+        TensorPattern i1 i2 -> return $ Syntax.LetTensor i1 i2 e1 e2
+        UnitPattern -> return $ Syntax.LetUnit e1 e2
+        BangPattern i1 -> return $ Syntax.LetBang i1 e1 e2
+        VanillaPattern i1 -> return $ Syntax.LetIn i1 e1 e2
+
+letpattern :: Parser Pattern
+letpattern = do
+    try lettensorpattern <|> try letunitpattern <|> try letbangpattern <|> letinpattern
+
+-- if M then N else P
 ite :: Parser Expr 
 ite = do
     reserved "if"
     cond <- expr 
-    reservedOp "then"
+    reserved "then"
     tr <- expr 
     reserved "else"
-    If cond tr <$> expr
+    Syntax.IfThenElse cond tr <$> expr
+
+
+-- Parsing sugar expressions
+
+-- let x = M in N
+letinpattern :: Parser Pattern
+letinpattern = VanillaPattern <$> identifier
+
+
+-- num :: Parser Expr 
+-- num =
+--     (reserved "Z" >> return Zero)
+--     <|> do 
+--         reserved "succ"
+--         Succ <$> expr
+
+-- isZero :: Parser Expr 
+-- isZero = do
+--     reserved "isZero"
+--     IsZero <$> expr
+
+pairepxr :: Parser Expr
+pairepxr = try tensor -- try tensor because "with" is also between "< >"... looks unclear - seria melhor outra opção :)
+        <|> try with
 
 aexp :: Parser Expr 
-aexp = parens expr 
-     <|> ite 
+aexp =   parens expr 
+
      <|> lambda 
+
+     <|> pairepxr
+
+     <|> unit -- not correctly parsing <<>*<>>
+
+     <|> proj
+
+     <|> plus
+     <|> caseplus
+
+     <|> bang
+
+     <|> letexp
+
      <|> bool 
-     <|> isZero
-     <|> num 
+
+     <|> ite 
+
      <|> variable
-     <|> proj 
-     <|> pair 
-     <|> unit 
+
+     -- <|> isZero
+     -- <|> num 
 
 expr :: Parser Expr 
 expr = aexp >>= \x -> 
@@ -191,7 +206,7 @@ expr = aexp >>= \x ->
 -- uma lista de expressões que vão ser associadas à esquerda uma a uma
 -- pelo fold ao x e sendo assim "Acumuladas" 
 -- para no final retornar a AST
-             (many1 aexp >>= \xs -> return (foldl App x xs))
+             (many1 aexp >>= \xs -> return (foldl Syntax.App x xs))
              <|> return x
 
 
@@ -201,18 +216,23 @@ ty :: Parser Type
 ty = tylit <|> parens type'
 
 tylit :: Parser Type 
-tylit =     (reservedOp "Bool" >> return Bool)
-        <|> (reservedOp "Nat"  >> return Nat )
-        <|> (reservedOp "Unit" >> return Unit)
+tylit =     (reservedOp "1" >> return Unit)
+        <|> (reservedOp "Bool" >> return Bool)
+        -- <|> (reservedOp "Nat"  >> return Nat )
 
 -- prof só tenho a dizer ...---...
+-- EDIT: agora já percebi um bocadinho mais +-
 type' :: Parser Type 
 type' = Ex.buildExpressionParser tyops ty
     where 
         infixOp x f = Ex.Infix (reservedOp x >> return f)
-        tyops = [ 
-            [infixOp "->" Fun Ex.AssocRight, infixOp "," Pair Ex.AssocLeft]
-                ]
+        tyops = [[
+            infixOp "-o" Fun Ex.AssocRight,
+            infixOp "(*)" Tensor Ex.AssocLeft,
+            infixOp "&" With Ex.AssocLeft,
+            infixOp "(+)" Plus Ex.AssocLeft
+            -- Prefix op ! ??
+            ]]
 
 
 -- Toplevel
@@ -220,9 +240,5 @@ type' = Ex.buildExpressionParser tyops ty
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"
 
--- parsePE :: String -> Either ParseError Expr
--- parsePE = runParser parseExpr [] "untyped lambda-calculus"
-
--- parseP :: String -> Expr
--- parseP s = fromRight (error "Parsing error") $ runParser parseExpr [] "untyped lambda-calculus" s
-
+rightParseExpr :: String -> Expr
+rightParseExpr s = fromRight (error "error parsing") $ parseExpr s

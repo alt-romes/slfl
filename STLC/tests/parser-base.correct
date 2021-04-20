@@ -1,6 +1,0 @@
-FVar "x"
-Abs Bool (BVar 0)
-App (Abs Bool (BVar 0)) True
-Abs Bool (App (BVar 0) True)
-Abs Bool (Abs Bool (App (App (BVar 0) (BVar 1)) (App True False)))
-Leaving GHCi.
