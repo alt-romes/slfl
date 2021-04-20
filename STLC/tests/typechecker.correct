@@ -1,0 +1,33 @@
+*Main> (Bool -o Bool)
+(Bool -o Bool)
+((Bool -o Bool) -o Bool)
+(Bool -o Bool)
+Bool
+(Bool -o Bool)
+Bool
+Bool
+*Main> Bool * Bool
+Bool * Bool
+Bool
+Bool
+Bool
+(Bool -o Bool)
+Bool
+*Main> 1
+Bool
+1
+Bool
+*Main> Bool & Bool
+(Bool -o Bool) & Bool
+(Bool -o Bool)
+Bool
+*Main> Bool + 1
+Bool + Bool
+1 + Bool
+Bool + 1
+*Main> *Main> !Bool
+(Bool * Bool -o Bool * Bool)
+Bool * Bool
+*Main> Bool
+Bool
+Leaving GHCi.

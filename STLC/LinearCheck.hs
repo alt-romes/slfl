@@ -109,7 +109,7 @@ lincheck depth gam del (CaseOfPlus e1 e2 e3) = do
     (Plus t1 t2, (bdel', fdel')) <- lincheck depth gam del e1
     (t3, del3) <- lincheck (depth+1) gam ((depth, t1):bdel', fdel') e2
     (t4, del4) <- lincheck (depth+1) gam ((depth, t2):bdel', fdel') e3
-    if t3 == t4 && del3 == del4
+    if t3 == t4 && del3 == del4 -- TODO: This comparison is wrong almost for sure
        then return (t4, del4)
        else Nothing
 
@@ -136,8 +136,8 @@ lincheck depth gam del Fls = return (Bool, del)
 lincheck depth gam del (IfThenElse e1 e2 e3) = do
     (Bool, del1) <- lincheck depth gam del e1
     (t2, del2) <- lincheck depth gam del1 e2
-    (t3, del3) <- lincheck depth gam del1 e2
-    if t2 == t3 && del2 == del3
+    (t3, del3) <- lincheck depth gam del1 e3
+    if t2 == t3 -- TODO: como é que aqui o linear funciona? ...
        then return (t3, del3)
        else Nothing
 
