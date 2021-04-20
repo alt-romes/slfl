@@ -30,11 +30,12 @@ pcheck "inl True : 1"
 pcheck "inl True : Bool"
 pcheck "inr 1 : True"
 pcheck "inr Bool : <>"
--- TODO caseof
+pcheck "case inl True : Bool of inl b => True | inr f => True"
 -- !
 pcheck "!True"
 pcheck "let !x = (!True) in (\\x : Bool * Bool -> x)"
 pcheck "let !x = (!True) in < x * x >"
+pcheck "let x = !True in < x & x >"
 -- the rest
 pcheck "True"
 pcheck "False"

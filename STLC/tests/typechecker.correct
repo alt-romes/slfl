@@ -25,9 +25,11 @@ Bool
 Bool + Bool
 1 + Bool
 Bool + 1
-*Main> *Main> !Bool
+Bool
+*Main> !Bool
 (Bool * Bool -o Bool * Bool)
 Bool * Bool
+!Bool & !Bool
 *Main> Bool
 Bool
 Leaving GHCi.
