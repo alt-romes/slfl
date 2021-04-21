@@ -2,11 +2,9 @@ module Desugar where
 
 import CoreSyntax
 import Syntax
+import LinearCheck 
 
 import Control.Monad.Reader
-
-type Name = String
-type Index = Int
 
 
 -- Acho que seria bom falarmos sobre isto mais um bocado professor,
@@ -98,12 +96,6 @@ desugar = desugar' 0
             abs <- desugar' n (Syntax.Abs id (typecheck e1') e2)
             return $ CoreSyntax.App abs e1'
 
-
--- placeholder 
-typecheck :: CoreExpr -> Type
-typecheck CoreSyntax.Tru = Bool
-typecheck CoreSyntax.Fls = Bool
-typecheck _ = error "placeholder used"
 
 -- type Ctxt = [(String, Int)]
 

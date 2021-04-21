@@ -1,0 +1,41 @@
+-- -o
+pcheck "(\\x : Bool -> x)"
+pcheck "(\\x : Bool -> True)"
+pcheck "(\\x : Bool -o Bool -> x True)"
+pcheck "(\\x : Bool -> True)"
+pcheck "(\\x : Bool -o Bool -> x True) (\\x : Bool -> x)"
+pcheck "(\\x : Bool -o Bool -> (\\y : Bool -> y)) (\\x : Bool -> x)"
+pcheck "(\\x : Bool -o Bool -> (\\y : Bool -> y)) (\\x : Bool -> x) True"
+pcheck "(\\x : Bool -o Bool -> (\\y : Bool -> y)) (\\x : Bool -> x) True"
+-- *
+pcheck "<True * False>"
+pcheck "let x * y = <True * False> in <(\\x : Bool -> False) x * y>"
+pcheck "let x * y = <True * False> in (\\x : Bool -> False) x"
+pcheck "let x * y = <True * False> in (\\x : Bool -> False) x"
+pcheck "let x * y = <(\\x : Bool -> True) * False> in x y"
+pcheck "let x * y = <(\\x : Bool -> True) * False> in x"
+pcheck "let x * y = <(\\x : Bool -> True) * False> in y"
+-- 1
+pcheck "<>"
+pcheck "let _ = <> in True"
+pcheck "let _ = (\\x : Bool -> <>) False in <>"
+pcheck "let _ = (\\x : Bool -> <>) False in False"
+-- &
+pcheck "<True & False>"
+pcheck "< (\\x : Bool -> x) & False>"
+pcheck "fst < (\\x : Bool -> x) & False>"
+pcheck "snd < (\\x : Bool -> x) & False>"
+-- +
+pcheck "inl True : 1"
+pcheck "inl True : Bool"
+pcheck "inr 1 : True"
+pcheck "inr Bool : <>"
+pcheck "case inl True : Bool of inl b => True | inr f => True"
+-- !
+pcheck "!True"
+pcheck "let !x = (!True) in (\\x : Bool * Bool -> x)"
+pcheck "let !x = (!True) in < x * x >"
+pcheck "let x = !True in < x & x >"
+-- the rest
+pcheck "True"
+pcheck "False"

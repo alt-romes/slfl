@@ -228,9 +228,9 @@ type' = Ex.buildExpressionParser tyops ty
         infixOp x f = Ex.Infix (reservedOp x >> return f)
         tyops = [[
             infixOp "-o" Fun Ex.AssocRight,
-            infixOp "(*)" Tensor Ex.AssocLeft,
+            infixOp "*" Tensor Ex.AssocLeft,
             infixOp "&" With Ex.AssocLeft,
-            infixOp "(+)" Plus Ex.AssocLeft
+            infixOp "+" Plus Ex.AssocLeft
             -- Prefix op ! ??
             ]]
 
