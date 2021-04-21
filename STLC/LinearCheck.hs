@@ -109,7 +109,7 @@ lincheck depth gam del (CaseOfPlus e1 e2 e3) = do
     (Plus t1 t2, (bdel', fdel')) <- lincheck depth gam del e1
     (t3, del3) <- lincheck (depth+1) gam ((depth, t1):bdel', fdel') e2
     (t4, del4) <- lincheck (depth+1) gam ((depth, t2):bdel', fdel') e3
-    if t3 == t4 && equalCtxts del3 del4
+    if t3 == t4 && del3 == del4
        then return (t4, del4)
        else Nothing
 
@@ -127,9 +127,8 @@ lincheck depth (bgam, fgam) del (LetBang e1 e2) = do
     lincheck (depth+1) ((depth, t1):bgam, fgam) del2 e2
 
 
---- ? ----------------------
+--- Bool -------------------
 
--- Onde é que estas regras se enquadram? Como é que lhes chamamos?
 lincheck depth gam del Tru = return (Bool, del)
 lincheck depth gam del Fls = return (Bool, del)
 
@@ -137,7 +136,7 @@ lincheck depth gam del (IfThenElse e1 e2 e3) = do
     (Bool, del1) <- lincheck depth gam del e1
     (t2, del2) <- lincheck depth gam del1 e2
     (t3, del3) <- lincheck depth gam del1 e3
-    if t2 == t3 && equalCtxts del2 del3 -- TODO: está correto?
+    if t2 == t3 && del2 == del3
        then return (t3, del3)
        else Nothing
 
@@ -152,9 +151,6 @@ findDelete _ [] _ = (Nothing, [])
 findDelete x ((y,t):xs) acc =
     if x==y then (Just t, reverse acc ++ xs)
     else findDelete x xs ((y,t):acc)
-
-equalCtxts :: Ctxt -> Ctxt -> Bool
-equalCtxts (a, a') (b, b') = a == b && a' == b'
 
 -- top level ---------------
 
