@@ -1,34 +1,13 @@
-module LinCheck where
+module TypeCheck where
 
-type Name = String 
+import CoreSyntax
 
-data LinTy 
-    = Fun LinTy LinTy  -- A -o B
-    | Tensor LinTy LinTy -- A * B 
-    | Unit  -- 1
-    | Bang LinTy -- !A
-    deriving (Eq)
-
--- 1 * A =~= A    1 -o A == A
-
-data LinExp 
-    = Abs Name LinTy LinExp -- \x:A.M
-    | MPair LinExp LinExp  -- M*N
-    | MUnit -- <>
-    | App LinExp LinExp -- M N
-    | LVar Name -- x
-    | UVar Name -- u
-    | LetBang Name LinExp LinExp  -- let !u = M in N
-    | LetTens Name Name LinExp LinExp -- let x*y = M in N
-    | LetUnit LinExp LinExp   -- let 1 = M in N
-
-
-type Ctxt = [(Name,LinTy)]
+type Ctxt = [(String,Type)]
 
 -- Delta |- M : A 
 -- DeltaI / DeltaO |- M : A
  
-check :: Ctxt -> LinExp -> Maybe (LinTy , Ctxt) 
+check :: Ctxt -> CoreExpr -> Maybe (Type , Ctxt) 
 
 -- Delta1 |- e1 : A     Delta2 |- e2 : B
 ------------------------------------------
@@ -38,7 +17,7 @@ check :: Ctxt -> LinExp -> Maybe (LinTy , Ctxt)
 --------------------------------------------------------------
 -- DeltaI/DeltaO2 |- MPair e1 e2 : A*B
 
-check ctx (MPair e1 e2) = do 
+check ctx (TensorValue e1 e2) = do 
     (t1,ctx1) <- check ctx e1
     (t2,ctx2) <- check ctx1 e2
     return (t1 `Tensor` t2 , ctx2 )
@@ -53,12 +32,12 @@ check ctx (MPair e1 e2) = do
 --------------------------------------------
 -- DeltaI / DeltaO | - Abs x A M : A -o B
 
-check ctx (Abs x t1 e) = do 
-    (t2,ctx1) <- check ((x,t1):ctx) e
-    let m = lookup x ctx1 
-    case m of
-        Nothing -> Just (Fun t1 t2 , ctx1)
-        _ -> Nothing
+-- check ctx (Abs x t1 e) = do 
+--     (t2,ctx1) <- check ((x,t1):ctx) e
+--     let m = lookup x ctx1 
+--     case m of
+--         Nothing -> Just (Fun t1 t2 , ctx1)
+--         _ -> Nothing
     
 
 
@@ -68,7 +47,7 @@ check ctx (Abs x t1 e) = do
 -----------------------------------
 -- DeltaI / DeltaI |- MUnit : Unit
 
-check ctx (MUnit) =  
+check ctx UnitValue =  
     return (Unit,ctx)
 
 
@@ -77,10 +56,10 @@ check ctx (MUnit) =
 -- DeltaI,x:A / DeltaI |- LVar x : A 
 
 
-check ctx (LVar x) = do
-    let (mt,ctx') = findDelete x ctx []
-    t <- mt
-    return (t , ctx')
+-- check ctx (BLVar x) = do
+--     let (mt,ctx') = findDelete x ctx []
+--     t <- mt
+--     return (t , ctx')
 
 
 
@@ -88,7 +67,7 @@ check ctx (LVar x) = do
 
     where 
     findDelete _ [] _ = (Nothing, [])
-    findDelete x ((y,t):xs) acc = if x==y then (Just t,(reverse acc) ++ xs) else 
+    findDelete x ((y,t):xs) acc = if x==y then (Just t, reverse acc ++ xs) else 
                                 findDelete x xs ((y,t):acc)
 
 
@@ -107,7 +86,7 @@ check ctx (LVar x) = do
 check ctx (App e1 e2) = do 
     (Fun t1 t2,ctx1) <- check ctx e1 
     (t,ctx2) <- check ctx1 e2
-    if (t1==t) then 
+    if t1==t then 
         Just (t2,ctx2)
     else 
         Nothing
@@ -121,7 +100,7 @@ check ctx (App e1 e2) = do
 
 -- DeltaI / DeltaO |- e1 : A*B   DeltaO,x:A,y:B /DeltaO2  |- e2: C    x e y not in DeltaO2
 -- DeltaI / DeltaO2 |- ... : C
-check ctx (LetTens x y e1 e2) = do
+check ctx (LetTensor x y e1 e2) = do
     (Tensor t1 t2 , ctx1) <- check ctx e1 
     ( t , ctx2) <- check ((x,t1):(y,t2):ctx1) e2
     let m1 = lookup x ctx2 
@@ -153,3 +132,13 @@ check ctx (LetUnit e1 e2) = do
 -- empty/ empty |- \x:1 . <> * (let 1 = x in <>) : 1 -o 1 * 1
 
 
+
+
+check ctxt Tru = return (Bool, ctxt)
+check ctxt Fls = return (Bool, ctxt)
+
+
+-- top level
+
+typecheck :: CoreExpr -> Type
+typecheck e = maybe (error "typecheck") fst (check [] e)
