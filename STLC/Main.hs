@@ -1,7 +1,13 @@
+import CoreSyntax
 import Parser
+import Desugar
+import Control.Monad.Reader
+
+import Data.Either
 
 import Control.Monad.Trans 
 import System.Console.Haskeline 
+
 
 process :: String -> IO ()
 process line =
@@ -17,4 +23,10 @@ main = runInputT defaultSettings loop
         minput <- getInputLine "> "
         case minput of 
             Nothing -> outputStrLn "Bye."
-            Just input -> (liftIO $ process input) >> loop
+            Just input -> liftIO (process input) >> loop
+
+
+-- run as module
+
+pdesugar :: String -> CoreExpr
+pdesugar s = runReader (desugar $ rightParseExpr s) []

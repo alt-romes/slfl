@@ -7,8 +7,8 @@ data CoreExpr
 
     = BLVar Int             -- bound linear/restricted var
     | BUVar Int             -- bound unrestricted var
-    | FLVar Int             -- free linear/restricted var
-    | FUVar Int             -- free unrestricted var
+    | FLVar String          -- free linear/restricted var
+    | FUVar String          -- free unrestricted var
 
     -- A -o B
     | Abs Type CoreExpr     -- \x:T -> M . with Bruijn indices
@@ -16,7 +16,7 @@ data CoreExpr
 
     -- A (*) B
     | TensorValue CoreExpr CoreExpr
-    | LetTensor String String CoreExpr CoreExpr
+    | LetTensor CoreExpr CoreExpr
 
     -- 1
     | UnitValue
@@ -30,7 +30,7 @@ data CoreExpr
     -- A (+) B
     | InjL Type CoreExpr    -- inr:A M : A (+) typeof M
     | InjR Type CoreExpr    -- inl:B M : typeof M (+) A
-    | CaseOfPlus CoreExpr String CoreExpr String CoreExpr -- case M of inl x => N | inr y => P : C
+    | CaseOfPlus CoreExpr CoreExpr CoreExpr -- case M of inl x => N | inr y => P : C
 
     -- !A
     | BangValue CoreExpr
@@ -43,6 +43,7 @@ data CoreExpr
     -- Bool
     | Tru
     | Fls
+    deriving (Show)
 
 
 data Type

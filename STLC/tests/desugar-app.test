@@ -1,0 +1,6 @@
+pdesugar "a b"
+pdesugar "a b c"
+pdesugar "a b c d e f"
+pdesugar "(\\x : Bool -> x) x"
+pdesugar "(\\x : Bool -> x) y"
+pdesugar "(\\x : Bool -o Bool -> x y) y"
