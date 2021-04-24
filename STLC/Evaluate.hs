@@ -1,5 +1,7 @@
 module Evaluate where
 
+import Data.Maybe
+
 import CoreSyntax
 import LinearCheck hiding (BoundCtxt, FreeCtxt, Ctxt, equalCtxts)
 
@@ -7,136 +9,122 @@ type BoundCtxt = [CoreExpr]
 type FreeCtxt = [(Name, CoreExpr)]
 type Ctxt = (BoundCtxt, FreeCtxt)
 
--- evaluate --- Ctxt, CoreExpr -> CoreExpr 
+-- eval --- Ctxt, CoreExpr -> CoreExpr 
 -- typechecker should make sure the expression is valid
-evaluate :: Ctxt -> CoreExpr -> CoreExpr
+eval :: Ctxt -> CoreExpr -> CoreExpr
 
 --- hyp --------------------
 
-evaluate (bctxt, fctxt) (BLVar x) = bctxt !! x
+eval (bctxt, _) (BLVar x) = bctxt !! x
 
-evaluate (bctxt, fctxt) (FLVar x) = fromJust $ lookup x fctxt
+eval (_, fctxt) (FLVar x) = fromJust $ lookup x fctxt
 
-evaluate (bctxt, fctxt) (BUVar x) = bctxt !! x
+eval (bctxt, _) (BUVar x) = bctxt !! x
 
-evaluate (bctxt, fctxt) (FUVar x) = fromJust $ lookup x fctxt
+eval (_, fctxt) (FUVar x) = fromJust $ lookup x fctxt
 
 --- -o ---------------------
 
 --  -oI
-evaluate ctxt (Abs t e) = -- todo; rever gestão recursos
-    return $ Abs t e
+eval _ (Abs t e) = Abs t e
 
 --  -oE
-evaluate ctxt (App e1 e2) = do
-    (Abs _ e1', del1) <- evaluate ctxt e1
-    (v, del2) <- evaluate ctxt e2
-    return (, del2)
+eval ctxt (App e1 e2) =
+    let Abs _ e1' = eval ctxt e1 in
+    let v = eval ctxt e2 in
+    let (bctxt, fctxt) = ctxt in
+    eval (v:bctxt, fctxt) e1'
 
 --- * ----------------------
 
 --  *I
-evaluate depth gam del (TensorValue e1 e2) = do
-    (t1, del2) <- evaluate depth gam del e1
-    (t2, del3) <- evaluate depth gam del2 e2
-    return (Tensor t1 t2, del3)
+eval ctxt (TensorValue e1 e2) =
+    let e1' = eval ctxt e1 in
+    let e2' = eval ctxt e2 in
+    TensorValue e1' e2'
 
 --  *E
-evaluate depth gam del (LetTensor e1 e2) = do
-    (Tensor t1 t2, (bdel', fdel')) <- evaluate depth gam del e1
-    (t3, del3) <- evaluate (depth+2) gam ((depth, t1):((depth+1, t2):bdel'), fdel') e2
-    return (t3, del3)
+eval ctxt (LetTensor e1 e2) =
+    let TensorValue e3 e4 = eval ctxt e1 in
+    let (bctxt, fctxt) = ctxt in
+    eval (e4:e3:bctxt, fctxt) e2
 
 --- 1 ----------------------
 
 --  1I
-evaluate depth gam del UnitValue = return (Unit, del)
+eval _ UnitValue = UnitValue
 
 --  1E
-evaluate depth gam del (LetUnit e1 e2) = do
-    (Unit, del2) <- evaluate depth gam del e1
-    (t2, del3) <- evaluate depth gam del2 e2
-    return (t2, del3)
+eval ctxt (LetUnit e1 e2) =
+    let UnitValue = eval ctxt e1 in
+    eval ctxt e2
 
 --- & ----------------------
 
 --  &I
-evaluate depth gam del (WithValue e1 e2) = do
-    (t1, del2) <- evaluate depth gam del e1
-    (t2, del3) <- evaluate depth gam del e2
-    if del2 == del3 then return (With t1 t2, del2)
-    else Nothing
+eval ctxt (WithValue e1 e2) =
+    let e1' = eval ctxt e1 in
+    let e2' = eval ctxt e2 in
+    WithValue e1' e2'
 
 --  &E
-evaluate depth gam del (Fst e) = do
-    (With t1 t2, del2) <- evaluate depth gam del e
-    return (t1, del2)
+eval ctxt (Fst e) =
+    let WithValue e1 e2 = eval ctxt e in
+    eval ctxt e1
 
 --  &E
-evaluate depth gam del (Snd e) = do
-    (With t1 t2, del2) <- evaluate depth gam del e
-    return (t2, del2)
+eval ctxt (Snd e) =
+    let WithValue e1 e2 = eval ctxt e in
+    eval ctxt e2
 
 --- + ----------------------
 
 --  +I
-evaluate depth gam del (InjL t1 e) = do
-    (t2, del2) <- evaluate depth gam del e
-    return (Plus t2 t1, del2)
+eval ctxt (InjL t e) =
+    let e' = eval ctxt e in
+    InjL t e'
 
 --  +I
-evaluate depth gam del (InjR t1 e) = do
-    (t2, del2) <- evaluate depth gam del e
-    return (Plus t1 t2, del2)
+eval ctxt (InjR t e) =
+    let e' = eval ctxt e in
+    InjR t e'
 
 --  +E
-evaluate depth gam del (CaseOfPlus e1 e2 e3) = do
-    (Plus t1 t2, (bdel', fdel')) <- evaluate depth gam del e1
-    (t3, del3) <- evaluate (depth+1) gam ((depth, t1):bdel', fdel') e2
-    (t4, del4) <- evaluate (depth+1) gam ((depth, t2):bdel', fdel') e3
-    if t3 == t4 && equalCtxts del3 del4
-       then return (t4, del4)
-       else Nothing
+eval ctxt (CaseOfPlus e1 e2 e3) =
+    let e1' = eval ctxt e1 in
+    let (bctxt, fctxt) = ctxt in
+    case e1' of
+        (InjL t e) -> eval (e1':bctxt, fctxt) e2
+        (InjR t e) -> eval (e1':bctxt, fctxt) e3
 
 --- ! ----------------------
 
 --  !I
-evaluate depth gam del (BangValue e) = do
-    (t2, del2) <- evaluate depth gam del e
-    if del2 /= del then Nothing
-    else return (Bang t2, del)
+eval ctxt (BangValue e) =
+    let e' = eval ctxt e in
+    BangValue e'
 
 --  !E
-evaluate depth (bgam, fgam) del (LetBang e1 e2) = do
-    (Bang t1, del2) <- evaluate depth (bgam, fgam) del e1
-    evaluate (depth+1) ((depth, t1):bgam, fgam) del2 e2
+eval ctxt (LetBang e1 e2) =
+    let BangValue e1' = eval ctxt e1 in
+    let (bctxt, fctxt) = ctxt in
+    eval (e1':bctxt, fctxt) e2
 
 
---- ? ----------------------
+--- Bool -------------------
 
--- Onde é que estas regras se enquadram? Como é que lhes chamamos?
-evaluate depth gam del Tru = return (Bool, del)
-evaluate depth gam del Fls = return (Bool, del)
+eval ctxt Tru = Tru
+eval ctxt Fls = Fls
 
-evaluate depth gam del (IfThenElse e1 e2 e3) = do
-    (Bool, del1) <- evaluate depth gam del e1
-    (t2, del2) <- evaluate depth gam del1 e2
-    (t3, del3) <- evaluate depth gam del1 e3
-    if t2 == t3 && equalCtxts del2 del3 -- TODO: está correto?
-       then return (t3, del3)
-       else Nothing
+eval ctxt (IfThenElse e1 e2 e3) =
+    let cond = eval ctxt e1 in
+    case cond of
+        Tru -> eval ctxt e2
+        Fls -> eval ctxt e3
 
--- end evaluate ------------
+-- end eval ------------
 
 
-
--- util --------------------
-
--- todo: como organizar os ficheiros? neste momento estou a usar
--- o findDelete do typechecker
-
-equalCtxts :: Ctxt -> Ctxt -> Bool
-equalCtxts (a, a') (b, b') = a == b && a' == b'
 
 -- top level ---------------
 

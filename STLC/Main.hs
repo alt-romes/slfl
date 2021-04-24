@@ -2,6 +2,7 @@ import CoreSyntax
 import Parser
 import Desugar
 import LinearCheck
+import Evaluate
 
 import Data.Either
 import Control.Monad.Reader
@@ -34,3 +35,9 @@ pdesugar s = runReader (desugar $ rightParseExpr s) []
 
 pcheck :: String -> Type
 pcheck s = typecheck $ pdesugar s
+
+pevaluate :: String -> CoreExpr
+pevaluate s =
+    let tree = pdesugar s in
+    let ty   = typecheck tree in -- make sure is well typed
+    eval ([], []) tree
