@@ -1,142 +1,147 @@
 module LinearCheck where
 
+import Data.Maybe
+-- import Data.Tuple.Extra -- Prof não consegui usar a both daqui
+                           -- porque os import não funcionava... fiz a minha
+
 import CoreSyntax
 
 type Index = Int
 type Name = String
 
-type BoundCtxt = [(Index, Type)]
+type BoundCtxt = [Maybe Type]
 type FreeCtxt = [(Name, Type)]
 type Ctxt = (BoundCtxt, FreeCtxt)
 
 
--- lincheck --- Depth, Gamma, DeltaIn, Expr -> (Type, DeltaOut)
-
-lincheck :: Int -> Ctxt -> Ctxt -> CoreExpr -> Maybe (Type, Ctxt)
+lincheck :: Ctxt -> CoreExpr -> Maybe (Type, Ctxt)
 
 --- hyp --------------------
 
-lincheck depth gam (bdel, fdel) (BLVar x) = do
-    let (maybet, bdel') = findDelete x bdel []
+lincheck ctxt (BLVar x) = do
+    let (pre, maybet:end) = splitAt x $ fst ctxt
     t <- maybet
-    return (t, (bdel', fdel))
+    return (t, (pre ++ Nothing:end, snd ctxt))
 
-lincheck depth gam (bdel, fdel) (FLVar x) = do
-    let (maybet, fdel') = findDelete x fdel []
+lincheck (bctxt, fctxt) (FLVar x) = do
+    let (maybet, fctxt') = findDelete x fctxt []
     t <- maybet
-    return (t, (bdel, fdel'))
+    return (t, (bctxt, fctxt'))
 
-lincheck depth (bgam, fgam) del (BUVar x) = do
-    t <- lookup x bgam
-    return (t, del)
+lincheck ctxt (BUVar x) = do
+    t <- fst ctxt !! x
+    return (t, ctxt)
 
-lincheck depth (bgam, fgam) del (FUVar x) = do
-    t <- lookup x fgam
-    return (t, del)
+lincheck ctxt (FUVar x) = do
+    t <- lookup x $ snd ctxt
+    return (t, ctxt)
 
 --- -o ---------------------
 
 --  -oI
-lincheck depth gam (bdel, fdel) (Abs t1 e) = do
-    (t2, del2) <- lincheck (depth+1) gam ((depth, t1):bdel, fdel) e
+lincheck (bdel, fdel) (Abs t1 e) = do
+    (t2, del2) <- lincheck (Just t1:bdel, fdel) e
     return (Fun t1 t2, del2)
 
 --  -oE
-lincheck depth gam del (App e1 e2) = do
-    (Fun t1 t2, del1) <- lincheck depth gam del e1
-    (t, del2) <- lincheck depth gam del1 e2
-    if t == t1 then return (t2, del2)
-    else Nothing
+lincheck del (App e1 e2) = do
+    (Fun t1 t2, del1) <- lincheck del e1
+    (t, del2) <- lincheck del1 e2
+    if t == t1
+        then return (t2, del2)
+        else Nothing
 
 --- * ----------------------
 
 --  *I
-lincheck depth gam del (TensorValue e1 e2) = do
-    (t1, del2) <- lincheck depth gam del e1
-    (t2, del3) <- lincheck depth gam del2 e2
+lincheck del (TensorValue e1 e2) = do
+    (t1, del2) <- lincheck del e1
+    (t2, del3) <- lincheck del2 e2
     return (Tensor t1 t2, del3)
 
 --  *E
-lincheck depth gam del (LetTensor e1 e2) = do
-    (Tensor t1 t2, (bdel', fdel')) <- lincheck depth gam del e1
-    (t3, del3) <- lincheck (depth+2) gam ((depth, t1):((depth+1, t2):bdel'), fdel') e2
+lincheck del (LetTensor e1 e2) = do
+    (Tensor t1 t2, (bdel', fdel')) <- lincheck del e1
+    (t3, del3) <- lincheck (Just t2:Just t1:bdel', fdel') e2
     return (t3, del3)
 
 --- 1 ----------------------
 
 --  1I
-lincheck depth gam del UnitValue = return (Unit, del)
+lincheck del UnitValue = return (Unit, del)
 
 --  1E
-lincheck depth gam del (LetUnit e1 e2) = do
-    (Unit, del2) <- lincheck depth gam del e1
-    (t2, del3) <- lincheck depth gam del2 e2
+lincheck del (LetUnit e1 e2) = do
+    (Unit, del2) <- lincheck del e1
+    (t2, del3) <- lincheck del2 e2
     return (t2, del3)
 
 --- & ----------------------
 
 --  &I
-lincheck depth gam del (WithValue e1 e2) = do
-    (t1, del2) <- lincheck depth gam del e1
-    (t2, del3) <- lincheck depth gam del e2
-    if del2 == del3 then return (With t1 t2, del2)
-    else Nothing
+lincheck del (WithValue e1 e2) = do
+    (t1, del2) <- lincheck del e1
+    (t2, del3) <- lincheck del e2
+    if equalCtxts del2 del3
+        then return (With t1 t2, del2)
+        else Nothing
 
 --  &E
-lincheck depth gam del (Fst e) = do
-    (With t1 t2, del2) <- lincheck depth gam del e
+lincheck del (Fst e) = do
+    (With t1 t2, del2) <- lincheck del e
     return (t1, del2)
 
 --  &E
-lincheck depth gam del (Snd e) = do
-    (With t1 t2, del2) <- lincheck depth gam del e
+lincheck del (Snd e) = do
+    (With t1 t2, del2) <- lincheck del e
     return (t2, del2)
 
 --- + ----------------------
 
 --  +I
-lincheck depth gam del (InjL t1 e) = do
-    (t2, del2) <- lincheck depth gam del e
+lincheck del (InjL t1 e) = do
+    (t2, del2) <- lincheck del e
     return (Plus t2 t1, del2)
 
 --  +I
-lincheck depth gam del (InjR t1 e) = do
-    (t2, del2) <- lincheck depth gam del e
+lincheck del (InjR t1 e) = do
+    (t2, del2) <- lincheck del e
     return (Plus t1 t2, del2)
 
 --  +E
-lincheck depth gam del (CaseOfPlus e1 e2 e3) = do
-    (Plus t1 t2, (bdel', fdel')) <- lincheck depth gam del e1
-    (t3, del3) <- lincheck (depth+1) gam ((depth, t1):bdel', fdel') e2
-    (t4, del4) <- lincheck (depth+1) gam ((depth, t2):bdel', fdel') e3
-    if t3 == t4 && del3 == del4
+lincheck del (CaseOfPlus e1 e2 e3) = do
+    (Plus t1 t2, (bdel', fdel')) <- lincheck del e1
+    (t3, del3) <- lincheck (Just t1:bdel', fdel') e2
+    (t4, del4) <- lincheck (Just t2:bdel', fdel') e3
+    if t3 == t4 && equalCtxts del3 del4
        then return (t4, del4)
        else Nothing
 
 --- ! ----------------------
 
 --  !I
-lincheck depth gam del (BangValue e) = do
-    (t2, del2) <- lincheck depth gam del e
-    if del2 /= del then Nothing
-    else return (Bang t2, del)
+lincheck del (BangValue e) = do
+    (t2, del2) <- lincheck del e
+    if equalCtxts del2 del
+        then return (Bang t2, del)
+        else Nothing
 
 --  !E
-lincheck depth (bgam, fgam) del (LetBang e1 e2) = do
-    (Bang t1, del2) <- lincheck depth (bgam, fgam) del e1
-    lincheck (depth+1) ((depth, t1):bgam, fgam) del2 e2
+lincheck ctxt (LetBang e1 e2) = do
+    (Bang t1, (bctxt', fctxt')) <- lincheck ctxt e1
+    lincheck (Just t1:bctxt', fctxt') e2
 
 
 --- Bool -------------------
 
-lincheck depth gam del Tru = return (Bool, del)
-lincheck depth gam del Fls = return (Bool, del)
+lincheck del Tru = return (Bool, del)
+lincheck del Fls = return (Bool, del)
 
-lincheck depth gam del (IfThenElse e1 e2 e3) = do
-    (Bool, del1) <- lincheck depth gam del e1
-    (t2, del2) <- lincheck depth gam del1 e2
-    (t3, del3) <- lincheck depth gam del1 e3
-    if t2 == t3 && del2 == del3
+lincheck del (IfThenElse e1 e2 e3) = do
+    (Bool, del1) <- lincheck del e1
+    (t2, del2) <- lincheck del1 e2
+    (t3, del3) <- lincheck del1 e3
+    if t2 == t3 && equalCtxts del2 del3
        then return (t3, del3)
        else Nothing
 
@@ -152,7 +157,10 @@ findDelete x ((y,t):xs) acc =
     if x==y then (Just t, reverse acc ++ xs)
     else findDelete x xs ((y,t):acc)
 
+equalCtxts :: Ctxt -> Ctxt -> Bool
+equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb)
+
 -- top level ---------------
 
 typecheck :: CoreExpr -> Type
-typecheck e = maybe (error "typecheck") fst (lincheck 0 ([], []) ([], []) e)
+typecheck e = maybe (error "typecheck") fst (lincheck ([], []) e)
