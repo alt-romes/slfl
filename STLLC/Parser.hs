@@ -202,12 +202,8 @@ aexp =   parens expr
 
 expr :: Parser Expr 
 expr = aexp >>= \x -> 
--- acho que percebi bem :), o many1 vai passar pelo sequenciador
--- uma lista de expressões que vão ser associadas à esquerda uma a uma
--- pelo fold ao x e sendo assim "Acumuladas" 
--- para no final retornar a AST
-             (many1 aexp >>= \xs -> return (foldl Syntax.App x xs))
-             <|> return x
+         (many1 aexp >>= \xs -> return (foldl Syntax.App x xs))
+         <|> return x
 
 
 -- Parsing Types 
@@ -220,8 +216,7 @@ tylit =     (reservedOp "1" >> return Unit)
         <|> (reservedOp "Bool" >> return Bool)
         -- <|> (reservedOp "Nat"  >> return Nat )
 
--- prof só tenho a dizer ...---...
--- EDIT: agora já percebi um bocadinho mais +-
+-- ...---...
 type' :: Parser Type 
 type' = Ex.buildExpressionParser tyops ty
     where 
@@ -231,7 +226,6 @@ type' = Ex.buildExpressionParser tyops ty
             infixOp "*" Tensor Ex.AssocLeft,
             infixOp "&" With Ex.AssocLeft,
             infixOp "+" Plus Ex.AssocLeft
-            -- Prefix op ! ??
             ]]
 
 

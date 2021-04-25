@@ -10,6 +10,9 @@ import Control.Monad.Reader
 import Control.Monad.Trans 
 import System.Console.Haskeline 
 
+import System.Environment
+import System.IO
+
 
 process :: String -> IO ()
 process line =
@@ -18,14 +21,23 @@ process line =
     Left err -> print err
     Right ex -> print ex
 
-main :: IO ()
-main = runInputT defaultSettings loop 
+interpret :: IO ()
+interpret = runInputT defaultSettings loop 
     where 
     loop = do 
         minput <- getInputLine "> "
         case minput of 
             Nothing -> outputStrLn "Bye."
             Just input -> liftIO (process input) >> loop
+
+-- interpretfile :: IO ()
+-- interpretfile = do
+--     (fileName:args) <- getArgs
+--     contents <- readFile fileName
+
+main :: IO ()
+main = interpret
+
 
 
 -- run as module
