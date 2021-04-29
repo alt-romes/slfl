@@ -1,5 +1,17 @@
 \documentclass{llncs}
 
+\usepackage[inline]{todo}
+\usepackage{cmll}
+\usepackage{mathpartir}
+
+\newcommand{\lolli}{\multimap}
+\newcommand{\tensor}{\otimes}
+\newcommand{\one}{\mathbf{1}}
+\newcommand{\bang}{{!}}
+
+\newcommand{\llet}[2]{\mathsf{let}\,#1\,\mathsf{in}\,#2}
+
+
 \title{Synthesis of Linear Functional Programs}
 \author{Rodrigo Mesquita}
 \date{April 2021}
@@ -11,15 +23,173 @@
 
 \section{Introduction}
 
-This work explores the process of synthetising linear functional programs from types based in linear logic, leveraging the Curry-Howard correspondence.
-- forma resumida a correspondência: "obs que proposições lógicas correspondem a tipos e programas bem tipificados correspondem a provas das proposições"
-Having a type be a proposition in linear logic, and from the Curry-Howard correspondence, we can relate a proof of that proposition directly to a linear functional program - finding a proof is finding a program with that type, so we formulate the synthesis as proof search in this logic.
+This work explores the process of synthetising linear functional
+programs from types based in linear logic, leveraging the Curry-Howard
+correspondence.  - forma resumida a correspondência: "obs que
+proposições lógicas correspondem a tipos e programas bem tipificados
+correspondem a provas das proposições" Having a type be a proposition
+in linear logic, and from the Curry-Howard correspondence, we can
+relate a proof of that proposition directly to a linear functional
+program - finding a proof is finding a program with that type, so we
+formulate the synthesis as proof search in this logic.
 
+\begin{enumerate}
+\item General motivation
+  \begin{itemize}
+\item Program synthesis is an automated or semi-automated process of
+  deriving a program from a specification of its behavior.
+\item Specifications appear in many forms\dots
+\item Program synthesis as a means of improving program
+  correctness/programmer productivity.
+\item Challenges: space of valid programs, space of valid
+  specifications,  etc.
+\end{itemize}
+\item \emph{Type-based} program synthesis
+  \begin{itemize}
+ \item Rich types as specifications.
+\item Languages with richer type systems allow for more precise
+  types. This precision can statically eliminate various kinds of
+  logical errors by making certain invalid program states ill-typed
+  (e.g. a ``null aware'' type system, will ensure you cannot
+  dereference a null-pointer).
+\item But can also be a burden -- the whole point of these type
+  systems is to ensure that ``less'' things are well-typed, and
+  sometimes its hard to convince the checker\dots
+\item Type-based synthesis leverages rich types as a way of pruning
+  the search space and by using types as a more ``familiar''
+  specification.
+\end{itemize}
+\item ``My'' problem: Synthesis based on linear types
+  \begin{itemize}
+  \item Linear types constrain resource usage in programs by \emph{statically} limiting
+    the number of times certain resources can be used during its
+    lifetime.
+  \item Applications in resource-aware programming such as concurrent
+    programming (e.g. session types) and memory-management
+    (e.g. Rust).
+  \item This work will study program synthesis in a functional,
+    linearly-typed setting, by leveraging the propositions-as-types
+    correspondence between linear logic and the (linear)
+    $\lambda$-calculus.
+  \item What is props-as-types? What is linear logic? Linear $\lambda$
+    is ``just'' a small functional core language.
+  \item Through props-as-types, synthesis can be formulated as proof
+    search and so we can leverage a lot of related technology from the
+    literature.
+  \end{itemize}
+\item Goals:
+  \begin{itemize}
+\item Full and partial synthesis of well-typed (in the above sense)
+  programs. Full synthesis means producing a function (or set of)
+  satisfying the spec. Partial synthesis means being given a partial
+  program (i.e. a function with a hole in it) and ``completing it''.
+\item Start from a small system, build up to recursive
+  types/functions.
+\item Potential to go further: type refinements; interactive
+  synthesis?
+ \item Evaluation through expressiveness benchmarks (can we synthesize
+   ``X''?); time measurements (how fast can we synthesize ``X''?');
+   etc.
+  \end{itemize}
+   
+\end{enumerate}
 
 \section{Background}
 
+More about the concepts than citing concrete works (but citations are
+needed!):
+\begin{enumerate}
+\item PL/Type systems in a ``formal'' sense (inference rules, etc)
+\item Propositions as types: Proofs as programs, proof search as
+  synthesis, etc.
+\item Linear logic: a ``resource aware logic''
+\item Proof search in LL: challenges, focusing as a ``solution''
+\item Linear $\lambda$-calculus: what does it look like.
+\item Type-based synthesis: ``inverting'' a type system.
+\end{enumerate}
+
 \section{Related Work}
-    
+
+Concrete works:
+\begin{itemize}
+\item Synthesis for graded types (no recursion   -- in that work, no
+  obvious connection of grading with
+  concurrency)~\cite{DBLP:conf/lopstr/HughesO20}
+
+\item Type-and-example-directed
+  synthesis~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
+  or how to turn your type system upside down.
+  
+\item Synthesis from (polymorphic) refinement types~\cite{DBLP:conf/pldi/PolikarpovaKS16}
+
+Refinement types provide very precise specifications to assist the
+synthesis process.
+
+\item Synthesis of heap-manipulating
+  programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}
+
+Less related, but more evidence of this idea of turning ``checking''
+systems into synthesis frameworks.
+
+\item Resource-guided synthesis \cite{DBLP:conf/pldi/KnothWP019}
+
+This resource-guided means something a bit different. Programs satisfy
+a functional specification and a symbolic resource bound in the sense
+of amortized analysis, but can provide technical insights.
+
+\end{itemize}
+
+\section{Goals and Work Plan}
+
+Expand on earlier points. Start from a functional language with linear
+types ($\tensor$, $\lolli$, $\oplus$, $\bang$); build on it with more
+``stuff''. General techniques, drawn from proof theory via props as
+types: explore focusing to tame non-determinism/search space. Partial
+synthesis is still proof search! Add other techniques as we go along
+(e.g. for recursion we need to constrain recursive calls).
+
+Mention that you've already implemented a type-checker for this
+(useful as a prelim. exercise but also later, for \emph{validation}).
+
+Validation and evaluation: validation is as simple as ``does it typecheck''? can you synth? how fast?
+
+\section{Bonus}
+
+\[
+  \begin{array}{lcl}
+    A, B & ::= & A \tensor B \mid A \lolli B \mid A \with B \mid A
+                 \oplus B \mid \bang A \mid \one \mid \dots\\[1ex]
+    M,N & ::= & \lambda x{:}A.M\\
+         & \mid & M\,N\\
+         & \mid & (M \tensor N)\\
+         & \mid & \llet{x\tensor y = M}{N} \\
+         & \mid & x \\
+         & \mid & \dots\\
+    \end{array}
+\]
+
+\[
+  \infer[$(\lolli\! I)$]
+  {\Delta , x{:}A \vdash M : B }
+  {\Delta \vdash \lambda x {:} A . M : A \lolli B}
+  \quad
+  \infer[$(\lolli\! E)$]
+  {\Delta_1 \vdash M : A \lolli B \and \Delta_2 \vdash N : A}
+  {\Delta_1, \Delta_2 \vdash M\,N : B}
+\]
+\[
+  \infer*[left=($\tensor I$)]
+  {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
+  {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
+  \quad
+  \infer*[right=($\tensor E$)]
+  {\Delta_1 \vdash M : A \tensor B \and \Delta_2 , x{:}A, y{:}B\vdash
+    N : C }
+  {\Delta_1 , \Delta_2\vdash \llet{x\tensor y = M}{N} : C }
+\]
+
+
+
 \bibliographystyle{splncs04}
 \bibliography{references}
 \end{document}
