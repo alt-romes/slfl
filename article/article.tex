@@ -1,6 +1,5 @@
 \documentclass{llncs}
 
-\usepackage[inline]{todo}
 \usepackage{cmll}
 \usepackage{mathpartir}
 
@@ -13,7 +12,7 @@
 
 
 \title{Synthesis of Linear Functional Programs}
-\author{Rodrigo Mesquita}
+\author{Rodrigo Mesquita \and Bernardo Toninho}
 \date{April 2021}
 \institute{NOVA School of Science and Technology}
 
@@ -23,15 +22,40 @@
 
 \section{Introduction}
 
-This work explores the process of synthetising linear functional programs from types based in linear logic, leveraging the Curry-Howard correspondence.
-Said correspondence states that propositions in a logic have a direct mapping to types, and well typed programs also have a one to one correspendence to proofs of those propositions.
-As such, having a type be a proposition in linear logic, we can relate a proof of that proposition directly to a linear functional program - finding a proof is finding a program with that type, and so we formulate the synthesis as proof search in linear logic.
+% General motivation?
+Program synthesis is an automated or semi-automated process of
+ deriving a program (generating code) from a high-level specification.
+ Specifications appear in many forms (i.e.
+ polymorphic refinement types~\cite{DBLP:conf/pldi/PolikarpovaKS16},
+ examples~\cite{DBLP:conf/popl/FrankleOWZ16},
+ graded linear types~\cite{DBLP:conf/lopstr/HughesO20}, ...),
+ and in this work the synthesis specification will be a linear type, ?possibly with refinements.?
+ The chosen specification form dictates the synthesis process, and different ones might
+ be approached in completely different ways.
+ In spite of the specification, most program synthetizer's have to deal with two main
+ inherent complexities: searching over a vast space of valid programs, and interpreting user intent.
+ Synthesis has many motivations, it can be seen as a means to improve a programmer's productivity and/or
+ program correctness (i.e. through suggestion and/or autocompletion), or as a tool to automate certain parts
+ of the programming process (i.e. in the same way AI might generate some boilerplate text to auxiliate a journalist, rather
+ than to replace), just to name a few examples.
+
+% Type based synthesis
+Type-based synthesis takes a given type and produces a program with that same type. 
+ 
+
+This work explores the process of synthetising linear functional
+programs from types based in linear logic, leveraging the Curry-Howard correspondence.
+Said correspondence states that propositions in a logic have a direct mapping to types,
+ and well typed programs also have a one to one correspendence to proofs of those propositions.
+As such, having a type be a proposition in linear logic, we can relate a proof of that
+proposition directly to a linear functional program
+ — finding a proof is finding a program with that type, and so we
+ formulate the synthesis as proof search in linear logic.
 
 \begin{enumerate}
 \item General motivation
   \begin{itemize}
-\item Program synthesis is an automated or semi-automated process of
-  deriving a program from a specification of its behavior.
+\item 
 \item Specifications appear in many forms\dots
 \item Program synthesis as a means of improving program
   correctness/programmer productivity.
@@ -48,7 +72,7 @@ As such, having a type be a proposition in linear logic, we can relate a proof o
   dereference a null-pointer).
 \item But can also be a burden -- the whole point of these type
   systems is to ensure that ``less'' things are well-typed, and
-  sometimes its hard to convince the checker\dots
+  sometimes it's hard to convince the checker\dots
 \item Type-based synthesis leverages rich types as a way of pruning
   the search space and by using types as a more ``familiar''
   specification.
