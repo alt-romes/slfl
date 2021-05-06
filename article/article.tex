@@ -143,6 +143,21 @@ benchmarks (i.e. can we synthesize ``X''?); time measurements (i.e. how fast can
 
 \section{Background}
 
+A type system can be formally described through natural deduction -- as a set of rules that determines the concept of deduction for some language~\cite{prawitznd65}.
+The language -- the propositions of a type system are the types themselves, the rules define how to construct types, and being able to deduct a type (i.e. constructing a derivation) proves the type is valid.
+[Preciso de ajuda nesta última frase, não é isto que quero dizer mas não sei descrever de forma correta e satisfatória :)]
+The natural deduction judgment is extended to include a \emph{term} (i.e. to make proofs explicit with a formal definition), and modified to include a list of hypothesis.
+[Também preciso de ajuda a reescrever a última, eu bem que procuro muito mas precisava de alcançar uma mestria de natural deduction - será mais rápido o professor ajudar-me a dar nomes às coisas :)]
+This extended judgment, called a typing judgment has the form:
+\[
+    \Gamma \vdash M : A
+\]
+Where the natural deduction list of hypothesis, $\Gamma$, is now called \emph{typing environment} (i.e. set of variables and their types), $M$ is still a \emph{term} but also known as ``program'', and $A$, the natural deduction proposition, is now called \emph{type}. This judgment can be read -- $M$ has type $A$ in $\Gamma$.
+% As a concrete example, let us describe the typing rule for the tensor type $A \tensor B$
+
+
+\section{Separate}
+
 More about the concepts than citing concrete works (but citations are
 needed!):
 \begin{enumerate}
