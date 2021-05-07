@@ -80,80 +80,105 @@ In the end, we intend to be able to do full and partial synthesis of well-typed 
 [Devia estar a escrever isto eu ahah?]The evaluation will be done through expressiveness
 benchmarks (i.e. can we synthesize ``X''?); time measurements (i.e. how fast can we synthesize ``X''?'); and so on.
 
-
-\begin{enumerate}
-\item General motivation
-  \begin{itemize}
-\item 
-\item Specifications appear in many forms\dots
-\item Program synthesis as a means of improving program
-  correctness/programmer productivity.
-\item Challenges: space of valid programs, space of valid
-  specifications,  etc.
-\end{itemize}
-\item \emph{Type-based} program synthesis
-  \begin{itemize}
- \item Rich types as specifications.
-\item Languages with richer type systems allow for more precise
-  types. This precision can statically eliminate various kinds of
-  logical errors by making certain invalid program states ill-typed
-  (e.g. a ``null aware'' type system, will ensure you cannot
-  dereference a null-pointer).
-\item But can also be a burden -- the whole point of these type
-  systems is to ensure that ``less'' things are well-typed, and
-  sometimes it's hard to convince the checker\dots
-\item Type-based synthesis leverages rich types as a way of pruning
-  the search space and by using types as a more ``familiar''
-  specification.
-\end{itemize}
-\item ``My'' problem: Synthesis based on linear types
-  \begin{itemize}
-  \item Linear types constrain resource usage in programs by \emph{statically} limiting
-    the number of times certain resources can be used during its
-    lifetime.
-  \item Applications in resource-aware programming such as concurrent
-    programming (e.g. session types) and memory-management
-    (e.g. Rust).
-  \item This work will study program synthesis in a functional,
-    linearly-typed setting, by leveraging the propositions-as-types
-    correspondence between linear logic and the (linear)
-    $\lambda$-calculus.
-  \item What is props-as-types? What is linear logic? Linear $\lambda$
-    is ``just'' a small functional core language.
-  \item Through props-as-types, synthesis can be formulated as proof
-    search and so we can leverage a lot of related technology from the
-    literature.
-  \end{itemize}
-\item Goals:
-  \begin{itemize}
-\item Full and partial synthesis of well-typed (in the above sense)
-  programs. Full synthesis means producing a function (or set of)
-  satisfying the spec. Partial synthesis means being given a partial
-  program (i.e. a function with a hole in it) and ``completing it''.
-\item Start from a small system, build up to recursive
-  types/functions.
-\item Potential to go further: type refinements; interactive
-  synthesis?
- \item Evaluation through expressiveness benchmarks (can we synthesize
-   ``X''?); time measurements (how fast can we synthesize ``X''?');
-   etc.
-  \end{itemize}
-   
-\end{enumerate}
+% \begin{enumerate}
+% \item General motivation
+%   \begin{itemize}
+% \item 
+% \item Specifications appear in many forms\dots
+% \item Program synthesis as a means of improving program
+%   correctness/programmer productivity.
+% \item Challenges: space of valid programs, space of valid
+%   specifications,  etc.
+% \end{itemize}
+% \item \emph{Type-based} program synthesis
+%   \begin{itemize}
+%  \item Rich types as specifications.
+% \item Languages with richer type systems allow for more precise
+%   types. This precision can statically eliminate various kinds of
+%   logical errors by making certain invalid program states ill-typed
+%   (e.g. a ``null aware'' type system, will ensure you cannot
+%   dereference a null-pointer).
+% \item But can also be a burden -- the whole point of these type
+%   systems is to ensure that ``less'' things are well-typed, and
+%   sometimes it's hard to convince the checker\dots
+% \item Type-based synthesis leverages rich types as a way of pruning
+%   the search space and by using types as a more ``familiar''
+%   specification.
+% \end{itemize}
+% \item ``My'' problem: Synthesis based on linear types
+%   \begin{itemize}
+%   \item Linear types constrain resource usage in programs by \emph{statically} limiting
+%     the number of times certain resources can be used during its
+%     lifetime.
+%   \item Applications in resource-aware programming such as concurrent
+%     programming (e.g. session types) and memory-management
+%     (e.g. Rust).
+%   \item This work will study program synthesis in a functional,
+%     linearly-typed setting, by leveraging the propositions-as-types
+%     correspondence between linear logic and the (linear)
+%     $\lambda$-calculus.
+%   \item What is props-as-types? What is linear logic? Linear $\lambda$
+%     is ``just'' a small functional core language.
+%   \item Through props-as-types, synthesis can be formulated as proof
+%     search and so we can leverage a lot of related technology from the
+%     literature.
+%   \end{itemize}
+% \item Goals:
+%   \begin{itemize}
+% \item Full and partial synthesis of well-typed (in the above sense)
+%   programs. Full synthesis means producing a function (or set of)
+%   satisfying the spec. Partial synthesis means being given a partial
+%   program (i.e. a function with a hole in it) and ``completing it''.
+% \item Start from a small system, build up to recursive
+%   types/functions.
+% \item Potential to go further: type refinements; interactive
+%   synthesis?
+%  \item Evaluation through expressiveness benchmarks (can we synthesize
+%    ``X''?); time measurements (how fast can we synthesize ``X''?');
+%    etc.
+%   \end{itemize}
+% \end{enumerate}
 
 \section{Background}
 
 A type system can be formally described through natural deduction -- as a set of rules that determines the concept of deduction for some language~\cite{prawitznd65}.
-The language -- the propositions of a type system are the types themselves, the rules define how to construct types, and being able to deduct a type (i.e. constructing a derivation) proves the type is valid.
-[Preciso de ajuda nesta última frase, não é isto que quero dizer mas não sei descrever de forma correta e satisfatória :)]
-The natural deduction judgment is extended to include a \emph{term} (i.e. to make proofs explicit with a formal definition), and modified to include a list of hypothesis.
-[Também preciso de ajuda a reescrever a última, eu bem que procuro muito mas precisava de alcançar uma mestria de natural deduction - será mais rápido o professor ajudar-me a dar nomes às coisas :)]
-This extended judgment, called a typing judgment has the form:
+This comes from the close relation between logic and programming languages, called the Curry-Howard isomorphism or correspondence. A logical proof describes a program, and a program describes a proof.
+The main observations made are ``propositions as types'', ``proofs as programs'', ``proof checking as type checking'' \cite{https://www.cs.cmu.edu/~fp/courses/15312-f04/handouts/23-curryhoward.pdf}.
+Formalizing our type system, the language i.e. the propositions of the logic are the types themselves, the inference rules are used to construct a proof which corresponds directly to a program, and the correctness of the proof assures the program is well-typed.
+The typical natural deduction judgment
+\[
+    A \textrm{ is a proposition}
+\]
+is extended to include a \emph{term}
+(i.e. to make proofs explicit with a formal definition -- these proofs map directly to a $\lambda$-calculus program as stated by the Curry-Howard correspondence????),
+and modified to include a list of hypothesis. 
+This extended judgment, called?? a typing judgment, has the form:
 \[
     \Gamma \vdash M : A
 \]
-Where the natural deduction list of hypothesis, $\Gamma$, is now called \emph{typing environment} (i.e. set of variables and their types), $M$ is still a \emph{term} but also known as ``program'', and $A$, the natural deduction proposition, is now called \emph{type}. This judgment can be read -- $M$ has type $A$ in $\Gamma$.
-% As a concrete example, let us describe the typing rule for the tensor type $A \tensor B$
+In the type system context, the list of hypothesis, $\Gamma$, is called \emph{typing environment} (i.e. set of variables and their types),
+ the term $M$ is the \emph{program}, and $A$, the natural deduction proposition, is the \emph{type}.
+ This judgment can be read -- $M$ has type $A$ in $\Gamma$.
+
+Type rules assert the validity of certain judgments on the basis of other judgments already known to be valid \cite{http://homepage.cs.uiowa.edu/~tinelli/classes/185/Fall06/notes/cardelli-95.pdf}.
+We introduce a few typing i.e. inference rules to display how a type system would be formalized.
+In natural deduction, there are both \emph{introduction} and \emph{elimination} rules for almost all logical connectives.
+The following rule is a hypothesis rule ??, não sei muito bem como sair daqui:)
+\[
+    \infer*[right=(var)]
+    {  }
+    {\Gamma, u: A \vdash u : A}
+\]
+It reads -- the program $u$ has type $A$ if our typing environment holds a variable labeled $u$ of type $A$.
+[também não sei muito bem onde quero chegar com isto :)]
+As another concrete example, let us describe the inference rule for the function type ($A \supset B$):
+\[
+    \infer*[right=($\supset I$)]
+    {\Gamma, u: A \vdash M : B}
+    {\Gamma \vdash \lambda u. M : A \supset B }
+\]
+It reads -- the program $\lambda u. M$ has type $A \supset B$ ($A$ implies $B$) as long as $M$ is a program of type $B$ knowning that $u$ is a variable of type $A$.
+The rule shown above is an \emph{introduction} rule, that introduces the ``implication'' connective, 
 
 
 \section{Separate}
