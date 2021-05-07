@@ -216,30 +216,6 @@ $\lambda$-calculus and propositional intuitionistic logic.
   contexto de ``lógica'' / Curry-Howard.}
 
 
-
-
-% Linear Logic
-<<<<<<< HEAD
-Linear logic \cite{DBLP:journals/tcs/Girard87} can be thought of as a logic of resources.
-Where we were previously able to utilize a variable i.e. a hypothesis as many times as we wanted,
-now we'll keep track of the amount available i.e. the ``resources'', and guarantee that every resource is used exactly once, hence the name ``Linear Logic''.
-It comes that connectives must be decomposed to get more primitive ones that reflect our resource aware system.
-So what would be the $\wedge$ (conjunction) in classical logic, decomposes into its respective multiplicative and additive connectives, $\tensor$ and $\with$.
-To present the formalization of this logic, besides the new connectives, we need to introduce the \emph{resource-aware context} $\Delta$.
- In contrast to the previously seen $\Gamma$, $\Delta$ is also a list of variables and their types, but in which each and every variable must be used exactly once.
- So, to introduce the connective $\tensor$ which defines a multiplicative pair of propositions, we must use exactly all the resources ($\Delta_1, \Delta_2$) needed
- to make the ($\Delta_1$) first proposition, and ($\Delta_2$) second proposition:
-\[
-    \infer*[right=($\tensor I$)]
-    {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
-    {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
-\]
-Out of the logical connectives, we need to mention one more, since it'll alter the judgment form, and it's the one 
-that ensures logical strength -- i.e. we're able to translate usual logic into linear logic.
-The $\bang$ is used (under certain conditions) to make a variable ``infinite'' i.e. to make
-it useable more than once. To distinguish the ``infinite'' variables, a separate context is used -- $\Gamma$. So $\Gamma$ holds the ``infinite'' resources, and $\Delta$ the resources that can only be used once.
-
-
 \mypara{Linear Logic}
 
 Linear logic \cite{DBLP:journals/tcs/Girard87} can be seen as a
@@ -260,6 +236,21 @@ but where only one of the two resources may be used. Similarly,
 implication becomes into linear implication, written $A\lolli B$,
 denoting a resource that will consume (exactly one) resource $A$ to
 produce a resource $B$.
+To present the formalization of this logic, besides the new connectives, we need to introduce the \emph{resource-aware context} $\Delta$.
+ In contrast to the previously seen $\Gamma$, $\Delta$ is also a list of variables and their types, but in which each and every variable must be used exactly once.
+ So, to introduce the connective $\tensor$ which defines a multiplicative pair of propositions, we must use exactly all the resources ($\Delta_1, \Delta_2$) needed
+ to make the ($\Delta_1$) first proposition, and ($\Delta_2$) second proposition:
+\[
+    \infer*[right=($\tensor I$)]
+    {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
+    {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
+\]
+Out of the logical connectives, we need to mention one more, since it'll alter the judgment form, and it's the one 
+that ensures logical strength -- i.e. we're able to translate usual logic into linear logic.
+The $\bang$ is used (under certain conditions) to make a variable ``infinite'' i.e. to make
+it useable more than once. To distinguish the ``infinite'' variables, a separate context is used -- $\Gamma$. So $\Gamma$ holds the ``infinite'' resources, and $\Delta$ the resources that can only be used once.
+
+
 
 \todo{Through the Curry-Howard correspondence, we can view the process
   of finding a proof of a proposition as the process of synthesizing a
