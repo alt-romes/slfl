@@ -170,20 +170,7 @@ measurements (i.e. how fast can we synthesize ``X''?'); and so on.
 
 \section{Background}
 
-<<<<<<< HEAD
-A type system can be formally described through natural deduction -- as a set of rules that determines the concept of deduction for some language~\cite{prawitznd65}.
-This comes from the close relation between logic and programming languages, called the Curry-Howard isomorphism or correspondence. A logical proof describes a program, and a program describes a proof.
-The main observations made are ``propositions as types'', ``proofs as programs'', ``proof checking as type checking'' \cite{https://www.cs.cmu.edu/~fp/courses/15312-f04/handouts/23-curryhoward.pdf}.
-Formalizing our type system, the language i.e. the propositions of the logic are the types themselves, the inference rules are used to construct a proof which corresponds directly to a program, and the correctness of the proof assures the program is well-typed.
-The typical natural deduction judgment
-\[
-    A \textrm{ is a proposition}
-\]
-is extended to include a \emph{term}
-(i.e. to make proofs explicit with a formal definition -- these proofs map directly to a $\lambda$-calculus program as stated by the Curry-Howard correspondence????),
-and modified to include a list of hypothesis. 
-This extended judgment, called?? a typing judgment, has the form:
-=======
+\todo{Merge! These 2 paragraphs}
 A type system can be formally described through a set of inference
 rules that inductively define a judgment of the form $\Gamma \vdash M
 : A$, stating that program expression $M$ has type $A$ according to
@@ -194,13 +181,18 @@ the \emph{typing assumptions} for variables tracked in $\Gamma$.
   para lógica linear, para proof search, etc\dots Só faz sentido falar de dedução natural no
   contexto de ``lógica'' / Curry-Howard.}
 
-natural deduction -- as a set of rules that determines the concept of deduction for some language~\cite{prawitznd65}.
-The language -- the propositions of a type system are the types themselves, the rules define how to construct types, and being able to deduct a type (i.e. constructing a derivation) proves the type is valid.
-[Preciso de ajuda nesta última frase, não é isto que quero dizer mas não sei descrever de forma correta e satisfatória :)]
-The natural deduction judgment is extended to include a \emph{term} (i.e. to make proofs explicit with a formal definition), and modified to include a list of hypothesis.
-[Também preciso de ajuda a reescrever a última, eu bem que procuro muito mas precisava de alcançar uma mestria de natural deduction - será mais rápido o professor ajudar-me a dar nomes às coisas :)]
-This extended judgment, called a typing judgment has the form:
->>>>>>> fe3a3a5c662bd145ae6414f6993ee5441e6efc84
+A type system can be formally described through natural deduction -- as a set of rules that determines the concept of deduction for some language~\cite{prawitznd65}.
+This comes from the close relation between logic and programming languages, the Curry-Howard isomorphism or correspondence. A logical proof describes a program, and a program describes a proof.
+The main observations made are ``propositions as types'', ``proofs as programs'', ``proof checking as type checking'' \cite{https://www.cs.cmu.edu/~fp/courses/15312-f04/handouts/23-curryhoward.pdf}.
+Formalizing our type system, the language i.e. the propositions of the logic are the types themselves, the inference rules are used to construct a proof which corresponds directly to a program, and the correctness of the proof assures the program is well-typed.
+The typical natural deduction judgment
+\[
+    A \textrm{ is a proposition}
+\]
+is extended to include a \emph{term}
+(i.e. to make proofs explicit with a formal definition -- these proofs map directly to a $\lambda$-calculus program as stated by the Curry-Howard correspondence????),
+and modified to include a list of hypothesis. 
+This extended judgment, called?? a typing judgment, has the form:
 \[
     \Gamma \vdash M : A
 \]
@@ -227,6 +219,14 @@ As another concrete example, let us describe the inference rule for the function
 \]
 It reads -- the program $\lambda u. M$ has type $A \supset B$ ($A$ implies $B$) as long as $M$ is a program of type $B$ knowning that $u$ is a variable of type $A$.
 The rule shown above is an \emph{introduction} rule, that introduces the ``implication'' connective, 
+
+% Linear Logic
+Linear logic \cite{DBLP:journals/tcs/Girard87} can be thought of as a logic of resources.
+Where we were previously able to utilize a variable i.e. a hypothesis as many times as we wanted,
+now we'll keep track of the amount available (the ``resources''), and guarantee that every resource is used exactly once, hence the name ``Linear Logic''.
+It comes that connectives must be decomposed to get more primitive ones that reflect our resource aware system.
+So what would be the $\wedge$ (and) in classical logic, decomposes into its multiplicative 
+ 
 
 
 \section{Separate}
@@ -275,6 +275,8 @@ of amortized analysis, but can provide technical insights.
 \end{itemize}
 
 \section{Goals and Work Plan}
+
+
 
 Expand on earlier points. Start from a functional language with linear
 types ($\tensor$, $\lolli$, $\oplus$, $\bang$); build on it with more
