@@ -116,7 +116,7 @@ such as concurrent programming (e.g. session types for message passing
 concurrency~\cite{}), and to memory-management (e.g.~Rust's ownership
 types).
 
-\mypara{Goals.}
+\mypara{Goals}
  % Goals
 In the end, we intend to be able to do full and partial synthesis of
 well-typed programs. Full synthesis consists of the production of a
@@ -192,60 +192,92 @@ measurements (i.e. how fast can we synthesize ``X''?').
 
 \section{Background}
 
-\todo{Merge! These 2 paragraphs}
-A type system can be formally described through a set of inference
-rules that inductively define a judgment of the form $\Gamma \vdash M
-: A$, stating that program expression $M$ has type $A$ according to
-the \emph{typing assumptions} for variables tracked in $\Gamma$.
-\dots
+\mypara{Type Systems} A type system can be formally described through
+a set of inference rules that inductively define a judgment of the
+form $\Gamma \vdash M : A$, stating that program expression $M$ has
+type $A$ according to the \emph{typing assumptions} for variables
+tracked in $\Gamma$. For instance,
+$x{:}\mathsf{Int}, y{:}\mathsf{Int} \vdash x+y : \mathsf{Int}$ states
+that $x+y$ has type $\mathsf{Int}$ under the assumption that $x$ and
+$y$ have type $\mathsf{Int}$.  An expression $M$ is deemed well-typed
+with a given type $A$ if one can construct a typing derivation with $M :
+A$ as its conclusion, by repeated application of the inference rules.
 
-\todo[inline]{Daqui, para tipificar uma função, para Curry-Howard,
-  para lógica linear, para proof search, etc\dots Só faz sentido falar de dedução natural no
-  contexto de ``lógica'' / Curry-Howard.}
+The simply-typed $\lambda$-calculus is a typed core functional
+language~\cite{} that captures \dots. Its syntax consists of
+functional abstraction, written $\lambda x{:}A.M$, denoting the
+an (anonymous) function that takes an argument of type $A$, bound to
+$x$ in $M$; and application $M\,N$, with the standard meaning, and
+variables $x$. For instance, the \dots \todo{Identity function!}
 
-A type system can be formally described through natural deduction -- as a set of rules that determines the concept of deduction for some language~\cite{prawitznd65}.
-This comes from the close relation between logic and programming languages, the Curry-Howard isomorphism or correspondence. A logical proof describes a program, and a program describes a proof.
+\mypara{Propositions as Types}
+%
+It turns out that the inference rules of the simply-typed
+$\lambda$-calculus are closely related to those of a system of natural
+deduction for intuitionistic logic~\cite{prawitznd65}. This
+relationship, known as the Curry-Howard correspondence~\cite{},
+identifies that the propositions of intuitionistic logic can be read
+as types for the simply-typed $\lambda$-calculus, and their proofs are
+exactly the \dots.
 The main observations made are ``propositions as types'', ``proofs as
-programs'', ``proof checking as type checking''
-\cite{https://www.cs.cmu.edu/~fp/courses/15312-f04/handouts/23-curryhoward.pdf}.
-Formalizing our type system, the language i.e. the propositions of the logic are the types themselves, the inference rules are used to construct a proof which corresponds directly to a program, and the correctness of the proof assures the program is well-typed.
-The typical natural deduction judgment
-\[
-    A \textrm{ is a proposition}
-\]
-is extended to include a \emph{term}
-(i.e. to make proofs explicit with a formal definition -- these proofs map directly to a $\lambda$-calculus program as stated by the Curry-Howard correspondence????),
-and modified to include a list of hypothesis. 
-This extended judgment, called?? a typing judgment, has the form:
-\[
-    \Gamma \vdash M : A
-\]
-In the type system context, the list of hypothesis, $\Gamma$, is called \emph{typing environment} (i.e. set of variables and their types),
- the term $M$ is the \emph{program}, and $A$, the natural deduction proposition, is the \emph{type}.
- This judgment can be read -- $M$ has type $A$ in $\Gamma$.
+programs'', ``proof checking as type checking''~\cite{}.
 
-Type rules assert the validity of certain judgments on the basis of other judgments already known to be valid \cite{http://homepage.cs.uiowa.edu/~tinelli/classes/185/Fall06/notes/cardelli-95.pdf}.
-We introduce a few typing i.e. inference rules to display how a type system would be formalized.
-In natural deduction, there are both \emph{introduction} and \emph{elimination} rules for almost all logical connectives.
-The following rule is a hypothesis rule ??, não sei muito bem como sair daqui:)
+Inference in ND are categorized as introduction or elimination, these
+correspond to constructors and destructors in programming languages
+(e.g. function abstraction vs application, construction of a pair vs
+projection).
+
+We introduce a few typing rules to display how a type system can be
+formalized.  In natural deduction, there are both \emph{introduction}
+and \emph{elimination} rules for almost all logical
+connectives.\todo{se mencionares intro e elim antes nao precisas de
+  repetir aqui.}  The following rule captures the nature of a
+hypothetical judgment, allowing for reasoning from assumptions:
 \[
     \infer*[right=(var)]
     {  }
     {\Gamma, u: A \vdash u : A}
-\]
-It reads -- the program $u$ has type $A$ if our typing environment holds a variable labeled $u$ of type $A$.
-[também não sei muito bem onde quero chegar com isto :)]
-As another concrete example, let us describe the inference rule for the function type ($A \supset B$):
+  \]
+  When seen as a typing rule for the $\lambda$-calculus, it
+  corresponds to the rule for typing variables -- variable $u$ has
+  type $A$ if the typing environment contains a variable $u$ of
+  type $A$.
+  
+  As another concrete example, let us consider the rule for
+  implication ($A \supset B$):
 \[
     \infer*[right=($\supset I$)]
     {\Gamma, u: A \vdash M : B}
     {\Gamma \vdash \lambda u. M : A \supset B }
-\]
-It reads -- the program $\lambda u. M$ has type $A \supset B$ ($A$ implies $B$) as long as $M$ is a program of type $B$ knowning that $u$ is a variable of type $A$.
-The rule shown above is an \emph{introduction} rule, that introduces the ``implication'' connective, 
+  \]
+  Logically, the rule states that to prove $A\supset B$, we assume $A$
+  and prove $B$. Through the Curry-Howard correspondence, implication
+  corresponds to the function type -- the program $\lambda u. M$ has
+  type $A \supset B$, provided $M$ has type
+  type $B$ under the assumption that $u$ is a variable of type $A$.  The rule
+  shown above is an \emph{introduction} rule, that introduces the
+  ``implication'' connective. 
+%$\rightarrow$ $\Rightarrow$, $\Longrightarrow$, $\longrightarrow$
+
+  \todo[inline]{Mesma historia para a aplicacao/modus ponens.
+Um bocadinho das ``consequencias'' do Curry-Howard. }
+
+The Curry-Howard correspondence generalizes beyond the simply-typed
+$\lambda$-calculus and propositional intuitionistic logic.
+\todo{Mencionar polimorfismo corresponde a logica de ordem superior,
+  etc. E tambem para logica linear \dots}
+
+
+ 
+\todo[inline]{Daqui, para tipificar uma função, para Curry-Howard,
+  para lógica linear, para proof search, etc\dots Só faz sentido falar de dedução natural no
+  contexto de ``lógica'' / Curry-Howard.}
+
+
+
 
 % Linear Logic
-\subsection{Linear Logic}
+\mypara{Linear Logic}
 
 Linear logic \cite{DBLP:journals/tcs/Girard87} can be seen as a
 resource-aware logic, where propositions are interpreted as resources
@@ -265,7 +297,12 @@ but where only one of the two resources may be used. Similarly,
 implication becomes into linear implication, written $A\lolli B$,
 denoting a resource that will consume (exactly one) resource $A$ to
 produce a resource $B$.
- 
+
+\todo{Through the Curry-Howard correspondence, we can view the process
+  of finding a proof of a proposition as the process of synthesizing a
+program of a given type.}
+
+
 
 
 \section{Separate}
@@ -273,43 +310,60 @@ produce a resource $B$.
 More about the concepts than citing concrete works (but citations are
 needed!):
 \begin{enumerate}
-\item PL/Type systems in a ``formal'' sense (inference rules, etc)
+\item PL/Type systems in a ``formal'' sense (inference rules, etc) [DONE]
 \item Propositions as types: Proofs as programs, proof search as
-  synthesis, etc.
-\item Linear logic: a ``resource aware logic''
-\item Proof search in LL: challenges, focusing as a ``solution''
+  synthesis, etc. [MOSTLY DONE]
+\item Linear logic: a ``resource aware logic'' [ONGOING]
+\item Proof search in LL: challenges, focusing as a ``solution'' [ONGOING]
 \item Linear $\lambda$-calculus: what does it look like.
 \item Type-based synthesis: ``inverting'' a type system.
 \end{enumerate}
 
 \section{Related Work}
 
-Concrete works:
+\todo[inline]{Os~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
+  como ``estrategia geral'' de ``ler'' um sistema de tipos +
+  engenharia como um sistema de sintese de programas tipificados;
+  Aqui~\cite{DBLP:conf/pldi/PolikarpovaKS16} estamos num contexto
+  ``mais avançado'' (polimorfismo e tipos refinados -- ``logica de
+  primeira ordem'') -- tipos ricos -- trabalho aspiracional,
+  tratamento de funcao recursivas, tratamento de tipos de dados
+  indutivos/algebricos; Aqui~\cite{DBLP:conf/lopstr/HughesO20},
+  sintese para graded modal types, tem a ver com ``linearidade'' kind
+  of, abordagem baseado em focusing (portanto Curry-Howard++), no caso
+  deles acaba por ser uma lógica ``modal'' vs linear -- não permite
+  futuramente explorar relações com e.g. concorrência, análise de
+  recursos.}
+
+Concrete works
 \begin{itemize}
-\item Synthesis for graded types (no recursion   -- in that work, no
-  obvious connection of grading with
-  concurrency)~\cite{DBLP:conf/lopstr/HughesO20}
+
 
 \item Type-and-example-directed
   synthesis~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
   or how to turn your type system upside down.
+
+  \item Synthesis for graded types (no recursion   -- in that work, no
+  obvious connection of grading with
+  concurrency)~\cite{DBLP:conf/lopstr/HughesO20}
+  
   
 \item Synthesis from (polymorphic) refinement types~\cite{DBLP:conf/pldi/PolikarpovaKS16}
 
 Refinement types provide very precise specifications to assist the
 synthesis process.
 
-\item Synthesis of heap-manipulating
-  programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}
+% \item Synthesis of heap-manipulating
+%   programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}
 
-Less related, but more evidence of this idea of turning ``checking''
-systems into synthesis frameworks.
+% Less related, but more evidence of this idea of turning ``checking''
+% systems into synthesis frameworks.
 
-\item Resource-guided synthesis \cite{DBLP:conf/pldi/KnothWP019}
+% \item Resource-guided synthesis \cite{DBLP:conf/pldi/KnothWP019}
 
-This resource-guided means something a bit different. Programs satisfy
-a functional specification and a symbolic resource bound in the sense
-of amortized analysis, but can provide technical insights.
+% This resource-guided means something a bit different. Programs satisfy
+% a functional specification and a symbolic resource bound in the sense
+% of amortized analysis, but can provide technical insights.
 
 \end{itemize}
 
