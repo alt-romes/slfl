@@ -11,6 +11,7 @@
 \newcommand{\tensor}{\otimes}
 \newcommand{\one}{\mathbf{1}}
 \newcommand{\bang}{{!}}
+\newcommand{\mypara}[1]{\paragraph{\textbf{#1}.}}
 
 \newcommand{\llet}[2]{\mathsf{let}\,#1\,\mathsf{in}\,#2}
 
@@ -28,86 +29,107 @@
 
 % General motivation?
 Program synthesis is an automated or semi-automated process of
-deriving a program (i.e.~generating code) from a high-level specification.
+deriving a program (i.e.~generating code) from a high-level
+specification.  
+%
+Synthesis can be seen as a means to improve a programmer's
+productivity and/or program correctness (i.e. through suggestion
+and/or autocompletion), or as a tool to automate certain parts of the
+programming process (e.g. in the same way AI might generate some
+boilerplate text to aid a journalist, rather than to replace the
+journalist outright), just to name a few examples.
+
 Specifications can take many forms (e.g.  polymorphic refinement
 types~\cite{DBLP:conf/pldi/PolikarpovaKS16},
 examples~\cite{DBLP:conf/popl/FrankleOWZ16}, graded linear
-types~\cite{DBLP:conf/lopstr/HughesO20}, ...).  In this work we
-explore type-based synthesis where specifications take the form of
-linear types.\todo{O que é um linear type?}
+types~\cite{DBLP:conf/lopstr/HughesO20}, ...).  Regardless of the kind
+of specification, program synthesizers have to deal with two main
+inherent sources of complexity: searching over a vast space of
+(potentially) valid programs, and interpreting user intent.
 %
-The chosen specification form dictates the synthesis process, and
-different ones might be approached in completely different
-ways.\todo{Esta frase não parece ter grande utilidade. O que queres
-  dizer aqui?}
+In this work we will explore type-based synthesis where specifications
+take the form of linear types, which are types that limit resource
+usage in programs.  Concretely, we will explore the proof-theoretic
+foundations of linear types via the Curry-Howard correspondence with
+linear logic, viewing program synthesis under the lens of (linear
+logic) bottom-up proof search.
 %
-Regardless of the kind of specification, program synthesizers have to
-deal with two main inherent sources of complexity: searching over a
-vast space of (potentially) valid programs, and interpreting user
-intent.
+
 %
-Synthesis has many motivations, it can be seen as a means to
-improve a programmer's productivity and/or program correctness
-(i.e. through suggestion and/or autocompletion), or as a tool to
-automate certain parts of the programming process (e.g. in the same
-way AI might generate some boilerplate text to auxiliate a journalist,
-rather than to replace), just to name a few examples.
-\todo[inline]{Acho que estes 3 ``paragrafos'' deviam estar por ordens diferentes.}
 
 
+\mypara{Type-Based Synthesis}
 % Type based synthesis
-Type-based synthesis takes a type and produces a program with that
-given type.  Types can be further explored to give the programmer more
-expressiveness (e.g. by adding constraints??), and are called rich
-types.  -- Gostava de ver com o prof aqui. [Estive a procurar e fiquei
+Type-based synthesis uses types as a form of program specification,
+automatically or semi-automatically producing a program expression
+with the given type and so matching the specification.
+%
+In order to make type-based specifications more expressive, type-based
+synthesis frameworks use rich type systems such as refinement
+types~\cite{} and polymorphic types~\cite{}.
+\todo[inline]{[Estive a procurar e fiquei
 um pouco confuso. polimorfismo é rich types?  dependent types are rich
 types? aqueles constraints são os dependent types pelo que
 percebi... mas n me parece correto. arithmetic types? temos de
 rever. Por agora vou por apenas os tópicos que o professor escreveu]
-Languages with richer type systems allow for more precise types. This
-precision can statically eliminate various kinds of logical errors by
-making certain invalid program states ill-typed (e.g. a ``null aware''
-type system, will ensure you cannot dereference a null-pointer).
-However, they can also be a burden -- the whole point of these type
-systems is to ensure that ``less'' things are well-typed, and
-sometimes it's hard to convince the checker.  Regarding the
-challenges, type-based synthesis leverages rich types as a way of
-pruning the search space, and by using types gives the user as a more
-``familiar'' specification.
+-- Não há propriamente uma definição rigorosa de ``rich types'',
+geralmente tudo o que vá além do tipico pode ser qualificado como
+rico.}
 
-This work explores the process of synthetising linear functional
-programs from types based in linear logic (linear types), leveraging
-the Curry-Howard correspondence.  Said correspondence states that
-propositions in a logic have a direct mapping to types, and well typed
-programs also have a one to one correspendence to proofs of those
-propositions.  As such, having a type be a proposition in linear
+
+Richer type systems allow for more precise types, which can
+statically eliminate various kinds of logical errors by making certain
+invalid program states ill-typed (e.g.,~a ``null aware'' type system,
+will ensure at compile-time that you cannot dereference a
+null-pointer). However, they can also be a burden -- the whole point
+of these type systems is to ensure that \emph{fewer} programs are
+deemed well-typed, which can pose additional challenges to the
+development process. Type-based synthesis leverages rich types as a
+way of pruning the search space, and by using types gives the user as
+a more ``familiar'' specification. For instance, the type
+$\mathsf{Int} \rightarrow \mathsf{Int} \rightarrow \mathsf{Int}$
+specifies a (curried) function that takes two integers and produces an
+integer. Viewed as a specification, it is extremely imprecise (there
+are an infinite number of functions that satisfy this specification).
+However, the richer type $(x{:}\mathsf{Int}) \rightarrow
+(y{:}\mathsf{Int}) \rightarrow \{z{:}\mathsf{Int} \mid z = x+y\}$
+very precisely specifies a function that takes integer arguments $x$
+and $y$ and returns an integer $z$ that is the sum of $x$ and $y$. 
+
+
+%
+This work explores the process of synthesizing linear functional
+programs from types based on linear logic propositions (i.e.~linear
+types) by leveraging the Curry-Howard correspondence.  The
+correspondence states that propositions in a logic have a direct
+mapping to types, and well-typed programs correspond to to proofs of
+those propositions.  As such, having a type be a proposition in linear
 logic, we can relate a proof of that proposition directly to a linear
 functional program — finding a proof is finding a program with that
-type, so we formulate the synthesis as proof search in linear logic,
-which makes to us available a lot of related technology from the proof
-search literature.  Linear types differ from usual types for they
-constrain resource usage in programs by \emph{statically?} limiting
-the number of times certain resources can be used during their
-lifetime.  They can be applied to resource-aware programming such as
-concurrent programming (e.g. session types??), and to
-memory-management (e.g. Rust) [Quero reescrever a frase acima, não
-gosto de como falamos de session types e rust em dois exemplos
-paralelos visto que não são coisas bem comparáveis. Revemos na
-reunião.]
- 
+type. Thus, we formulate synthesis as proof search in linear logic,
+which allows us to inform our work with approaches from the proof
+search literature.  Linear types differ from more traditional types in
+that they constrain resource usage in programs by \emph{statically}
+limiting the number of times certain resources can be used during
+their lifetime.  They can be applied to resource-aware programming
+such as concurrent programming (e.g. session types for message passing
+concurrency~\cite{}), and to memory-management (e.g.~Rust's ownership
+types).
+
+\mypara{Goals.}
  % Goals
 In the end, we intend to be able to do full and partial synthesis of
-well-typed programs -- full synthesis being the production of a
+well-typed programs. Full synthesis consists of the production of a
 function (or set of) satisfying the specification; partial synthesis
-being the ``completion'' of a partial program (i.e. a function with a
-\emph{hole} in it) -- Starting from a small core linear --
-i.e. \emph{resource-aware} functional language, and building up to
-recursive types/functions.  Eventually, possibly, enhancing the
-synthesis process with type refinements, and making it interactive --
-i.e. the synthetiser offers the user ``choices'' mid-process.  [Devia
-estar a escrever isto eu ahah?]The evaluation will be done through
-expressiveness benchmarks (i.e. can we synthesize ``X''?); time
-measurements (i.e. how fast can we synthesize ``X''?'); and so on.
+is the ``completion'' of a partial program (i.e. a function with a
+\emph{hole} in it). The work will start from a small core linear --
+i.e. \emph{resource-aware} functional language, building up to
+recursive types/functions, with potential other avenues of further
+extension. 
+%
+We will evaluate the work through
+expressiveness benchmarks (i.e. can we synthesize ``X''?) and time
+measurements (i.e. how fast can we synthesize ``X''?').
 
 % \begin{enumerate}
 % \item General motivation
@@ -183,7 +205,9 @@ the \emph{typing assumptions} for variables tracked in $\Gamma$.
 
 A type system can be formally described through natural deduction -- as a set of rules that determines the concept of deduction for some language~\cite{prawitznd65}.
 This comes from the close relation between logic and programming languages, the Curry-Howard isomorphism or correspondence. A logical proof describes a program, and a program describes a proof.
-The main observations made are ``propositions as types'', ``proofs as programs'', ``proof checking as type checking'' \cite{https://www.cs.cmu.edu/~fp/courses/15312-f04/handouts/23-curryhoward.pdf}.
+The main observations made are ``propositions as types'', ``proofs as
+programs'', ``proof checking as type checking''
+\cite{https://www.cs.cmu.edu/~fp/courses/15312-f04/handouts/23-curryhoward.pdf}.
 Formalizing our type system, the language i.e. the propositions of the logic are the types themselves, the inference rules are used to construct a proof which corresponds directly to a program, and the correctness of the proof assures the program is well-typed.
 The typical natural deduction judgment
 \[
@@ -221,6 +245,7 @@ It reads -- the program $\lambda u. M$ has type $A \supset B$ ($A$ implies $B$) 
 The rule shown above is an \emph{introduction} rule, that introduces the ``implication'' connective, 
 
 % Linear Logic
+<<<<<<< HEAD
 Linear logic \cite{DBLP:journals/tcs/Girard87} can be thought of as a logic of resources.
 Where we were previously able to utilize a variable i.e. a hypothesis as many times as we wanted,
 now we'll keep track of the amount available i.e. the ``resources'', and guarantee that every resource is used exactly once, hence the name ``Linear Logic''.
@@ -241,6 +266,29 @@ The $\bang$ is used (under certain conditions) to make a variable ``infinite'' i
 it useable more than once. To distinguish the ``infinite'' variables, a separate context is used -- $\Gamma$. So $\Gamma$ holds the ``infinite'' resources, and $\Delta$ the resources that can only be used once.
 
 
+=======
+\subsection{Linear Logic}
+
+Linear logic \cite{DBLP:journals/tcs/Girard87} can be seen as a
+resource-aware logic, where propositions are interpreted as resources
+that are consumed during the inference process.  Where in standard
+propositional logic we are able to use an assumption as many times as
+we want, in linear logic every resource (i.e., every assumption) must
+be used \emph{exactly once}, or \emph{linearly}. This usage
+restriction gives rise to new logical connectives, based on the way
+the ambient resources are used. For instance, conjunction, usually
+written as $A\wedge B$, appears in two forms in linear logic:
+multiplicative or simultaneous conjunction (written $A\tensor B$); and
+additive or alternative conjunction (written $A\with
+B$). Multiplicative conjunction denotes the simultaneous availability
+of resources $A$ and $B$, requiring both of them to be
+used. Alternative conjunction denotes the availability of $A$ and $B$,
+but where only one of the two resources may be used. Similarly,
+implication becomes into linear implication, written $A\lolli B$,
+denoting a resource that will consume (exactly one) resource $A$ to
+produce a resource $B$.
+ 
+>>>>>>> 34e0c5ccf73bf3cc0c0f8b4327a0dcf8928a2b70
 
 
 \section{Separate}
