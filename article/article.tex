@@ -97,8 +97,8 @@ reunião.]
  
  % Goals
 In the end, we intend to be able to do full and partial synthesis of
-well-typed programs -- Full synthesis being the production of a
-function (or set of) satisfying the specification; Partial synthesis
+well-typed programs -- full synthesis being the production of a
+function (or set of) satisfying the specification; partial synthesis
 being the ``completion'' of a partial program (i.e. a function with a
 \emph{hole} in it) -- Starting from a small core linear --
 i.e. \emph{resource-aware} functional language, and building up to
@@ -223,10 +223,24 @@ The rule shown above is an \emph{introduction} rule, that introduces the ``impli
 % Linear Logic
 Linear logic \cite{DBLP:journals/tcs/Girard87} can be thought of as a logic of resources.
 Where we were previously able to utilize a variable i.e. a hypothesis as many times as we wanted,
-now we'll keep track of the amount available (the ``resources''), and guarantee that every resource is used exactly once, hence the name ``Linear Logic''.
+now we'll keep track of the amount available i.e. the ``resources'', and guarantee that every resource is used exactly once, hence the name ``Linear Logic''.
 It comes that connectives must be decomposed to get more primitive ones that reflect our resource aware system.
-So what would be the $\wedge$ (and) in classical logic, decomposes into its multiplicative 
- 
+So what would be the $\wedge$ (conjunction) in classical logic, decomposes into its respective multiplicative and additive connectives, $\tensor$ and $\with$.
+To present the formalization of this logic, besides the new connectives, we need to introduce the \emph{resource-aware context} $\Delta$.
+ In contrast to the previously seen $\Gamma$, $\Delta$ is also a list of variables and their types, but in which each and every variable must be used exactly once.
+ So, to introduce the connective $\tensor$ which defines a multiplicative pair of propositions, we must use exactly all the resources ($\Delta_1, \Delta_2$) needed
+ to make the ($\Delta_1$) first proposition, and ($\Delta_2$) second proposition:
+\[
+    \infer*[right=($\tensor I$)]
+    {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
+    {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
+\]
+Out of the logical connectives, we need to mention one more, since it'll alter the judgment form, and it's the one 
+that ensures logical strength -- i.e. we're able to translate usual logic into linear logic.
+The $\bang$ is used (under certain conditions) to make a variable ``infinite'' i.e. to make
+it useable more than once. To distinguish the ``infinite'' variables, a separate context is used -- $\Gamma$. So $\Gamma$ holds the ``infinite'' resources, and $\Delta$ the resources that can only be used once.
+
+
 
 
 \section{Separate}
