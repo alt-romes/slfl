@@ -138,7 +138,6 @@ language~\cite{} that captures the essence of a type system in a simple and fami
 functional abstraction, written $\lambda x{:}A.M$, denoting
 an (anonymous) function that takes an argument of type $A$, bound to
 $x$ in $M$; and application $M\,N$, with the standard meaning, and
-<<<<<<< HEAD
 variables $x$. For instance, the term $\lambda x{:}A.x$, denoting the identity function, is a functional abstraction
 taking an argument of type $A$ and returning it back.
 
@@ -149,7 +148,6 @@ $\lambda$-calculus are closely related to those of a system of natural
 deduction for intuitionistic logic~\cite{prawitznd65}. This
 relationship, known as the Curry-Howard correspondence~\cite{},
 identifies that the propositions of intuitionistic logic can be read
-<<<<<<< HEAD
 as types for the simply-typed $\lambda$-calculus (``propositions as types'' observation),
 their proofs are exactly the program with the given type (``proofs as programs'' observation),
 and checking a proof is type checking a program (``proof checking as type checking'' observation)~\cite{}.
@@ -311,7 +309,14 @@ needed!):
 Concrete works
 
 \mypara{Type-and-Example-Directed Program Synthesis}~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
-In this paper, type synthesis is explored 
+This paper explores a purely functional, recursive program synthesis technique based on types/proof search (as we intend to do),
+with examples as an auxiliar technique to trim down the program synthesis vast search space.
+\todo[inline]{more introduction to the paper}.
+A good use is made of the general strategy of using a type system
+to generate programs (by ``inverting'' it), rather than to type-check one.
+Moreover, the paper uses a data structure called ``refinement tree'' in conjunction
+with the extra information provided by the examples to allow for efficient synthesis
+of non-trivial programs.
 
 \item Type-and-example-directed
   synthesis~
