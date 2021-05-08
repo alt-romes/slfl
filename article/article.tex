@@ -116,8 +116,8 @@ recursive types/functions, with potential other avenues of further
 extension. 
 %
 We will evaluate the work through
-expressiveness benchmarks (i.e. can we synthesize ``X''?) and time
-measurements (i.e. how fast can we synthesize ``X''?').
+expressiveness benchmarks (i.e. can we synthesize a term of type $T$?) and time
+measurements (i.e. how fast can we synthesize a term of type $T$?').
 
 
 \section{Background}
@@ -138,7 +138,8 @@ language~\cite{} that captures the essence of a type system in a simple and fami
 functional abstraction, written $\lambda x{:}A.M$, denoting
 an (anonymous) function that takes an argument of type $A$, bound to
 $x$ in $M$; and application $M\,N$, with the standard meaning, and
-variables $x$. For instance, $\lambda x{:}A.x$, the identity function, is a functional abstraction
+<<<<<<< HEAD
+variables $x$. For instance, the term $\lambda x{:}A.x$, denoting the identity function, is a functional abstraction
 taking an argument of type $A$ and returning it back.
 
 \mypara{Propositions as Types}
@@ -148,16 +149,19 @@ $\lambda$-calculus are closely related to those of a system of natural
 deduction for intuitionistic logic~\cite{prawitznd65}. This
 relationship, known as the Curry-Howard correspondence~\cite{},
 identifies that the propositions of intuitionistic logic can be read
-as types for the simply-typed $\lambda$-calculus (``propositions as types'' observation), their proofs are
-exactly the program with that type (``proofs as programs'' observation), and checking a proof is type checking a program (``proof checking as type checking'' observation)~\cite{}.
+<<<<<<< HEAD
+as types for the simply-typed $\lambda$-calculus (``propositions as types'' observation),
+their proofs are exactly the program with the given type (``proofs as programs'' observation),
+and checking a proof is type checking a program (``proof checking as type checking'' observation)~\cite{}.
 
 Inference rules in natural deduction are categorized as introduction or elimination, these
 correspond to constructors and destructors in programming languages
 (e.g. function abstraction vs application, construction of a pair vs
 projection).
 
-We introduce a few typing rules to display how a type system can be
-formalized. The following rule captures the nature of a
+We introduce a few typing rules to both show how a type system can be
+formalized and to show the relationship with (intuitionistic)
+propositional logic. The following rule captures the nature of a
 hypothetical judgment, allowing for reasoning from assumptions:
 \[
     \infer*[right=(var)]
@@ -226,23 +230,31 @@ but where only one of the two resources may be used. Similarly,
 implication becomes into linear implication, written $A\lolli B$,
 denoting a resource that will consume (exactly one) resource $A$ to
 produce a resource $B$.
-To present the formalization of this logic, besides the new connectives, we 
-need to introduce the \emph{resource-aware context} $\Delta$.
- In contrast to the previously seen $\Gamma$, $\Delta$ is also a list of variables and their types,
- but in which each and every variable must be used exactly once.
-To introduce the connective $\tensor$ which defines a multiplicative pair of propositions,
- we must use exactly all the resources ($\Delta_1, \Delta_2$) needed
- to make the ($\Delta_1$) first proposition, and ($\Delta_2$) second proposition:
+
+To present the formalization of this logic, besides the new
+connectives, we need to introduce the \emph{resource-aware context}
+$\Delta$.  In contrast to the previously seen $\Gamma$, $\Delta$ is
+also a list of variables and their types, but where each and every
+variable must be used exactly once during inference.  So, to introduce
+the connective $\tensor$ which defines a multiplicative pair of
+propositions, we must use exactly all the resources
+($\Delta_1, \Delta_2$) needed to realize the ($\Delta_1$) 
+proposition $A$, and ($\Delta_2$) proposition $B$:
 \[
     \infer*[right=($\tensor I$)]
     {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
     {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
 \]
-Out of the logical connectives, we need to mention one more, since it'll alter the judgment form, and it's the one 
-that ensures logical strength -- i.e. we're able to translate usual logic into linear logic.
-The $\bang$ is used (under certain conditions) to make a variable ``infinite'' i.e. to make
-it useable more than once. To distinguish the ``infinite'' variables, a separate context is used --
-$\Gamma$. $\Gamma$ holds the ``infinite'' resources, and $\Delta$ the resources that can only be used once.
+Out of the logical connectives, we need to mention one more, since
+it'll alter the judgment form, and it's the one that ensures logical
+strength -- i.e. we're able to translate intuitionistic logic into
+linear logic.
+  The proposition $\bang A$ (read \emph{of course} $A$)
+is used (under certain conditions) to make a resource ``infinite''
+i.e. to make it useable an arbitrary number of times. To distinguish the
+``infinite'' variables, a separate, unrestricted, context is used -- $\Gamma$. So
+$\Gamma$ holds the ``infinite'' resources, and $\Delta$ the resources
+that can only be used once.
 The linear typing judgment for the introduction of the exponential $\bang$ takes the form:
 \todo{A formula está um pouco estranha (faltam espaços)?}
 \[
