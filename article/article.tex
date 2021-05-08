@@ -290,44 +290,51 @@ needed!):
 
 \section{Related Work}
 
+% \todo[inline]{Os~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
+%   como ``estrategia geral'' de ``ler'' um sistema de tipos +
+%   engenharia como um sistema de sintese de programas tipificados;
+%   Aqui~\cite{DBLP:conf/pldi/PolikarpovaKS16} estamos num contexto
+%   ``mais avançado'' (polimorfismo e tipos refinados -- ``logica de
+%   primeira ordem'') -- tipos ricos -- trabalho aspiracional,
+%   tratamento de funcao recursivas, tratamento de tipos de dados
+%   indutivos/algebricos; Aqui~\cite{DBLP:conf/lopstr/HughesO20},
+%   sintese para graded modal types, tem a ver com ``linearidade'' kind
+%   of, abordagem baseado em focusing (portanto Curry-Howard++), no caso
+%   deles acaba por ser uma lógica ``modal'' vs linear -- não permite
+%   futuramente explorar relações com e.g. concorrência, análise de
+%   recursos.}
 
 
-\todo[inline]{Os~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
-  como ``estrategia geral'' de ``ler'' um sistema de tipos +
-  engenharia como um sistema de sintese de programas tipificados;
-  Aqui~\cite{DBLP:conf/pldi/PolikarpovaKS16} estamos num contexto
-  ``mais avançado'' (polimorfismo e tipos refinados -- ``logica de
-  primeira ordem'') -- tipos ricos -- trabalho aspiracional,
-  tratamento de funcao recursivas, tratamento de tipos de dados
-  indutivos/algebricos; Aqui~\cite{DBLP:conf/lopstr/HughesO20},
-  sintese para graded modal types, tem a ver com ``linearidade'' kind
-  of, abordagem baseado em focusing (portanto Curry-Howard++), no caso
-  deles acaba por ser uma lógica ``modal'' vs linear -- não permite
-  futuramente explorar relações com e.g. concorrência, análise de
-  recursos.}
+Type-based program synthesis is a studied field\todo{ dizer de uma forma melhor? }, and it follows
+that a lot of literature is available to inspire and complement our work.
+Most? follow the synthesis-as-proof-search pattern, however, the process is
+novel for each, due to a variety of different rich types explored, and their respective logics; or nuances done to the process, such
+as considering examples; or even the programming paradigm of the output produced (e.g. generating heap manipulating programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
+Some other common patterns we might want to follow are the type refinements and the support for recursive functions.
+These works share some common ground, and base themselves of the same works we do -- most famously the Curry-Howard correspondence, but also,
+for example, works on the method of Focusing~\cite{focusing}.
 
-Concrete works
 
 \mypara{Type-and-Example-Directed Program Synthesis}~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
 This paper explores a purely functional, recursive program synthesis technique based on types/proof search (as we intend to do),
 with examples as an auxiliar technique to trim down the program synthesis vast search space.
 \todo[inline]{more introduction to the paper}.
 A good use is made of the general strategy of using a type system
-to generate programs (by ``inverting'' it), rather than to type-check one.
+to generate programs (by ``inverting'' the type system), rather than using it to type-check one.
 Moreover, the paper uses a data structure called ``refinement tree'' in conjunction
 with the extra information provided by the examples to allow for efficient synthesis
-of non-trivial programs.
+of non-trivial programs. Overall it employs good engineering to achieve type-based synthesis
+of functional typed programs, with at least two additions that we might want to follow too
+(type refinements and recursive functions).
 
-\item Type-and-example-directed
-  synthesis~
-  or how to turn your type system upside down.
+% or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
+  
+\mypara{Synthesis from (polymorphic) refinement types}~\cite{DBLP:conf/pldi/PolikarpovaKS16}
 
-  \item Synthesis for graded types (no recursion   -- in that work, no
+\mypara{Synthesis for graded types} (no recursion   -- in that work, no
   obvious connection of grading with
   concurrency)~\cite{DBLP:conf/lopstr/HughesO20}
   
-  
-\item Synthesis from (polymorphic) refinement types~\cite{DBLP:conf/pldi/PolikarpovaKS16}
 
 Refinement types provide very precise specifications to assist the
 synthesis process.
