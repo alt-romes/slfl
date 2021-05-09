@@ -74,8 +74,8 @@ null-pointer). However, they can also be a burden -- the whole point
 of these type systems is to ensure that \emph{fewer} programs are
 deemed well-typed, which can pose additional challenges to the
 development process. Type-based synthesis leverages rich types as a
-way of pruning the search space, and by using types gives the user as
-a more ``familiar'' specification. For instance, the type
+way of pruning the search space, and by using types the user 
+is given a more ``familiar'' specification. For instance, the type
 $\mathsf{Int} \rightarrow \mathsf{Int} \rightarrow \mathsf{Int}$
 specifies a (curried) function that takes two integers and produces an
 integer. Viewed as a specification, it is extremely imprecise (there
@@ -204,9 +204,8 @@ $B$, provided $M$ has type $A \rightarrow B$ and $N$ has type $A$.
 
 The Curry-Howard correspondence generalizes beyond the simply-typed
 $\lambda$-calculus and propositional intuitionistic logic. It extends
-to the realms of polymorphism (higher-order logic \todo{review -
-  \url{https://en.wikipedia.org/wiki/Lambda_cube}} second-order
-propositional calculus), dependent types (first-order predicate
+to the realms of polymorphism (second-order
+logic), dependent types (first-order
 logic), and various other extensions of natural deduction and
 simply-typed $\lambda$-calculus -- which include linear logic and
 linear types.
@@ -262,28 +261,90 @@ takes the form:
     \infer*[right=($\bang I$)]
     {\Gamma ; \emptyset \vdash M : A}
     {\Gamma ; \emptyset \vdash \bang M : \bang A}
-  \]
-  Logically, a proof of $\bang A$ cannot use linear resources since
-  $\bang A$ denotes an unbounded (potentially $0$) number of copies of
-  $A$. Proofs of $\bang A$ may use other unrestricted or exponential
-  resources, tracked by context $\Gamma$.
-  From a computational perspective, the type $\bang A$
-  internalizes the simply-typed $\lambda$-calculus in the linear
-  $\lambda$-calculus.
+\]
+Logically, a proof of $\bang A$ cannot use linear resources since
+$\bang A$ denotes an unbounded (potentially $0$) number of copies of
+$A$. Proofs of $\bang A$ may use other unrestricted or exponential
+resources, tracked by context $\Gamma$.
+From a computational perspective, the type $\bang A$
+internalizes the simply-typed $\lambda$-calculus in the linear
+$\lambda$-calculus.
 
-  The elimination form for the exponential, written $\llet{ !u
-    = M}{ N}$, warrants the use of resource $A$ an unbounded
-  number of times in $N$ via the variable $u$:  
+The elimination form for the exponential, written $\llet{ !u
+= M}{ N}$, warrants the use of resource $A$ an unbounded
+number of times in $N$ via the variable $u$:  
 \[
     \infer*[right=($\bang E$)]
     {\Gamma ; \Delta_1 \vdash M : \bang A \and \Gamma, u{:}A ; \Delta_2 \vdash N : C}
     {\Gamma ; \Delta_1, \Delta_2 \vdash \llet{ !u = M}{ N} : C}
 \]
+Again, through the Curry-Howard correspondence, we can view the process
+of finding a proof of a proposition in this linear logic as the process of synthesizing a
+linear functional program of a given type.
+
+\mypara{Resource-Management}
+Coming from linear logic, we now have a new problem to solve:
+When searching for a proof, how do we break the
+contexts in the necessary way to allocate the correct resources
+to prove each judgment the judgment we're proving depends on?
+This is where the idea of \emph{input/output} contexts come in.
+To solve this issue we will adopt the resource-management
+approach
+of~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:conf/lics/LiangM09}.
+Instead of requiring non-deterministic guesses of resource splits
+during proof search, we will make use of an \emph{input} and an
+\emph{output} context, leading to the following general strategy: to
+prove $A\tensor B$ using resources $\Delta$, prove $A$ with $\Delta$,
+consuming some subset of $\Delta$, and produce as output the leftover
+resources $\Delta'$; prove $B$ using $\Delta'$ and then output the
+remaining resources $\Delta''$; finally, after having proven
+$A\tensor B$, output $\Delta''$, for subsequent derivations.
+
+\mypara{Sequent Calculus}
+Inference rules in natural deduction (the ones we have considered so far)
+are complicated to use in a proof-search strategy.
+A more suited candidate is the equivalent \emph{sequent calculus} system
+in which \emph{all} inference rules are read naturally in a \emph{bottom-up} manner.
+The introduction and elimination rules from natural deduction disappear,
+and its place is taken by right and left rules, respectively.
+Right rules and introduction rules are almost identical, since introduction rules were
+already read bottom-up. The inference rule for implication introduction ($\supset$ is used instead of $\rightarrow$), seen above in natural deduction under the
+\emph{propositions as types} subsection, is the following right rule in sequent calculus:
+\[
+    \infer*[right=($\supset R$)]
+    {\Gamma, u: A \vdash M : B}
+    {\Gamma \vdash \lambda u. M : A \supset B}
+\]
+Left rules try to capture the same idea as elimination rules in natural deduction, but are altered
+to reflect it bottom-up, instead of top-down (usual ``orientation'' of elimination rules).
+The inference rule for the also seen above implication elimination, is the following left rule here:
+\[
+    \infer*[right=($\supset L$)]
+    {\Gamma , u: A \supset B \vdash M : A \supset B \and \Gamma \vdash N : A}
+    {\Gamma \vdash M\,N : B}
+\]
+We'll define our inference rules for synthesis under the sequent calculus system,
+for it simplifies the work to be done in the synthetizer.
+
+\mypara{Focusing}
+Even with everything mentioned so far, non-determinism still pertains proof-search in logic, e,g., at any given point, many proof rules are applicable in general.
+Focusing has been previously studied as a way to conduct proof search in linear logic~\cite{}
+--
+a method created to trim down the search space of valid proofs in
+linear logic, by eagerly applying invertible rules (i.e.~rules whose
+conclusion implies the premises), and then by ``focusing'' on a single
+connective when no more direct (invertible) rules can be applied. If
+the search is not successful, the procedure backtracks and another
+connective is chosen as the focus.
+%
+Focusing eliminates all of the
+``don't care'' non-determinism from proof search, since the order in
+which invertible rules are applied does not affect the outcome of the
+search, leaving only the non-determinism that pertains to unknowns (or
+``don't know'' non-determinism), identifying precisely the points at
+which backtracking search is necessary.
 
 
-\todo{Through the Curry-Howard correspondence, we can view the process
-  of finding a proof of a proposition as the process of synthesizing a
-program of a given type.}
 
 
 % \section{Separate}
@@ -301,20 +362,6 @@ program of a given type.}
 % \end{enumerate}
 
 \section{Related Work}
-
-% \todo[inline]{Os~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
-%   como ``estrategia geral'' de ``ler'' um sistema de tipos +
-%   engenharia como um sistema de sintese de programas tipificados;
-%   Aqui~\cite{DBLP:conf/pldi/PolikarpovaKS16} estamos num contexto
-%   ``mais avançado'' (polimorfismo e tipos refinados -- ``logica de
-%   primeira ordem'') -- tipos ricos -- trabalho aspiracional,
-%   tratamento de funcao recursivas, tratamento de tipos de dados
-%   indutivos/algebricos; Aqui~\cite{DBLP:conf/lopstr/HughesO20},
-%   sintese para graded modal types, tem a ver com ``linearidade'' kind
-%   of, abordagem baseado em focusing (portanto Curry-Howard++), no caso
-%   deles acaba por ser uma lógica ``modal'' vs linear -- não permite
-%   futuramente explorar relações com e.g. concorrência, análise de
-%   recursos.}
 
 Type-based program synthesis is a vast field of study and so it
 follows that a lot of literature is available to inspire and
@@ -391,27 +438,10 @@ synthesis procedure, which can limit the effectiveness of the overall
 approach as one scales to more sophisticated settings (e.g.~refinement
 types).
 
-
-% (no recursion   -- in that work, no
-%   obvious connection of grading with
-%   concurrency)
-  
-
-% Refinement types provide very precise specifications to assist the
-% synthesis process.
-
-% \item Synthesis of heap-manipulating
-%   programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}
-
-% Less related, but more evidence of this idea of turning ``checking''
-% systems into synthesis frameworks.
-
 % \item Resource-guided synthesis \cite{DBLP:conf/pldi/KnothWP019}
-
 % This resource-guided means something a bit different. Programs satisfy
 % a functional specification and a symbolic resource bound in the sense
 % of amortized analysis, but can provide technical insights.
-
 
 \section{Goals and Work Plan}
 
@@ -422,10 +452,9 @@ the Curry-Howard correspondence, we'll formulate the synthesis of
 typed programs in our functional language as bottom-up proof-search in
 linear logic.
 
-
 Since proof rules in \emph{natural deduction} do not entail a
 proof-search strategy, we will use the equivalent \emph{sequent
-  calculus} system to formulate our typing rules in a way that is
+calculus} system to formulate our typing rules in a way that is
 amenable to proof search.
 %
 In sequent calculus, rules can be naturally understood in a
@@ -435,17 +464,8 @@ to algorithmically reason about resource contexts: for instance, if we
 read rule $\tensor I$ from Section~\ref{sec:background} bottom-up, we
 must non-deterministically guess how to correctly split ambient
 resources into $\Delta_1$ and $\Delta_2$ to separately prove $A$ and
-$B$. To solve this issue we will adopt the resource-management
-approach
-of~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:conf/lics/LiangM09}.
-Instead of requiring non-deterministic guesses of resource splits
-during proof search, we will make use of an \emph{input} and an
-\emph{output} context, leading to the following general strategy: to
-prove $A\tensor B$ using resources $\Delta$, prove $A$ with $\Delta$,
-consuming some subset of $\Delta$, and produce as output the leftover
-resources $\Delta'$; prove $B$ using $\Delta'$ and then output the
-remaining resources $\Delta''$; finally, after having proven
-$A\tensor B$, output $\Delta''$, for subsequent derivations.
+$B$. The resource-management approach we'll adopt to solve this has been 
+previously explained in more detail.
 
 With the use of input/output contexts, and the sequent calculus
 formulation of the inference rules, we draw closer to an effective
@@ -453,22 +473,8 @@ strategy for bottom-up proof search and so of program synthesis.
 %
 
 However, the search process still encompasses significant
-non-determinism, e.g., at any given point, many proof rules are
-applicable in general. To address this we draw on the technique of
-focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05} --
-a method created to trim down the search space of valid proofs in
-linear logic, by eagerly applying invertible rules (i.e.~rules whose
-conclusion implies the premises), and then by ``focusing'' on a single
-connective when no more direct (invertible) rules can be applied. If
-the search is not successful, the procedure backtracks and another
-connective is chosen as the focus.
-%
-Focusing eliminates all of the
-``don't care'' non-determinism from proof search, since the order in
-which invertible rules are applied does not affect the outcome of the
-search, leaving only the non-determinism that pertains to unknowns (or
-``don't know'' non-determinism), identifying precisely the points at
-which backtracking search is necessary.
+non-determinism. To address this we draw on the technique of
+focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05} as seen before.
 
 With the basic framework in place, we will consider additional
 (simply-typed) language constructs and synthesis of program fragments
@@ -481,12 +487,10 @@ valid programs space.
 Putting together everything above, and the more detailed information in the background section -- linear types, sequent calculus, resource management, and focusing,
 we have a set of inference rules (written out in the appendix) that define how the synthesis process will progress.
 
-The full and partial synthesis mentioned are closely related, in which the latter is also a complete synthesis, but inserted inside another, bigger, program that makes use pf the synthetized function.
-
 \mypara{Work Plan}
 The end goal is to have a synthetizer capable of taking a type (possibly refined) as input,
 and to produce (possibly interactively) a function or more (possibly recursive) with that same type.
-Besides the synth, we've already created a parser and a type-checker -- more than good preparation for the
+We've already created a parser and a type-checker -- more than good preparation for the
 development of the synthetizer, they will be useful to \emph{validate} the functions synthetized, and to implement the
 synthesis of partial programs. The implementations are in Haskell, a functional language, since it's easier to reason about inference rules that way.
 
