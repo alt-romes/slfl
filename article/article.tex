@@ -5,7 +5,6 @@
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{hyperref}
-\usepackage{todonotes}
 
 \newcommand{\lolli}{\multimap}
 \newcommand{\tensor}{\otimes}
@@ -64,7 +63,7 @@ with the given type and so matching the specification.
 %
 In order to make type-based specifications more expressive, type-based
 synthesis frameworks use rich type systems such as refinement
-types~\cite{} and polymorphic types~\cite{}.
+types~\cite{DBLP:conf/pldi/PolikarpovaKS16} and polymorphic types~\cite{DBLP:conf/pldi/PolikarpovaKS16}.
 
 Richer type systems allow for more precise types, which can
 statically eliminate various kinds of logical errors by making certain
@@ -101,7 +100,7 @@ that they constrain resource usage in programs by \emph{statically}
 limiting the number of times certain resources can be used during
 their lifetime.  They can be applied to resource-aware programming
 such as concurrent programming (e.g. session types for message passing
-concurrency~\cite{}), and to memory-management (e.g.~Rust's ownership
+concurrency~\cite{DBLP:journals/mscs/CairesPT16}), and to memory-management (e.g.~Rust's ownership
 types).
 
 \mypara{Goals}
@@ -134,7 +133,7 @@ with a given type $A$ if one can construct a typing derivation with $M :
 A$ as its conclusion, by repeated application of the inference rules.
 
 The simply-typed $\lambda$-calculus is a typed core functional
-language~\cite{} that captures the essence of a type system in a simple and familiar environment. Its syntax consists of
+language~\cite{10.5555/509043} that captures the essence of a type system in a simple and familiar environment. Its syntax consists of
 functional abstraction, written $\lambda x{:}A.M$, denoting
 an (anonymous) function that takes an argument of type $A$, bound to
 $x$ in $M$; and application $M\,N$, with the standard meaning, and
@@ -338,48 +337,48 @@ as follows:
     \infer*[right=($\supset L$)]
     {\Gamma , u:B\vdash M : C \and \Gamma, u{:}A\supset B \vdash N : A}
     {\Gamma, u{:}A\supset B\vdash M\{(u\,N)/u\} : C}
-  \]
-  As implied by their name, left rules define how to decompose or make
-  use of a connective on the left of the turnstile $\vdash$. To use an
-  assumption of $A\supset B$ while attempting to show some proposition
-  $C$ we produce a proof of $A$, which allows us to use an assumption
-  of $B$ to prove $C$. In terms of the corresponding $\lambda$-terms,
-  the $\supset L$ rule corresponds to applying the variable $u$ to the
-  argument $N$ but potentially deep in the structure of $M$.
+\]
+As implied by their name, left rules define how to decompose or make
+use of a connective on the left of the turnstile $\vdash$. To use an
+assumption of $A\supset B$ while attempting to show some proposition
+$C$ we produce a proof of $A$, which allows us to use an assumption
+of $B$ to prove $C$. In terms of the corresponding $\lambda$-terms,
+the $\supset L$ rule corresponds to applying the variable $u$ to the
+argument $N$ but potentially deep in the structure of $M$.
 
-  
-  We'll define our inference rules for synthesis under the sequent
-  calculus system, for it simplifies the work to be done in the
-  synthesizer.
 
-  \mypara{Focusing}
-  
-  Even with everything mentioned so far, non-determinism is still
-  present proof-search in logic, e,g., at any given point, many proof
-  rules are applicable in general. The technique of focusing~\cite{}
-  has been previously studied as a way to discipline proof search in
-  linear logic-- a method created to trim down the search space of
-  valid proofs in linear logic, by eagerly applying invertible rules
-  (i.e.~rules whose conclusion implies the premises), and then by
-  ``focusing'' on a single connective when no more direct (invertible)
-  rules can be applied, that is, only applying rules that breakdown
-  the connective under focus or its subformulas. If the search is not
-  successful, the procedure backtracks and another connective is
-  chosen as the focus.
+We'll define our inference rules for synthesis under the sequent
+calculus system, for it simplifies the work to be done in the
+synthesizer.
 
-  Focusing eliminates all of the ``don't care'' non-determinism from
-  proof search, since the order in which invertible rules are applied
-  does not affect the outcome of the search, leaving only the
-  non-determinism that pertains to unknowns (or ``don't know''
-  non-determinism), identifying precisely the points at which
-  backtracking search is necessary.
+\mypara{Focusing}
+
+Even with everything mentioned so far, non-determinism is still
+present proof-search in logic, e,g., at any given point, many proof
+rules are applicable in general. The technique of focusing~\cite{10.1093/logcom/2.3.297}
+has been previously studied as a way to discipline proof search in
+linear logic-- a method created to trim down the search space of
+valid proofs in linear logic, by eagerly applying invertible rules
+(i.e.~rules whose conclusion implies the premises), and then by
+``focusing'' on a single connective when no more direct (invertible)
+rules can be applied, that is, only applying rules that breakdown
+the connective under focus or its subformulas. If the search is not
+successful, the procedure backtracks and another connective is
+chosen as the focus.
+
+Focusing eliminates all of the ``don't care'' non-determinism from
+proof search, since the order in which invertible rules are applied
+does not affect the outcome of the search, leaving only the
+non-determinism that pertains to unknowns (or ``don't know''
+non-determinism), identifying precisely the points at which
+backtracking search is necessary.
 
 
 \section{Related Work}
 
 Type-based program synthesis is a vast field of study and so it
 follows that a lot of literature is available to inspire and
-complement our work. Most works~\cite{} follow some variation of the
+complement our work. Most works~\cite{DBLP:conf/lopstr/HughesO20,DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16} follow some variation of the
 synthesis-as-proof-search approach, however, the process is novel for
 each, due to a variety of different rich types explored, and their
 respective corresponding logics and programming languages; or nuances
@@ -388,18 +387,18 @@ program examples; or even the programming paradigm of the output
 produced (e.g. generating heap manipulating
 programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).  Some other
 common patterns we might want to follow are the use of type
-refinements~\cite{} and the support for synthesis of recursive
-functions~\cite{}.  These works share some common ground, and base
+refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16} and the support for synthesis of recursive
+functions~\cite{DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15}.  These works share some common ground, and base
 themselves of the same works we do -- most famously the Curry-Howard
 correspondence, but also, for example, works on focusing-based
-proof-search~\cite{focusing}.
+proof-search~\cite{10.1093/logcom/2.3.297}.
 
 \mypara{Type-and-Example-Directed Program Synthesis} This
 work~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
 explores a purely functional, recursive program synthesis technique
 based on types/proof search (as we intend to do), with examples as an
 auxiliar technique to trim down the program synthesis vast search
-space.  \todo[inline]{more introduction to the paper}.  A good use is
+space. A good use is
 made of the general strategy of using a type system to generate
 programs (by ``inverting'' the type system), rather than using it to
 type-check one.  Moreover, the paper uses a data structure called
