@@ -355,9 +355,9 @@ synthesizer.
 
 Even with everything mentioned so far, non-determinism is still
 present proof-search in logic, e,g., at any given point, many proof
-rules are applicable in general. The technique of focusing~\cite{10.1093/logcom/2.3.297}
+rules are applicable in general. The technique of focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05}
 has been previously studied as a way to discipline proof search in
-linear logic-- a method created to trim down the search space of
+linear logic -- a method created to trim down the search space of
 valid proofs in linear logic, by eagerly applying invertible rules
 (i.e.~rules whose conclusion implies the premises), and then by
 ``focusing'' on a single connective when no more direct (invertible)
@@ -531,25 +531,26 @@ The implementations have been carried out in Haskell since it's easier
 to model and implement inference rules in a functional setting.
 
 \mypara{Step by step} Our work so far has been constantly accompanied
-by somewhat dense theoretical material, state of the art,
-which we must understand to overcome challenges in these fields,
-and build from the start a more scalable synthetizer -- we want
-to display concrete results to prove the feasability of synthetising
-linear types, and thus possibility for future application to related fields,
-such as session types for message passing concurrency.
+by the study of somewhat dense theoretical material, state of the art,
+which we must understand to overcome challenges in these fields, in
+order to develop a more scalable synthetizer -- we want to display
+concrete results to prove the feasability of program synthesis from
+linear types, and thus open the possibility for future application to
+related fields, such as program synthesis based on session types for
+message-passing concurrency.
 
-Apart from the theory, when we started studying type systems, we created
-a simple type-checker for the simply-typed $\lambda$-calculus.
+Apart from the theory, when we started studying type systems, we
+created a simple type-checker for the simply-typed $\lambda$-calculus.
 While learning about linear type systems, and the simply-typed linear
-$\lambda$-calculus, we developed a parser, a desugar module, and an
-evaluation module to write simple programs in the language;
-culminating in writing the type-checker for linear types. At this point,
-where we stand as of now, we can parse, type-check, and evaluate this
-small linear functional language.
-The next step is to start developing the actual synthetizer, embedding it
-with all the techniques we've seen. Following work will be done to
-augment usability, expand the language domain, and add features such as the
-ones mentioned above.
+$\lambda$-calculus, we developed a parser, a desugaring module, and an
+evaluation module to write, analyze and execute simple programs in the
+language; culminating in writing a type-checker for the linear
+$\lambda$-calculus. At this point, we can parse, typecheck, and
+execute this small linear functional language.  The next step is to
+start developing the actual synthetizer, embedding it with all the
+techniques we've seen. Following work will be done to augment
+usability, expand the language domain, and add features such as those
+mentioned above.
 
 \mypara{Evaluation} Validation and evaluation of our work is fairly
 easy. Simple questions such as \emph{does it typecheck}? \emph{can
