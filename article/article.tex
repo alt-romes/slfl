@@ -146,12 +146,14 @@ taking an argument of type $A$ and returning it back.
 It turns out that the inference rules of the simply-typed
 $\lambda$-calculus are closely related to those of a system of natural
 deduction for intuitionistic logic~\cite{prawitznd65}. This
-relationship, known as the Curry-Howard correspondence~\cite{},
+relationship, known as the Curry-Howard
+correspondence~(see~\cite{DBLP:journals/cacm/Wadler15} for a
+historical survey),
 identifies that the propositions of intuitionistic logic can be read
 as types for the simply-typed $\lambda$-calculus (``propositions as
 types''), their proofs are exactly the program with the given type
 (``proofs as programs''), and checking a proof is type checking a
-program (``proof checking as type checking'')~\cite{}.
+program (``proof checking as type checking'').
 
 Inference rules in natural deduction are categorized as introduction
 or elimination rules, these correspond, respectively, to rules for
@@ -269,8 +271,8 @@ takes the form:
   internalizes the simply-typed $\lambda$-calculus in the linear
   $\lambda$-calculus.
 
-  The elimination form for the exponential, written $\vdash \llet{ !u
-    = M}{ N}$, warrants the use of the resource $A$ an unbounded
+  The elimination form for the exponential, written $\llet{ !u
+    = M}{ N}$, warrants the use of resource $A$ an unbounded
   number of times in $N$ via the variable $u$:  
 \[
     \infer*[right=($\bang E$)]
@@ -350,23 +352,42 @@ functions).
 
 % or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
   
-\mypara{Program Synthesis from Polymorfic Refinement Types}~\cite{DBLP:conf/pldi/PolikarpovaKS16}
-This paper also attempts to synthetize recursive functional programs, in a more ``advanced'' setting. The specification
-is a combination of two rich types, polymorfic and refinement types (which correspond to a first-order logic through the Curry-Howard isomorphism) -- this is an interesting
-combo that offers ``expressive power and decidability, which enables automatic verification--and hence synthesis--of nontrivial programs''.
-Their approach to the refinement types is a new algorithm that supports decomposition of the refinement specification,
-and they separation between the language of specification and programs.
+\mypara{Program Synthesis from Polymorfic Refinement Types} The
+work~\cite{DBLP:conf/pldi/PolikarpovaKS16} also studies synthesis
+recursive functional programs but in a more ``advanced'' setting. The
+specification is a combination of two rich forms of types: polymorphic and
+refinement types (which correspond to a first-order logic through the
+Curry-Howard isomorphism) -- this is an interesting combination that offers
+``expressive power and decidability, which enables automatic
+verification--and hence synthesis--of nontrivial programs''.  Their
+approach to refinement types consists a new algorithm that supports
+decomposition of the refinement specification, allowing for separation
+between the language of specification and programs and making the
+approach amenable to compositional synthesis techniques.
 
 
-\mypara{Resourceful Program Synthesis from Graded Linear Types}~\cite{DBLP:conf/lopstr/HughesO20}
-This paper attempts to synthetize programs in a manner very similar to ours.
-It uses graded modal types, which is an ``augment'' to linear types -- a more \emph{fine-grained} version, since it allows for
-quantitative specification of resource usage, in contrast to ours either \emph{linear} or \emph{unrestricted} (``banged'' values) use of assumptions.
-Their resource management is more complex, and so they provide solutions which adapt Hodas and Miller's input-output model~\cite{} -- the model we'll be using.
-They also use focusing as a solution to trim down search space, and our solution will use the same literature as a base.
-However, since the logic behind the their types is \emph{modal}, instead of \emph{linear}, it doesn't allow to, in the future, explore
-the tight relation between linear logic and concurrency based (message passing) programs with session types (e.g. synthetize concurrent programs with message passing), and other fields such as
-resource analysis? -- which ours will. 
+\mypara{Resourceful Program Synthesis from Graded Linear Types} The
+work~\cite{DBLP:conf/lopstr/HughesO20} synthesizes programs using an
+approach very similar to our own.  The work employs so-called graded
+modal types, which is an refinement of pure linear types -- a more
+\emph{fine-grained} version, since it allows for quantitative
+specification of resource usage, in contrast to ours either
+\emph{linear} or \emph{unrestricted} (via the linear logic
+exponential) use of assumptions.  Their resource management is more
+complex, and so they provide solutions which adapt Hodas and Miller's
+resource management approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09} -- the model we'll be using.
+
+They also use focusing as a solution to trim down search space and
+to ensure that synthesis only produces well-typed programs, and
+our solution will use the same literature as a base.  However, since
+their underlying logic is \emph{modal} rather than purely
+\emph{linear}, it lacks a clear correspondence with concurrent
+session-typed programs~\cite{}, which is a crucial avenue of future
+work. Moreover, their use grading effectively requires constraint solving to
+be integrated with the synthesis procedure, which can limit the
+effectiveness of the overall approach as one scales to more
+sophisticated settings (e.g.~refinement types).
+
 
 % (no recursion   -- in that work, no
 %   obvious connection of grading with
