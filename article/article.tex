@@ -345,22 +345,6 @@ search, leaving only the non-determinism that pertains to unknowns (or
 which backtracking search is necessary.
 
 
-
-
-% \section{Separate}
-
-% More about the concepts than citing concrete works (but citations are
-% needed!):
-% \begin{enumerate}
-% \item PL/Type systems in a ``formal'' sense (inference rules, etc) [DONE]
-% \item Propositions as types: Proofs as programs, proof search as
-%   synthesis, etc. [MOSTLY DONE]
-% \item Linear logic: a ``resource aware logic'' [ONGOING]
-% \item Proof search in LL: challenges, focusing as a ``solution'' [ONGOING]
-% \item Linear $\lambda$-calculus: what does it look like.
-% \item Type-based synthesis: ``inverting'' a type system.
-% \end{enumerate}
-
 \section{Related Work}
 
 Type-based program synthesis is a vast field of study and so it
@@ -379,7 +363,6 @@ functions~\cite{}.  These works share some common ground, and base
 themselves of the same works we do -- most famously the Curry-Howard
 correspondence, but also, for example, works on focusing-based
 proof-search~\cite{focusing}.
-
 
 \mypara{Type-and-Example-Directed Program Synthesis} This
 work~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
@@ -411,7 +394,6 @@ approach to refinement types consists a new algorithm that supports
 decomposition of the refinement specification, allowing for separation
 between the language of specification and programs and making the
 approach amenable to compositional synthesis techniques.
-
 
 \mypara{Resourceful Program Synthesis from Graded Linear Types} The
 work~\cite{DBLP:conf/lopstr/HughesO20} synthesizes programs using an
@@ -489,10 +471,11 @@ we have a set of inference rules (written out in the appendix) that define how t
 
 \mypara{Work Plan}
 The end goal is to have a synthetizer capable of taking a type (possibly refined) as input,
-and to produce (possibly interactively) a function or more (possibly recursive) with that same type.
+that produces (possibly interactively) a function or more (possibly recursive) with that same type.
 We've already created a parser and a type-checker -- more than good preparation for the
 development of the synthetizer, they will be useful to \emph{validate} the functions synthetized, and to implement the
 synthesis of partial programs. The implementations are in Haskell, a functional language, since it's easier to reason about inference rules that way.
+Our work began 
 
 \mypara{Evaluation}
 Validation and evaluation of our work is fairly simple. Simple questions such as \emph{does it typecheck}? \emph{can you synth}? \emph{how fast}?
