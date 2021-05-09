@@ -351,7 +351,7 @@ functions).
 
 % or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
   
-\mypara{Synthesis from (polymorphic) refinement types}~\cite{DBLP:conf/pldi/PolikarpovaKS16}
+\mypara{Program Synthesis from Polymorfic Refinement Types}~\cite{DBLP:conf/pldi/PolikarpovaKS16}
 This paper also attempts to synthetize recursive functional programs, in a more ``advanced'' setting. The specification
 is a combination of two rich types, polymorfic and refinement types (which correspond to a first-order logic through the Curry-Howard isomorphism) -- this is an interesting
 combo that offers ``expressive power and decidability, which enables automatic verification--and hence synthesis--of nontrivial programs''.
@@ -359,9 +359,19 @@ Their approach to the refinement types is a new algorithm that supports decompos
 and they separation between the language of specification and programs.
 
 
-\mypara{Synthesis for graded types} (no recursion   -- in that work, no
-  obvious connection of grading with
-  concurrency)~\cite{DBLP:conf/lopstr/HughesO20}
+\mypara{Resourceful Program Synthesis from Graded Linear Types}~\cite{DBLP:conf/lopstr/HughesO20}
+This paper attempts to synthetize programs in a manner very similar to ours.
+It uses graded modal types, which is an ``augment'' to linear types -- a more \emph{fine-grained} version, since it allows for
+quantitative specification of resource usage, in contrast to ours either \emph{linear} or \emph{unrestricted} (``banged'' values) use of assumptions.
+Their resource management is more complex, and so they provide solutions which adapt Hodas and Miller's input-output model~\cite{} -- the model we'll be using.
+They also use focusing as a solution to trim down search space, and our solution will use the same literature as a base.
+However, since the logic behind the their types is \emph{modal}, instead of \emph{linear}, it doesn't allow to, in the future, explore
+the tight relation between linear logic and concurrency based (message passing) programs with session types (e.g. synthetize concurrent programs with message passing), and other fields such as
+resource analysis? -- which ours will. 
+
+% (no recursion   -- in that work, no
+%   obvious connection of grading with
+%   concurrency)
   
 
 Refinement types provide very precise specifications to assist the
