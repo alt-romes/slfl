@@ -284,19 +284,19 @@ takes the form:
 program of a given type.}
 
 
-\section{Separate}
+% \section{Separate}
 
-More about the concepts than citing concrete works (but citations are
-needed!):
-\begin{enumerate}
-\item PL/Type systems in a ``formal'' sense (inference rules, etc) [DONE]
-\item Propositions as types: Proofs as programs, proof search as
-  synthesis, etc. [MOSTLY DONE]
-\item Linear logic: a ``resource aware logic'' [ONGOING]
-\item Proof search in LL: challenges, focusing as a ``solution'' [ONGOING]
-\item Linear $\lambda$-calculus: what does it look like.
-\item Type-based synthesis: ``inverting'' a type system.
-\end{enumerate}
+% More about the concepts than citing concrete works (but citations are
+% needed!):
+% \begin{enumerate}
+% \item PL/Type systems in a ``formal'' sense (inference rules, etc) [DONE]
+% \item Propositions as types: Proofs as programs, proof search as
+%   synthesis, etc. [MOSTLY DONE]
+% \item Linear logic: a ``resource aware logic'' [ONGOING]
+% \item Proof search in LL: challenges, focusing as a ``solution'' [ONGOING]
+% \item Linear $\lambda$-calculus: what does it look like.
+% \item Type-based synthesis: ``inverting'' a type system.
+% \end{enumerate}
 
 \section{Related Work}
 
@@ -313,7 +313,6 @@ needed!):
 %   deles acaba por ser uma lógica ``modal'' vs linear -- não permite
 %   futuramente explorar relações com e.g. concorrência, análise de
 %   recursos.}
-
 
 Type-based program synthesis is a vast field of study and so it
 follows that a lot of literature is available to inspire and
@@ -374,8 +373,8 @@ resource analysis? -- which ours will.
 %   concurrency)
   
 
-Refinement types provide very precise specifications to assist the
-synthesis process.
+% Refinement types provide very precise specifications to assist the
+% synthesis process.
 
 % \item Synthesis of heap-manipulating
 %   programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}
@@ -392,54 +391,75 @@ synthesis process.
 
 \section{Goals and Work Plan}
 
+We start with the definition of our type system and simply-typed functional language
+with linear types ($\lolli$, $\tensor$, $1$, $\with$, $\oplus$, $\bang$, $Bool?$).
+Through the Curry-Howard correspondence, we'll formulate the synthesis of a
+linear type in our functional lanugage as proof search in linear logic.
+Since \emph{natural deduction} is ``natural'' in practice, and thus, harder to streamline and reason about,
+we'll use the equivalent \emph{sequent calculus} to formulate our inference rules.
+In sequent calculus, all our rules can be read in a \emph{bottom-up} manner, simplifying the reasoning for the synthetizer.
+Therafter, a way to reason about our resource contexts is needed, and the Hodas and Miller's? input-output model~\cite{} comes into play.
+According to it, instead of a single context that we must split into parts when proving the judgments
+above the inference rule line, we'll utilize an \emph{input} and an \emph{output} context -- to prove $A\tensor B$ with $\Delta$, prove $A$ with $\Delta$, consuming the needed resources, and output a $\Delta'$, prove $B$ with $\Delta'$ and the output the remaining resources in $\Delta''$, and finally, after having proven $A\tensor B$, output $\Delta''$, which might be used by another judgment.
+With the input/output contexts, and the sequent calculus formulation of the inference rules, we're on a good path to synthetize programs.
+However, even though proof-search here might seem direct, it still encompasses a lot of non-determinism, e.g., which rule to apply at a certain point?
+To this we add focusing~\cite{} -- a method created to trim down the search space of valid proofs in a linear logic, by conducting the
+proof-search first with invertible rules, and then by focusing where no more direct (invertible) rules can be applied.
+With focusing we tame some of non-determinism from the synthesis aspect. \todo{talvez algo mais sobre focusing aqui.}
+We might, later on, add refinement types also as a way to constrain the valid programs space.
+Additionally, we might need to discuss strategies to synthetize recursive functions as well.
 
-Expand on earlier points. Start from a functional language with linear
-types ($\tensor$, $\lolli$, $\oplus$, $\bang$); build on it with more
-``stuff''. General techniques, drawn from proof theory via props as
-types: explore focusing to tame non-determinism/search space. Partial
-synthesis is still proof search! Add other techniques as we go along
-(e.g. for recursion we need to constrain recursive calls).
+Putting together everything above, and the more detailed information in the background section -- linear types, sequent calculus, resource management, and focusing,
+we have a set of inference rules (written out in the appendix) that define how the synthesis process will progress.
 
-Mention that you've already implemented a type-checker for this
-(useful as a prelim. Exercise but also later, for \emph{validation}).
 
-Validation and evaluation: validation is as simple as ``does it typecheck''? can you synth? how fast?
+% Expand on earlier points. Start from a functional language with linear
+% types ($\tensor$, $\lolli$, $\oplus$, $\bang$); build on it with more
+% ``stuff''. General techniques, drawn from proof theory via props as
+% types: explore focusing to tame non-determinism/search space. Partial
+% synthesis is still proof search! Add other techniques as we go along
+% (e.g. for recursion we need to constrain recursive calls).
 
-\section{Bonus}
+% Mention that you've already implemented a type-checker for this
+% (useful as a prelim. Exercise but also later, for \emph{validation}).
 
-\[
-  \begin{array}{lcl}
-    A, B & ::= & A \tensor B \mid A \lolli B \mid A \with B \mid A
-                 \oplus B \mid \bang A \mid \one \mid \dots\\[1ex]
-    M,N & ::= & \lambda x{:}A.M\\
-         & \mid & M\,N\\
-         & \mid & (M \tensor N)\\
-         & \mid & \llet{x\tensor y = M}{N} \\
-         & \mid & x \\
-         & \mid & \dots\\
-    \end{array}
-\]
+% Validation and evaluation: validation is as simple as ``does it typecheck''? can you synth? how fast?
 
-\[
-  \infer[$(\lolli\! I)$]
-  {\Delta , x{:}A \vdash M : B}
-  {\Delta \vdash \lambda x {:} A . M : A \lolli B}
-  \quad
-  \infer[$(\lolli\! E)$]
-  {\Delta_1 \vdash M : A \lolli B \and \Delta_2 \vdash N : A}
-  {\Delta_1, \Delta_2 \vdash M\,N : B}
-\]
+% \section{Bonus}
 
-\[
-  \infer*[left=($\tensor I$)]
-  {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
-  {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
-  \quad
-  \infer*[right=($\tensor E$)]
-  {\Delta_1 \vdash M : A \tensor B \and \Delta_2 , x{:}A, y{:}B\vdash
-    N : C }
-  {\Delta_1 , \Delta_2\vdash \llet{x\tensor y = M}{N} : C }
-\]
+% \[
+%   \begin{array}{lcl}
+%     A, B & ::= & A \tensor B \mid A \lolli B \mid A \with B \mid A
+%                  \oplus B \mid \bang A \mid \one \mid \dots\\[1ex]
+%     M,N & ::= & \lambda x{:}A.M\\
+%          & \mid & M\,N\\
+%          & \mid & (M \tensor N)\\
+%          & \mid & \llet{x\tensor y = M}{N} \\
+%          & \mid & x \\
+%          & \mid & \dots\\
+%     \end{array}
+% \]
+
+% \[
+%   \infer[$(\lolli\! I)$]
+%   {\Delta , x{:}A \vdash M : B}
+%   {\Delta \vdash \lambda x {:} A . M : A \lolli B}
+%   \quad
+%   \infer[$(\lolli\! E)$]
+%   {\Delta_1 \vdash M : A \lolli B \and \Delta_2 \vdash N : A}
+%   {\Delta_1, \Delta_2 \vdash M\,N : B}
+% \]
+
+% \[
+%   \infer*[left=($\tensor I$)]
+%   {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
+%   {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
+%   \quad
+%   \infer*[right=($\tensor E$)]
+%   {\Delta_1 \vdash M : A \tensor B \and \Delta_2 , x{:}A, y{:}B\vdash
+%     N : C }
+%   {\Delta_1 , \Delta_2\vdash \llet{x\tensor y = M}{N} : C }
+% \]
 
 
 
