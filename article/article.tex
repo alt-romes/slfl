@@ -120,7 +120,7 @@ expressiveness benchmarks (i.e. can we synthesize a term of type $T$?) and time
 measurements (i.e. how fast can we synthesize a term of type $T$?').
 
 
-\section{Background}
+\section{Background}\label{sec:background}
 
 \mypara{Type Systems} A type system can be formally described through
 a set of inference rules that inductively define a judgment of the
@@ -375,18 +375,21 @@ specification of resource usage, in contrast to ours either
 \emph{linear} or \emph{unrestricted} (via the linear logic
 exponential) use of assumptions.  Their resource management is more
 complex, and so they provide solutions which adapt Hodas and Miller's
-resource management approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09} -- the model we'll be using.
+resource management
+approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
+-- the model we will be using.
 
-They also use focusing as a solution to trim down search space and
-to ensure that synthesis only produces well-typed programs, and
-our solution will use the same literature as a base.  However, since
-their underlying logic is \emph{modal} rather than purely
-\emph{linear}, it lacks a clear correspondence with concurrent
-session-typed programs~\cite{}, which is a crucial avenue of future
-work. Moreover, their use grading effectively requires constraint solving to
-be integrated with the synthesis procedure, which can limit the
-effectiveness of the overall approach as one scales to more
-sophisticated settings (e.g.~refinement types).
+They also use focusing as a solution to trim down search space and to
+ensure that synthesis only produces well-typed programs, and our
+solution will use the same literature as a base.  However, since their
+underlying logic is \emph{modal} rather than purely \emph{linear}, it
+lacks a clear correspondence with concurrent session-typed
+programs~\cite{DBLP:journals/mscs/CairesPT16,DBLP:conf/concur/CairesP10},
+which is a crucial avenue of future work. Moreover, their use grading
+effectively requires constraint solving to be integrated with the
+synthesis procedure, which can limit the effectiveness of the overall
+approach as one scales to more sophisticated settings (e.g.~refinement
+types).
 
 
 % (no recursion   -- in that work, no
@@ -412,23 +415,68 @@ sophisticated settings (e.g.~refinement types).
 
 \section{Goals and Work Plan}
 
-We start with the definition of our type system and simply-typed functional language
-with linear types ($\lolli$, $\tensor$, $1$, $\with$, $\oplus$, $\bang$, $Bool?$).
-Through the Curry-Howard correspondence, we'll formulate the synthesis of a
-linear type in our functional lanugage as proof search in linear logic.
-Since \emph{natural deduction} is ``natural'' in practice, and thus, harder to streamline and reason about,
-we'll use the equivalent \emph{sequent calculus} to formulate our inference rules.
-In sequent calculus, all our rules can be read in a \emph{bottom-up} manner, simplifying the reasoning for the synthetizer.
-Therafter, a way to reason about our resource contexts is needed, and the Hodas and Miller's? input-output model~\cite{} comes into play.
-According to it, instead of a single context that we must split into parts when proving the judgments
-above the inference rule line, we'll utilize an \emph{input} and an \emph{output} context -- to prove $A\tensor B$ with $\Delta$, prove $A$ with $\Delta$, consuming the needed resources, and output a $\Delta'$, prove $B$ with $\Delta'$ and the output the remaining resources in $\Delta''$, and finally, after having proven $A\tensor B$, output $\Delta''$, which might be used by another judgment.
-With the input/output contexts, and the sequent calculus formulation of the inference rules, we're on a good path to synthetize programs.
-However, even though proof-search here might seem direct, it still encompasses a lot of non-determinism, e.g., which rule to apply at a certain point?
-To this we add focusing~\cite{} -- a method created to trim down the search space of valid proofs in a linear logic, by conducting the
-proof-search first with invertible rules, and then by focusing where no more direct (invertible) rules can be applied.
-With focusing we tame some of non-determinism from the synthesis aspect. \todo{talvez algo mais sobre focusing aqui.}
-We might, later on, add refinement types also as a way to constrain the valid programs space.
-Additionally, we might need to discuss strategies to synthetize recursive functions as well.
+We start with the definition of our type system and simply-typed
+functional language with linear function, sum and product types
+($\lolli$, $\tensor$, $\one$, $\with$, $\oplus$, $\bang$).  Through
+the Curry-Howard correspondence, we'll formulate the synthesis of
+typed programs in our functional language as bottom-up proof-search in
+linear logic.
+
+
+Since proof rules in \emph{natural deduction} do not entail a
+proof-search strategy, we will use the equivalent \emph{sequent
+  calculus} system to formulate our typing rules in a way that is
+amenable to proof search.
+%
+In sequent calculus, rules can be naturally understood in a
+\emph{bottom-up} manner, simplifying the reasoning for the
+synthesizer. Moreover, the linear nature of our system requires a way
+to algorithmically reason about resource contexts: for instance, if we
+read rule $\tensor I$ from Section~\ref{sec:background} bottom-up, we
+must non-deterministically guess how to correctly split ambient
+resources into $\Delta_1$ and $\Delta_2$ to separately prove $A$ and
+$B$. To solve this issue we will adopt the resource-management
+approach
+of~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:conf/lics/LiangM09}.
+Instead of requiring non-deterministic guesses of resource splits
+during proof search, we will make use of an \emph{input} and an
+\emph{output} context, leading to the following general strategy: to
+prove $A\tensor B$ using resources $\Delta$, prove $A$ with $\Delta$,
+consuming some subset of $\Delta$, and produce as output the leftover
+resources $\Delta'$; prove $B$ using $\Delta'$ and then output the
+remaining resources $\Delta''$; finally, after having proven
+$A\tensor B$, output $\Delta''$, for subsequent derivations.
+
+With the use of input/output contexts, and the sequent calculus
+formulation of the inference rules, we draw closer to an effective
+strategy for bottom-up proof search and so of program synthesis.
+%
+
+However, the search process still encompasses significant
+non-determinism, e.g., at any given point, many proof rules are
+applicable in general. To address this we draw on the technique of
+focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05} --
+a method created to trim down the search space of valid proofs in
+linear logic, by eagerly applying invertible rules (i.e.~rules whose
+conclusion implies the premises), and then by ``focusing'' on a single
+connective when no more direct (invertible) rules can be applied. If
+the search is not successful, the procedure backtracks and another
+connective is chosen as the focus.
+%
+Focusing eliminates all of the
+``don't care'' non-determinism from proof search, since the order in
+which invertible rules are applied does not affect the outcome of the
+search, leaving only the non-determinism that pertains to unknowns (or
+``don't know'' non-determinism), identifying precisely the points at
+which backtracking search is necessary.
+
+With the basic framework in place, we will consider additional
+(simply-typed) language constructs and synthesis of program fragments
+or \emph{partial synthesis} -- given a program with a typed hole,
+synthesize a term to fill out the hole accordingly. We will
+subsequently also consider synthesis of recursive functions and,
+might, later on, add refinement types also as a way to constrain the
+valid programs space.
 
 Putting together everything above, and the more detailed information in the background section -- linear types, sequent calculus, resource management, and focusing,
 we have a set of inference rules (written out in the appendix) that define how the synthesis process will progress.
