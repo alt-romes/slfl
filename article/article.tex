@@ -279,70 +279,100 @@ number of times in $N$ via the variable $u$:
     {\Gamma ; \Delta_1, \Delta_2 \vdash \llet{ !u = M}{ N} : C}
 \]
 Again, through the Curry-Howard correspondence, we can view the process
-of finding a proof of a proposition in this linear logic as the process of synthesizing a
-linear functional program of a given type.
+of finding a proof of a proposition in linear logic as the process of synthesizing a
+linear functional program of the given type.
 
 \mypara{Resource-Management}
-Coming from linear logic, we now have a new problem to solve:
-When searching for a proof, how do we break the
-contexts in the necessary way to allocate the correct resources
-to prove each judgment the judgment we're proving depends on?
-This is where the idea of \emph{input/output} contexts come in.
+Be it from the perspective of proof \emph{checking} (i.e.~type checking) or
+proof \emph{search} linear logic poses a key challenge when compared
+to the non-linear setting:
+When constructing a derivation (bottom-up), we are seemingly forced to
+guess how to correctly split the linear context such that the
+sub-derivations have access to the correct resources (e.g.~the
+$\tensor I$ rule above).
+%
+%
+
 To solve this issue we will adopt the resource-management
 approach
-of~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:conf/lics/LiangM09}.
+of~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:conf/lics/LiangM09},
+which generalizes the judgment  from $\Delta \vdash M : A$ to
+$\Delta_I \ \Delta_O \vdash M : A$, where $\Delta_I$ is an input
+context and $\Delta_O$ is an output context.
 Instead of requiring non-deterministic guesses of resource splits
-during proof search, we will make use of an \emph{input} and an
-\emph{output} context, leading to the following general strategy: to
-prove $A\tensor B$ using resources $\Delta$, prove $A$ with $\Delta$,
+during proof search, we track which resources are used and which are
+remaining via the two contexts, leading to the following general strategy: to
+prove $A\tensor B$ using (input) resources $\Delta$, prove $A$ with
+input context $\Delta$,
 consuming some subset of $\Delta$, and produce as output the leftover
-resources $\Delta'$; prove $B$ using $\Delta'$ and then output the
+resources $\Delta'$; prove $B$ using $\Delta'$ as its input context and then output the
 remaining resources $\Delta''$; finally, after having proven
 $A\tensor B$, output $\Delta''$, for subsequent derivations.
 
-\mypara{Sequent Calculus}
-Inference rules in natural deduction (the ones we have considered so far)
-are complicated to use in a proof-search strategy.
-A more suited candidate is the equivalent \emph{sequent calculus} system
-in which \emph{all} inference rules are read naturally in a \emph{bottom-up} manner.
-The introduction and elimination rules from natural deduction disappear,
-and its place is taken by right and left rules, respectively.
-Right rules and introduction rules are almost identical, since introduction rules were
-already read bottom-up. The inference rule for implication introduction ($\supset$ is used instead of $\rightarrow$), seen above in natural deduction under the
-\emph{propositions as types} subsection, is the following right rule in sequent calculus:
+\mypara{Sequent Calculus} Inference rules in natural deduction (the
+ones we have considered so far) are ill-suited for bottom-up
+proof-search since elimination rules work top-down and introduction
+rules work bottom-up.  A more suited candidate is the equivalent
+\emph{sequent calculus} system in which \emph{all} inference rules can
+be understood naturally in a \emph{bottom-up} manner.  The
+introduction and elimination rules from natural deduction disappear,
+and their place is taken by right and left rules, respectively.
+%
+Right rules correspond exactly to the introduction rules of natural
+deduction, which were already understood bottom-up. The inference rule
+for implication introduction ($\supset$ is used instead of
+$\rightarrow$), seen above in natural deduction under the
+\emph{propositions as types} subsection, corresponds to the following
+right rule in sequent calculus:
 \[
     \infer*[right=($\supset R$)]
     {\Gamma, u: A \vdash M : B}
     {\Gamma \vdash \lambda u. M : A \supset B}
-\]
-Left rules try to capture the same idea as elimination rules in natural deduction, but are altered
-to reflect it bottom-up, instead of top-down (usual ``orientation'' of elimination rules).
-The inference rule for the also seen above implication elimination, is the following left rule here:
+  \]
+
+Intuitively, left rules act as the elimination rules of natural deduction, but are altered
+to work bottom-up, instead of top-down.
+The inference rule for the also seen above implication elimination, is
+as follows:
 \[
     \infer*[right=($\supset L$)]
-    {\Gamma , u: A \supset B \vdash M : A \supset B \and \Gamma \vdash N : A}
-    {\Gamma \vdash M\,N : B}
-\]
-We'll define our inference rules for synthesis under the sequent calculus system,
-for it simplifies the work to be done in the synthetizer.
+    {\Gamma , u:B\vdash M : C \and \Gamma, u{:}A\supset B \vdash N : A}
+    {\Gamma, u{:}A\supset B\vdash M\{(u\,N)/u\} : C}
+  \]
+  As implied by their name, left rules define how to decompose or make
+  use of a connective on the left of the turnstile $\vdash$. To use an
+  assumption of $A\supset B$ while attempting to show some proposition
+  $C$ we produce a proof of $A$, which allows us to use an assumption
+  of $B$ to prove $C$. In terms of the corresponding $\lambda$-terms,
+  the $\supset L$ rule corresponds to applying the variable $u$ to the
+  argument $N$ but potentially deep in the structure of $M$.
 
-\mypara{Focusing}
-Even with everything mentioned so far, non-determinism still pertains proof-search in logic, e,g., at any given point, many proof rules are applicable in general.
-Focusing has been previously studied as a way to conduct proof search in linear logic~\cite{}
---
-a method created to trim down the search space of valid proofs in
-linear logic, by eagerly applying invertible rules (i.e.~rules whose
-conclusion implies the premises), and then by ``focusing'' on a single
-connective when no more direct (invertible) rules can be applied. If
-the search is not successful, the procedure backtracks and another
-connective is chosen as the focus.
-%
-Focusing eliminates all of the
-``don't care'' non-determinism from proof search, since the order in
-which invertible rules are applied does not affect the outcome of the
-search, leaving only the non-determinism that pertains to unknowns (or
-``don't know'' non-determinism), identifying precisely the points at
-which backtracking search is necessary.
+  
+  We'll define our inference rules for synthesis under the sequent
+  calculus system, for it simplifies the work to be done in the
+  synthesizer.
+
+  \mypara{Focusing}
+  
+  Even with everything mentioned so far, non-determinism is still
+  present proof-search in logic, e,g., at any given point, many proof
+  rules are applicable in general. The technique of focusing~\cite{}
+  has been previously studied as a way to discipline proof search in
+  linear logic-- a method created to trim down the search space of
+  valid proofs in linear logic, by eagerly applying invertible rules
+  (i.e.~rules whose conclusion implies the premises), and then by
+  ``focusing'' on a single connective when no more direct (invertible)
+  rules can be applied, that is, only applying rules that breakdown
+  the connective under focus or its subformulas. If the search is not
+  successful, the procedure backtracks and another connective is
+  chosen as the focus.
+
+  Focusing eliminates all of the ``don't care'' non-determinism from
+  proof search, since the order in which invertible rules are applied
+  does not affect the outcome of the search, leaving only the
+  non-determinism that pertains to unknowns (or ``don't know''
+  non-determinism), identifying precisely the points at which
+  backtracking search is necessary.
 
 
 
@@ -471,10 +501,11 @@ With the use of input/output contexts, and the sequent calculus
 formulation of the inference rules, we draw closer to an effective
 strategy for bottom-up proof search and so of program synthesis.
 %
-
+%
 However, the search process still encompasses significant
 non-determinism. To address this we draw on the technique of
-focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05} as seen before.
+focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05} as
+discussed above.
 
 With the basic framework in place, we will consider additional
 (simply-typed) language constructs and synthesis of program fragments
@@ -484,22 +515,48 @@ subsequently also consider synthesis of recursive functions and,
 might, later on, add refinement types also as a way to constrain the
 valid programs space.
 
-Putting together everything above, and the more detailed information in the background section -- linear types, sequent calculus, resource management, and focusing,
-we have a set of inference rules (written out in the appendix) that define how the synthesis process will progress.
+Putting together everything above, and the more detailed information
+in the background section -- linear types, sequent calculus, resource
+management, and focusing, we have a set of inference rules (written
+out in the appendix) that define how the synthesis process will
+progress.
 
-\mypara{Work Plan}
-The end goal is to have a synthetizer capable of taking a type (possibly refined) as input,
-and to produce (possibly interactively) a function or more (possibly recursive) with that same type.
-We've already created a parser and a type-checker -- more than good preparation for the
-development of the synthetizer, they will be useful to \emph{validate} the functions synthetized, and to implement the
-synthesis of partial programs. The implementations are in Haskell, a functional language, since it's easier to reason about inference rules that way.
+\subsection{Work Plan}
 
-\mypara{Evaluation}
-Validation and evaluation of our work is fairly simple. Simple questions such as \emph{does it typecheck}? \emph{can you synth}? \emph{how fast}?
-are the core of our evaluation. In more concrete terms, we can compare our times to state of the art synthetizers, present a list of working examples
-of programs synthesed by our synth, and according benchmarks. On the eventual addition of recursive functions, refinement types, and interactive synthesis,
-we'll consider, respectively, other examples to showcase recursive functions synthesis, updated times for benchmarks with refinement types, and a display of
-the possible user interaction in the user process, and the resulting function following it.
+The end goal is to have a synthetizer capable of
+taking a type (possibly refined) as input, and to produce (possibly
+interactively) one or more functions with that type, if any exist.
+
+As mentioned above, we will begin with (both partial and full)
+synthesis for the linear $\lambda$-calculus. We will then extend the
+language with additional type constructs (e.g. base types, records,
+algebraic data types) and consider synthesis in that setting. Finally,
+we will consider synthesis of recursive functions, and,
+time-permitting, we will consider simple forms of type refinements
+(e.g. arithmetic refinements).
+
+We've already implemented a parser and a type-checker for a linear
+$\lambda$-calculus using the resource management technique described
+in previous section -- more than
+good preparation for the development of the synthesizer, they will be
+useful to \emph{validate} the synthesized functions, and to enable
+the synthesis of partial programs.
+%
+The implementations have been carried out in Haskell since it's easier
+to model and implement inference rules in a functional setting.
+
+\mypara{Evaluation} Validation and evaluation of our work is fairly
+simple. Simple questions such as \emph{does it typecheck}? \emph{can
+  we synthesize}? \emph{how fast}?  are the core of our evaluation. In
+more concrete terms, we can compare our times to state of the art
+synthetizers, present a list of working examples of programs synthesized
+by our framework, and corresponding benchmarks.
+
+On the eventual addition of recursive functions, refinement types, and
+interactive synthesis, we'll consider, respectively, other examples to
+showcase recursive functions synthesis, updated times for benchmarks
+with refinement types, and a display of the possible user interaction
+in the user process, and the resulting function following it.
 
 
 % Expand on earlier points. Start from a functional language with linear
