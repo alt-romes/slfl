@@ -148,16 +148,17 @@ $\lambda$-calculus are closely related to those of a system of natural
 deduction for intuitionistic logic~\cite{prawitznd65}. This
 relationship, known as the Curry-Howard correspondence~\cite{},
 identifies that the propositions of intuitionistic logic can be read
-as types for the simply-typed $\lambda$-calculus (``propositions as types'' observation),
-their proofs are exactly the program with the given type (``proofs as programs'' observation),
-and checking a proof is type checking a program (``proof checking as type checking'' observation)~\cite{}.
+as types for the simply-typed $\lambda$-calculus (``propositions as
+types''), their proofs are exactly the program with the given type
+(``proofs as programs''), and checking a proof is type checking a
+program (``proof checking as type checking'')~\cite{}.
 
-Inference rules in natural deduction are categorized as introduction or elimination, these
-correspond to constructors and destructors in programming languages
-(e.g. function abstraction vs application, construction of a pair vs
-projection).
+Inference rules in natural deduction are categorized as introduction
+or elimination rules, these correspond, respectively, to rules for
+constructors and destructors in programming languages (e.g. function
+abstraction vs application, construction of a pair vs projection).
 
-We introduce a few typing rules to both show how a type system can be
+We introduce select typing rules to both show how a type system can be
 formalized and to show the relationship with (intuitionistic)
 propositional logic. The following rule captures the nature of a
 hypothetical judgment, allowing for reasoning from assumptions:
@@ -186,27 +187,28 @@ $B$ under the assumption that $u$ is a variable of type $A$. The rule
 shown above is an \emph{introduction} rule, that introduces the
 ``implication'' connective.
  
-Finally, let us consider an \emph{elimination} rule, also for the implication connective:
+Finally, let us consider an \emph{elimination} rule, also for implication:
 \[
     \infer*[right=($\rightarrow E$)]
     {\Gamma \vdash M : A \rightarrow B \and \Gamma \vdash N : A}
     {\Gamma \vdash M\,N : B}
 \]
-Elimination rules are easier to think of in a top-down manner. Logically, this rule states
-that if we prove $A \rightarrow B$ and $A$ we can prove $B$. Through the Curry-Howard correspondence,
-implication elimination corresponds to function application, and its type is the function return type
--- the program $M N$ has type $B$, provided $M$ has type $A \rightarrow B$ and $N$ has type $A$.
+Elimination rules are easier to think of in a top-down
+manner. Logically, this rule states that if we prove $A \rightarrow B$
+and $A$ we can prove $B$. Through the Curry-Howard correspondence,
+implication elimination corresponds to function application, and its
+type is the function return type -- the application $M N$ has type
+$B$, provided $M$ has type $A \rightarrow B$ and $N$ has type $A$.
 
 The Curry-Howard correspondence generalizes beyond the simply-typed
-$\lambda$-calculus and propositional intuitionistic logic. It extends to
-the realms of polymorphism (higher-order logic $\todo{review - {https://en.wikipedia.org/wiki/Lambda_cube}}$ second-order propositional calculus),
-dependent types (first-order predicate logic), and every other extension
-of natural deduction and simply-typed $\lambda$-calculus -- which also means
-linear logic and linear types.
+$\lambda$-calculus and propositional intuitionistic logic. It extends
+to the realms of polymorphism (higher-order logic $\todo{review -
+  \url{https://en.wikipedia.org/wiki/Lambda_cube}}$ second-order
+propositional calculus), dependent types (first-order predicate
+logic), and various other extensions of natural deduction and
+simply-typed $\lambda$-calculus -- which include linear logic and
+linear types.
 
-\todo[inline]{Daqui, para tipificar uma função, para Curry-Howard,
-  para lógica linear, para proof search, etc\dots Só faz sentido falar de dedução natural no
-  contexto de ``lógica'' / Curry-Howard.}
 
 \mypara{Linear Logic}
 
@@ -243,31 +245,39 @@ proposition $A$, and ($\Delta_2$) proposition $B$:
     {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
     {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
 \]
-Out of the logical connectives, we need to mention one more, since
-it'll alter the judgment form, and it's the one that ensures logical
-strength -- i.e. we're able to translate intuitionistic logic into
-linear logic.
-  The proposition $\bang A$ (read \emph{of course} $A$)
-is used (under certain conditions) to make a resource ``infinite''
-i.e. to make it useable an arbitrary number of times. To distinguish the
-``infinite'' variables, a separate, unrestricted, context is used -- $\Gamma$. So
-$\Gamma$ holds the ``infinite'' resources, and $\Delta$ the resources
-that can only be used once.
-The linear typing judgment for the introduction of the exponential $\bang$ takes the form:
-\todo{A formula está um pouco estranha (faltam espaços)?}
+Out of the logical connectives, we need to mention one more, since it
+augments the form of the judgment and it's the one that ensures
+logical strength -- i.e. we're able to translate intuitionistic logic
+into linear logic.  The proposition $\bang A$ (read \emph{of course}
+$A$) is used (under certain conditions) to make a resource
+``infinite'' i.e. to make it useable an arbitrary number of times. To
+distinguish the ``infinite'' variables, a separate, unrestricted,
+context is used -- $\Gamma$. So $\Gamma$ holds the ``infinite''
+resources, and $\Delta$ the resources that can only be used once.  The
+linear typing judgment for the introduction of the exponential $\bang A$
+takes the form: 
 \[
     \infer*[right=($\bang I$)]
     {\Gamma ; \emptyset \vdash M : A}
-    {\Gamma ; \emptyset \vdash !M : !A}
-\]
-\todo{Describe exponent introduction and new gamma context}
-\todo{Add h spaces in formula}
+    {\Gamma ; \emptyset \vdash \bang M : \bang A}
+  \]
+  Logically, a proof of $\bang A$ cannot use linear resources since
+  $\bang A$ denotes an unbounded (potentially $0$) number of copies of
+  $A$. Proofs of $\bang A$ may use other unrestricted or exponential
+  resources, tracked by context $\Gamma$.
+  From a computational perspective, the type $\bang A$
+  internalizes the simply-typed $\lambda$-calculus in the linear
+  $\lambda$-calculus.
+
+  The elimination form for the exponential, written $\vdash \llet{ !u
+    = M}{ N}$, warrants the use of the resource $A$ an unbounded
+  number of times in $N$ via the variable $u$:  
 \[
     \infer*[right=($\bang E$)]
-    {\Gamma ; \Delta_1 \vdash M : !A \and \Gamma, u{:}A ; \Delta_2 \vdash N : C}
-    {\Gamma ; \Delta_1, \Delta_2 \vdash let !u = M \mathsf{in} N : C}
+    {\Gamma ; \Delta_1 \vdash M : \bang A \and \Gamma, u{:}A ; \Delta_2 \vdash N : C}
+    {\Gamma ; \Delta_1, \Delta_2 \vdash \llet{ !u = M}{ N} : C}
 \]
-\todo{Describe exponent elimination and new gamma context}
+
 
 \todo{Through the Curry-Howard correspondence, we can view the process
   of finding a proof of a proposition as the process of synthesizing a
@@ -305,27 +315,39 @@ needed!):
 %   recursos.}
 
 
-Type-based program synthesis is a studied field\todo{ dizer de uma forma melhor? }, and it follows
-that a lot of literature is available to inspire and complement our work.
-Most? follow the synthesis-as-proof-search pattern, however, the process is
-novel for each, due to a variety of different rich types explored, and their respective logics; or nuances done to the process, such
-as considering examples; or even the programming paradigm of the output produced (e.g. generating heap manipulating programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
-Some other common aspects we might want to follow are the type refinements and the support for recursive functions.
-These works share some common ground, and base themselves of the same works we do -- most famously the Curry-Howard correspondence, but also,
-for example, works on the method of Focusing~\cite{focusing}.
+Type-based program synthesis is a vast field of study and so it
+follows that a lot of literature is available to inspire and
+complement our work. Most works~\cite{} follow some variation of the
+synthesis-as-proof-search approach, however, the process is novel for
+each, due to a variety of different rich types explored, and their
+respective corresponding logics and programming languages; or nuances
+of the synthesis process itself, such as complementing types with
+program examples; or even the programming paradigm of the output
+produced (e.g. generating heap manipulating
+programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).  Some other
+common patterns we might want to follow are the use of type
+refinements~\cite{} and the support for synthesis of recursive
+functions~\cite{}.  These works share some common ground, and base
+themselves of the same works we do -- most famously the Curry-Howard
+correspondence, but also, for example, works on focusing-based
+proof-search~\cite{focusing}.
 
 
-\mypara{Type-and-Example-Directed Program Synthesis}~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
-This paper explores a purely functional, recursive program synthesis technique based on types/proof search (as we intend to do),
-with examples as an auxiliar technique to trim down the program synthesis vast search space.
-\todo[inline]{more introduction to the paper}.
-A good use is made of the general strategy of using a type system
-to generate programs (by ``inverting'' the type system), rather than using it to type-check one.
-Moreover, the paper uses a data structure called ``refinement tree'' in conjunction
-with the extra information provided by the examples to allow for efficient synthesis
-of non-trivial programs. Overall it employs good engineering to achieve type-based synthesis
-of functional typed programs, with at least two additions that we might want to follow too
-(type refinements and recursive functions).
+\mypara{Type-and-Example-Directed Program Synthesis} This
+work~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
+explores a purely functional, recursive program synthesis technique
+based on types/proof search (as we intend to do), with examples as an
+auxiliar technique to trim down the program synthesis vast search
+space.  \todo[inline]{more introduction to the paper}.  A good use is
+made of the general strategy of using a type system to generate
+programs (by ``inverting'' the type system), rather than using it to
+type-check one.  Moreover, the paper uses a data structure called
+``refinement tree'' in conjunction with the extra information provided
+by the examples to allow for efficient synthesis of non-trivial
+programs. Overall it employs good engineering to achieve type-based
+synthesis of functional typed programs, with at least two additions
+that we might want to follow too (type refinements and recursive
+functions).
 
 % or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
   
