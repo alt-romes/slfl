@@ -199,7 +199,7 @@ implication elimination corresponds to function application, and its type is the
 
 The Curry-Howard correspondence generalizes beyond the simply-typed
 $\lambda$-calculus and propositional intuitionistic logic. It extends to
-the realms of polymorphism (higher-order logic \todo{review - {https://en.wikipedia.org/wiki/Lambda_cube}} second-order propositional calculus),
+the realms of polymorphism (higher-order logic $\todo{review - {https://en.wikipedia.org/wiki/Lambda_cube}}$ second-order propositional calculus),
 dependent types (first-order predicate logic), and every other extension
 of natural deduction and simply-typed $\lambda$-calculus -- which also means
 linear logic and linear types.
@@ -310,7 +310,7 @@ that a lot of literature is available to inspire and complement our work.
 Most? follow the synthesis-as-proof-search pattern, however, the process is
 novel for each, due to a variety of different rich types explored, and their respective logics; or nuances done to the process, such
 as considering examples; or even the programming paradigm of the output produced (e.g. generating heap manipulating programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
-Some other common patterns we might want to follow are the type refinements and the support for recursive functions.
+Some other common aspects we might want to follow are the type refinements and the support for recursive functions.
 These works share some common ground, and base themselves of the same works we do -- most famously the Curry-Howard correspondence, but also,
 for example, works on the method of Focusing~\cite{focusing}.
 
@@ -330,6 +330,12 @@ of functional typed programs, with at least two additions that we might want to 
 % or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
   
 \mypara{Synthesis from (polymorphic) refinement types}~\cite{DBLP:conf/pldi/PolikarpovaKS16}
+This paper also attempts to synthetize recursive functional programs, in a more ``advanced'' setting. The specification
+is a combination of two rich types, polymorfic and refinement types (which correspond to a first-order logic through the Curry-Howard isomorphism) -- this is an interesting
+combo that offers ``expressive power and decidability, which enables automatic verification--and hence synthesis--of nontrivial programs''.
+Their approach to the refinement types is a new algorithm that supports decomposition of the refinement specification,
+and they separation between the language of specification and programs.
+
 
 \mypara{Synthesis for graded types} (no recursion   -- in that work, no
   obvious connection of grading with
