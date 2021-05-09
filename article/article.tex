@@ -433,7 +433,7 @@ Additionally, we might need to discuss strategies to synthetize recursive functi
 Putting together everything above, and the more detailed information in the background section -- linear types, sequent calculus, resource management, and focusing,
 we have a set of inference rules (written out in the appendix) that define how the synthesis process will progress.
 
-The full and partial synthesis mentioned are closely related, in which the latter is also a complete synthesis, but inserted inside another, bigger, program that makes use the synthetized function.
+The full and partial synthesis mentioned are closely related, in which the latter is also a complete synthesis, but inserted inside another, bigger, program that makes use pf the synthetized function.
 
 \mypara{Work Plan}
 The end goal is to have a synthetizer capable of taking a type (possibly refined) as input,
@@ -442,7 +442,12 @@ Besides the synth, we've already created a parser and a type-checker -- more tha
 development of the synthetizer, they will be useful to \emph{validate} the functions synthetized, and to implement the
 synthesis of partial programs. The implementations are in Haskell, a functional language, since it's easier to reason about inference rules that way.
 
-
+\mypara{Evaluation}
+Validation and evaluation of our work is fairly simple. Simple questions such as \emph{does it typecheck}? \emph{can you synth}? \emph{how fast}?
+are the core of our evaluation. In more concrete terms, we can compare our times to state of the art synthetizers, present a list of working examples
+of programs synthesed by our synth, and according benchmarks. On the eventual addition of recursive functions, refinement types, and interactive synthesis,
+we'll consider, respectively, other examples to showcase recursive functions synthesis, updated times for benchmarks with refinement types, and a display of
+the possible user interaction in the user process, and the resulting function following it.
 
 
 % Expand on earlier points. Start from a functional language with linear
