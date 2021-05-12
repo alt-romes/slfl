@@ -10,6 +10,8 @@ import Text.Parsec
 import Text.Parsec.String 
 import qualified Text.Parsec.Expr as Ex 
 
+import qualified Data.Text.Lazy as L
+
 import Data.Either
 import Debug.Trace
 
@@ -228,11 +230,49 @@ type' = Ex.buildExpressionParser tyops ty
             infixOp "+" Plus Ex.AssocLeft
             ]]
 
+-- Parsing modules
+
+type Binding = (String, Expr)
+
+argument :: Parser (String, Type)
+argument = do
+    argname <- identifier
+    char ':'
+    argtype <- ty
+    return (argname, argtype)
+
+letdecl :: Parser Binding
+letdecl = do
+  reserved "let"
+  name <- identifier
+  args <- many argument
+  reservedOp "="
+  body <- expr
+  return (name, foldr (uncurry Syntax.Abs) body args)
+
+val :: Parser Binding
+val = do
+  ex <- expr
+  return ("main", ex)
+
+top :: Parser Binding
+top = do
+  x <- letdecl <|> val
+  optional (char ';')
+  return x
+
+modl :: Parser [Binding]
+modl = many top
 
 -- Toplevel
 
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"
+
+parseModule :: FilePath -> Either ParseError [Binding]
+parseModule fname = do
+    input <- readFile fname
+    parse (contents modl) fname input
 
 rightParseExpr :: String -> Expr
 rightParseExpr s = fromRight (error "error parsing") $ parseExpr s
