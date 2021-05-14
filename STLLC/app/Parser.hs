@@ -233,13 +233,13 @@ type' = Ex.buildExpressionParser tyops ty
 argument :: Parser (String, Type)
 argument = do
     argname <- identifier
-    char ':'
+    reservedOp ":"
     argtype <- ty
     return (argname, argtype)
 
 letdecl :: Parser Binding
 letdecl = do
-  reserved "let"
+  reserved "let" <|> reserved "var"
   name <- identifier
   args <- many argument
   reservedOp "="
@@ -254,7 +254,7 @@ val = do
 top :: Parser Binding
 top = do
   x <- letdecl <|> val
-  optional (char ';')
+  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona
   return x
 
 modl :: Parser [Binding]

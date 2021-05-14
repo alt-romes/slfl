@@ -2,6 +2,7 @@ module LinearCheck where
 
 import Data.Maybe
 import Data.Bifunctor
+import Debug.Trace
 
 import CoreSyntax
 
@@ -167,10 +168,12 @@ equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb)
 typecheck :: CoreExpr -> Type
 typecheck e = maybe (error "[Typecheck] Failed") fst (lincheck ([], []) e)
 
+
 typecheckModule :: [CoreBinding] -> [TypeBinding]
-typecheckModule cbs = reverse $ typecheckModule' cbs []
+typecheckModule cbs = typecheckModule' cbs []
     where typecheckModule' cbs acc = 
             if null cbs then []
             else let (n, ce):xs = cbs in
-                 let tb = (n, maybe (error "[Typecheck] Failed") fst $ lincheck ([], acc) ce) in
+                 let tb = (n, maybe (error ("[Typecheck Module] Failed when parsing " ++ show (n, ce) ++ " with accumulator " ++ show acc)) fst $ lincheck ([], acc) ce) in
                      tb:typecheckModule' xs (tb:acc)
+

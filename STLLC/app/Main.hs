@@ -86,7 +86,8 @@ mevaluate fname = do
         return $ evaluateModule cbindings
 
 main :: IO ()
-main = let fname = "mymodules/1.l" in do
+main = do
+    (fname:args) <- getArgs
     p <- mparse fname
     print p
     d <- mdesugar fname

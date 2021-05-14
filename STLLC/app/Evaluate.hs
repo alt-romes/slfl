@@ -5,6 +5,8 @@ import Data.Maybe
 import CoreSyntax
 import LinearCheck hiding (BoundCtxt, FreeCtxt, Ctxt, equalCtxts)
 
+import Debug.Trace
+
 type BoundCtxt = [CoreExpr]
 type FreeCtxt = [(Name, CoreExpr)]
 type Ctxt = (BoundCtxt, FreeCtxt)
@@ -16,13 +18,13 @@ eval :: Ctxt -> CoreExpr -> CoreExpr
 
 --- hyp --------------------
 
-eval (bctxt, _) (BLVar x) = bctxt !! x
+eval c@(bctxt, _) (BLVar x) = eval c $ bctxt !! x
 
-eval (_, fctxt) (FLVar x) = fromJust $ lookup x fctxt
+eval c@(_, fctxt) (FLVar x) = eval c $ fromJust $ lookup x fctxt
 
-eval (bctxt, _) (BUVar x) = bctxt !! x
+eval c@(bctxt, _) (BUVar x) = eval c $ bctxt !! x
 
-eval (_, fctxt) (FUVar x) = fromJust $ lookup x fctxt
+eval c@(_, fctxt) (FUVar x) = eval c $ fromJust $ lookup x fctxt
 
 --- -o ---------------------
 
@@ -30,10 +32,9 @@ eval (_, fctxt) (FUVar x) = fromJust $ lookup x fctxt
 eval _ (Abs t e) = Abs t e
 
 --  -oE
-eval ctxt (App e1 e2) =
+eval ctxt@(bctxt, fctxt) (App e1 e2) =
     let Abs _ e1' = eval ctxt e1 in
     let v = eval ctxt e2 in
-    let (bctxt, fctxt) = ctxt in
     eval (v:bctxt, fctxt) e1'
 
 --- * ----------------------
@@ -45,9 +46,8 @@ eval ctxt (TensorValue e1 e2) =
     TensorValue e1' e2'
 
 --  *E
-eval ctxt (LetTensor e1 e2) =
+eval ctxt@(bctxt, fctxt) (LetTensor e1 e2) =
     let TensorValue e3 e4 = eval ctxt e1 in
-    let (bctxt, fctxt) = ctxt in
     eval (e4:e3:bctxt, fctxt) e2
 
 --- 1 ----------------------
