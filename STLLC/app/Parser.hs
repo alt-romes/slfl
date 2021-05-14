@@ -10,8 +10,6 @@ import Text.Parsec
 import Text.Parsec.String 
 import qualified Text.Parsec.Expr as Ex 
 
-import qualified Data.Text.Lazy as L
-
 import Data.Either
 import Debug.Trace
 
@@ -232,12 +230,10 @@ type' = Ex.buildExpressionParser tyops ty
 
 -- Parsing modules
 
-type Binding = (String, Expr)
-
 argument :: Parser (String, Type)
 argument = do
     argname <- identifier
-    reservedOp ":"
+    char ':'
     argtype <- ty
     return (argname, argtype)
 
@@ -269,8 +265,8 @@ modl = many top
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"
 
-parseModule :: FilePath -> String -> Either ParseError [(String, Expr)]
+parseModule :: FilePath -> String -> Either ParseError [Binding]
 parseModule = parse (contents modl)
 
 rightParseExpr :: String -> Expr
-rightParseExpr s = fromRight (error "error parsing") $ parseExpr s
+rightParseExpr s = fromRight (error "[Expr Parse]") $ parseExpr s

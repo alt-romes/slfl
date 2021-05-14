@@ -9,8 +9,9 @@ type BoundCtxt = [CoreExpr]
 type FreeCtxt = [(Name, CoreExpr)]
 type Ctxt = (BoundCtxt, FreeCtxt)
 
+-- Note: the typechecker should make sure the expression is valid 
+
 -- eval --- Ctxt, CoreExpr -> CoreExpr 
--- typechecker should make sure the expression is valid
 eval :: Ctxt -> CoreExpr -> CoreExpr
 
 --- hyp --------------------
@@ -127,4 +128,13 @@ eval ctxt (IfThenElse e1 e2 e3) =
 
 
 -- top level ---------------
+
+evalExpr :: CoreExpr -> CoreExpr
+evalExpr = eval ([], [])
+
+evaluateModule :: [CoreBinding] -> CoreExpr
+evaluateModule cbs =
+    case lookup "main" cbs of
+      Nothing -> error "[Eval] No main function defined"
+      Just exp -> eval ([], cbs) exp
 

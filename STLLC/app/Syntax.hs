@@ -3,6 +3,7 @@ module Syntax where
 import Prelude hiding (Bool)
 import CoreSyntax
 
+type Binding = (String, Expr)
 
 data Expr
 

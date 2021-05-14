@@ -1,6 +1,4 @@
-# Configuration for LSP (hls)
-
 cradle:
-  direct:
-    # hack to detect cabal packages
-    arguments: ["-package-db", "/Users/romes/.cabal/store/ghc-8.10.4/package.db"]
+  cabal:
+    - path: "app/Main.hs"
+      component: "STLLC:exe:STLLC"

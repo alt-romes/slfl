@@ -1,10 +1,12 @@
 module LinearCheck where
 
 import Data.Maybe
--- import Data.Tuple.Extra -- Prof não consegui usar a both daqui
-                           -- porque os import não funcionava... fiz a minha
+import Data.Bifunctor
 
 import CoreSyntax
+
+type TypeBinding = (String, Type)
+
 
 type Index = Int
 type Name = String
@@ -163,4 +165,12 @@ equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb)
 -- top level ---------------
 
 typecheck :: CoreExpr -> Type
-typecheck e = maybe (error "typecheck") fst (lincheck ([], []) e)
+typecheck e = maybe (error "[Typecheck] Failed") fst (lincheck ([], []) e)
+
+typecheckModule :: [CoreBinding] -> [TypeBinding]
+typecheckModule cbs = reverse $ typecheckModule' cbs []
+    where typecheckModule' cbs acc = 
+            if null cbs then []
+            else let (n, ce):xs = cbs in
+                 let tb = (n, maybe (error "[Typecheck] Failed") fst $ lincheck ([], acc) ce) in
+                     tb:typecheckModule' xs (tb:acc)

@@ -2,6 +2,7 @@ module CoreSyntax where
 
 import Prelude hiding (Bool)
 
+type CoreBinding = (String, CoreExpr)
 
 data CoreExpr
 
@@ -43,7 +44,7 @@ data CoreExpr
     -- Bool
     | Tru
     | Fls
-    deriving (Show)
+    deriving (Show, Eq)
 
 
 data Type

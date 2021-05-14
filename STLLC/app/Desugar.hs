@@ -8,7 +8,6 @@ import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 
-
 data Mult = Linear | Unr | Unknown deriving (Eq)
 newtype Var a = Var Mult deriving (Eq)
 
@@ -91,3 +90,9 @@ desugar (Syntax.LetIn id e1 e2) = do
     e1' <- desugar e1
     abs <- desugar (Syntax.Abs id (typecheck e1') e2)
     return $ CoreSyntax.App abs e1'
+
+
+desugarModule :: [Binding] -> [CoreBinding]
+desugarModule = map desugarModule'
+    where desugarModule' (name, exp) = (name, runReader (desugar exp) []) 
+
