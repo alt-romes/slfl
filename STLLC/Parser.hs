@@ -237,7 +237,7 @@ type Binding = (String, Expr)
 argument :: Parser (String, Type)
 argument = do
     argname <- identifier
-    char ':'
+    reservedOp ":"
     argtype <- ty
     return (argname, argtype)
 
@@ -269,10 +269,8 @@ modl = many top
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (contents expr) "<stdin>"
 
-parseModule :: FilePath -> Either ParseError [Binding]
-parseModule fname = do
-    input <- readFile fname
-    parse (contents modl) fname input
+parseModule :: FilePath -> String -> Either ParseError [(String, Expr)]
+parseModule = parse (contents modl)
 
 rightParseExpr :: String -> Expr
 rightParseExpr s = fromRight (error "error parsing") $ parseExpr s

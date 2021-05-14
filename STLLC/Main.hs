@@ -42,6 +42,11 @@ main = interpret
 
 -- run as module
 
+parseModule :: String -> IO (Either ParseError [Binding])
+parseModule fname = do
+    input <- readFile fname
+
+
 pdesugar :: String -> CoreExpr
 pdesugar s = runReader (desugar $ rightParseExpr s) []
 
