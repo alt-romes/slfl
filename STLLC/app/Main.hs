@@ -34,12 +34,6 @@ interpret = runInputT defaultSettings loop
             Nothing -> outputStrLn "Bye."
             Just input -> liftIO (process input) >> loop
 
--- interpretfile :: IO ()
--- interpretfile = do
---     (fileName:args) <- getArgs
---     contents <- readFile fileName
-
-
 pdesugar :: String -> CoreExpr
 pdesugar s = runReader (desugar $ rightParseExpr s) []
 
