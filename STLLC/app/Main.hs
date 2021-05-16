@@ -85,19 +85,27 @@ mevaluate fname = do
     let _ = typecheckModule cbindings in -- make sure module is well typed
         return $ evaluateModule cbindings
 
--- main :: IO ()
--- main = do
---     (fname:args) <- getArgs
---     p <- mparse fname
---     print p
---     d <- mdesugar fname
---     print d
---     t <- mcheck fname
---     print t
---     e <- mevaluate fname
---     print e
+runmodule :: String -> IO ()
+runmodule fname = do
+    p <- mparse fname
+    print p
+    d <- mdesugar fname
+    print d
+    t <- mcheck fname
+    print t
+    e <- mevaluate fname
+    print e
 
-main = do
-    (t:args) <- getArgs
+synthetize :: String -> IO ()
+synthetize t = do
     let surroundtype = '(':t ++ ")"
     print $ synthType (ptype surroundtype)
+
+main :: IO ()
+main = do
+    (action:args) <- getArgs
+    case action of
+      "synth" -> let (arg:oargs) = args in synthetize arg
+      "mod" -> let (arg:oargs) = args in runmodule arg
+      "module" -> let (arg:oargs) = args in runmodule arg
+      _ -> synthetize action
