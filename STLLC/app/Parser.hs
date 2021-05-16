@@ -268,8 +268,5 @@ parseExpr = parse (contents expr) "<stdin>"
 parseModule :: FilePath -> String -> Either ParseError [Binding]
 parseModule = parse (contents modl)
 
-rightParseExpr :: String -> Expr
-rightParseExpr s = fromRight (error "[Expr Parse]") $ parseExpr s
-
-parseType :: String -> Type
-parseType s = fromRight (error "[Expr Parse]") $ parse (contents ty) "<stdin>" s
+parseType :: String -> Either ParseError Type
+parseType = parse (contents ty) "<stdin>"

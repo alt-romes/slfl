@@ -35,8 +35,13 @@ interpret = runInputT defaultSettings loop
             Nothing -> outputStrLn "Bye."
             Just input -> liftIO (process input) >> loop
 
+rparse :: String -> Expr
+rparse s = case parseExpr s of
+             Left x -> error $ "[Expr Parse] Failed: " ++ show x
+             Right x -> x
+
 pdesugar :: String -> CoreExpr
-pdesugar s = runReader (desugar $ rightParseExpr s) []
+pdesugar s = runReader (desugar $ rparse s) []
 
 pcheck :: String -> Type
 pcheck s = typecheck $ pdesugar s
@@ -46,6 +51,11 @@ pevaluate s =
     let tree = pdesugar s in
     let ty   = typecheck tree in -- make sure is well typed
     evalExpr tree
+
+ptype :: String -> Type
+ptype s = case parseType s of
+             Left x -> error $ "[Expr Parse] Failed: " ++ show x
+             Right x -> x
 
 -- modules
 
@@ -89,4 +99,4 @@ mevaluate fname = do
 
 main = do
     (t:args) <- getArgs
-    print $ synthType (parseType t)
+    print $ synthType (ptype t)

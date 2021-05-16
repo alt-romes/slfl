@@ -99,7 +99,7 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
         ---- +R
         focus' Nothing c (Plus a b) = do
             (il, d') <- focus' Nothing c a
-            pure (InjL b il, d')
+            return (InjL b il, d')
             <|> do
             (ir, d') <- focus' Nothing c b
             return (InjR a ir, d')
@@ -118,11 +118,35 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
 
         ---- Left synchronous rules -------------------
 
+        ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
             (expb, d') <- focus' (Just ("g", b)) c goal
             let (expa, d'') = synth (g, d', []) a
-            return (App expb expa, d'')
+            return (LetIn "i" (App (Var n) expa) expb, d'')
             
+        ---- &L
+        focus' (Just (n, With a b)) c goal = do
+            (lf, d') <- focus' (Just ("n", a)) c goal
+            return (Fst lf, d')
+            <|> do
+            (rt, d') <- focus' (Just ("n", b)) c goal
+            return (Snd rt, d')
+
+
+        ---- Proposition no longer synchronous --------
+
+        ---- hyp -- left focused proposition is atomic
+        focus' (Just (n, Bool)) (g, d) goal = do -- como fazer isto mais extensível ? onde tenho bool devia ser uma lista de props atómicas certo?
+            guard (Bool == goal)
+            return (Var n, d)
+
+        ---- left focus is not atomic and not left synchronous, unfocus
+        focus' (Just a) (g, d) goal = return $ synth (g, d, [a]) goal
+        
+        ---- right focus is not atomic and not synchronous, unfocus
+        -- ?? estou a ter tmb alguma difficuldade a visualizar esta situação :)
+        focus' Nothing (g, d) goal = return $ synth (g, d, []) goal
+
 
 
 ---- top level
