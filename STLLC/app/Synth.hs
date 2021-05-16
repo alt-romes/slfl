@@ -3,6 +3,8 @@ module Synth where
 import Control.Applicative
 import Control.Monad.Logic
 
+import Debug.Trace
+
 import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool))
 import Syntax
 
@@ -18,8 +20,8 @@ synth :: Ctxt -> Type -> (Expr, Delta)
 ---- Right asynchronous rules -----------------
 
 ---- -oR
-synth (г, d, o) (Fun a b) = let (exp, d') = synth (г, d, ("x", a):o) b in
-                                 (Abs "x" a exp , d')
+synth (г, d, o) (Fun a b) = trace "Fun" $ let (exp, d') = synth (г, d, ("x", a):o) b in
+                                 (Abs "x" a exp, d')
 
 ---- &R
 synth c (With a b) = let (expa, d') = synth c a in
@@ -53,7 +55,7 @@ synth (g, d, (n, Bang a):o) t = synth ((n, a):g, d, o) t
 
 -- synth (g, d, (n, Fun a b):o) t = synth (g, (n, Fun a b):d, o) t
 -- synth (g, d, (n, With a b):o) t = synth (g, (n, With a b):d, o) t
-synth (g, d, p:o) t = synth (g, p:d, o) t -- generalization of above
+synth (g, d, p:o) t = trace "To Delta" $ synth (g, p:d, o) t -- generalization of above
 
 -- eventually the ordered context will be empty, then start focusing
 
@@ -61,7 +63,7 @@ synth (g, d, p:o) t = synth (g, p:d, o) t -- generalization of above
 ---- Synchronous rules -------------------------
 
 synth (g, d, []) t = -- no more asynchronous propositions, focus
-       observe $ focus (g, d) t
+       trace "Focus" $ observe $ focus (g, d) t
 
 
 focus :: FocusCtxt -> Type -> Logic (Expr, Delta)
@@ -69,17 +71,20 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
             <|> decideLeft c goal
             <|> decideLeftBang c goal
     where
-        decideRight c goal = focus' Nothing c goal
+        decideRight c goal =
+            case goal of               -- to decide right, goal cannot be atomic . se calhar isto devia ser verificado antes para nao fazer parte do backtrack?
+              Bool -> empty
+              _ -> trace "DRight" $ focus' Nothing c goal
 
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              a:din' -> focus' (Just a) (g, din') goal
+              a:din' -> trace "DLeft" $ focus' (Just a) (g, din') goal
 
         decideLeftBang (g, din) goal = do
             case g of
               []   -> empty
-              a:g' -> focus' (Just a) (g, din) goal
+              a:g' -> trace "DLeft!" $ focus' (Just a) (g, din) goal
         
         focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> Logic (Expr, Delta)
 
@@ -135,7 +140,7 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
 
         ---- Proposition no longer synchronous --------
 
-        ---- hyp -- left focused proposition is atomic
+        ---- hyp -- left focus is atomic
         focus' (Just (n, Bool)) (g, d) goal = do -- como fazer isto mais extensível ? onde tenho bool devia ser uma lista de props atómicas certo?
             guard (Bool == goal)
             return (Var n, d)
