@@ -6,6 +6,7 @@ import Parser
 import Desugar
 import LinearCheck
 import Evaluate
+import Synth
 
 import Data.Either
 import Control.Monad.Reader
@@ -57,10 +58,6 @@ mparse fname = do
           Left x -> do { print x; error "[Module Parse] Failed" }
           Right x -> return x
 
-mparse' fname = do
-    inp <- readFile fname
-    print $ parseModule fname inp
-
 mdesugar :: String -> IO [CoreBinding]
 mdesugar fname = do
    pbindings  <- mparse fname
@@ -79,14 +76,18 @@ mevaluate fname = do
     let _ = typecheckModule cbindings in -- make sure module is well typed
         return $ evaluateModule cbindings
 
-main :: IO ()
+-- main :: IO ()
+-- main = do
+--     (fname:args) <- getArgs
+--     p <- mparse fname
+--     print p
+--     d <- mdesugar fname
+--     print d
+--     t <- mcheck fname
+--     print t
+--     e <- mevaluate fname
+--     print e
+
 main = do
-    (fname:args) <- getArgs
-    p <- mparse fname
-    print p
-    d <- mdesugar fname
-    print d
-    t <- mcheck fname
-    print t
-    e <- mevaluate fname
-    print e
+    (t:args) <- getArgs
+    print $ synthType (pcheck t)

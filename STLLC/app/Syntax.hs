@@ -27,8 +27,8 @@ data Expr
     | Snd Expr
 
     -- A (+) B
-    | InjL Type Expr    -- inr:A M : A (+) typeof M
-    | InjR Type Expr    -- inl:B M : typeof M (+) A
+    | InjL Type Expr    -- inl:B M : typeof M (+) A
+    | InjR Type Expr    -- inr:A M : A (+) typeof M
     | CaseOfPlus Expr String Expr String Expr -- case M of inl x => N | inr y => P : C
 
     -- !A
