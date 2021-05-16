@@ -17,23 +17,32 @@ type Ctxt = (Gamma, Delta, Omega) -- Delta out is a return value
 
 type FocusCtxt = (Gamma, Delta) -- Gamma, DeltaIn
 
-type SynthState = (Delta, Int)  -- Resources available through the process (DeltaOut) and current variable number to be used
+type SynthState = Int  -- variable number to be used, note: should we also use the state monad for the delta context???
+
 
 variableNames :: [String]
 variableNames = ["x", "y", "z", "u", "v", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
 
-synth :: Ctxt -> Type -> (Expr, Delta)
+getName :: Int -> String
+getName i = variableNames !! i
+
+synth :: Ctxt -> Type -> State SynthState (Expr, Delta)
 
 ---- Right asynchronous rules -----------------
 
 ---- -oR
-synth (г, d, o) (Fun a b) = let (exp, d') = synth (г, d, ("x", a):o) b in
-                                 (Abs "x" a exp, d')
+synth (г, d, o) (Fun a b) = do
+    vari <- get
+    let name = getName vari
+    put $ vari + 1
+    (exp, d') <- synth (г, d, (name, a):o) b
+    return (Abs name a exp, d')
 
 ---- &R
-synth c (With a b) = let (expa, d') = synth c a in
-                         let (expb, _) = synth c a in -- ?? DeltaOut from synth a and DeltaOut from synth b should be the same ??
-                             (WithValue expa expb, d')
+synth c (With a b) = do
+    (expa, d') <- synth c a
+    (expb, _) <- synth c a -- ?? DeltaOut from synth a and DeltaOut from synth b should be the same ??
+    return (WithValue expa expb, d')
 
 -- no more synchronous right propositions, start inverting the ordered context (omega)
 
@@ -41,18 +50,29 @@ synth c (With a b) = let (expa, d') = synth c a in
 ---- Left asynchronous rules ------------------
 
 ---- *L
-synth (g, d, (n, Tensor a b):o) t = let (expt, d') = synth (g, d, ("y", b):("x", a):o) t in
-                                        (LetTensor "x" "y" (Var n) expt, d')
+synth (g, d, (n, Tensor a b):o) t = do
+    vari <- get
+    let n1 = getName vari
+    let n2 = getName (vari+1)
+    put $ vari + 2
+    (expt, d') <- synth (g, d, (n2, b):(n1, a):o) t
+    return (LetTensor n1 n2 (Var n) expt, d')
 
 ---- 1L
-synth (g, d, (n, Unit):o) t = let (expt, d') = synth (g, d, o) t in
-                                  (LetUnit (Var n) expt, d')
+synth (g, d, (n, Unit):o) t = do
+    (expt, d') <- synth (g, d, o) t
+    return (LetUnit (Var n) expt, d')
 
 ---- +L
-synth (g, d, (n, Plus a b):o) t = let (expa, d') = synth (g, d, ("l", a):o) t in
-                                      let (expb, _) = synth (g, d, ("r", b):o) t in -- ?? como é que garanto que ambos estes synth vão usar os mesmos recursos?
-                                                                                    -- ? tenho de ter LogicT até nas invertíveis e andar para trás quando estas coisas correm mal? parece-me estranho,,
-                                          (CaseOfPlus (Var n) "l" expa "r" expb, d')
+synth (g, d, (n, Plus a b):o) t = do
+    vari <- get
+    let n1 = getName vari
+    let n2 = getName (vari+1)
+    put $ vari + 2
+    (expa, d') <- synth (g, d, (n1, a):o) t
+    (expb, _)  <- synth (g, d, (n2, b):o) t    -- ?? como é que garanto que ambos estes synth vão usar os mesmos recursos?
+                                                -- ? tenho de ter LogicT até nas invertíveis e andar para trás quando estas coisas correm mal? parece-me estranho,,
+    return (CaseOfPlus (Var n) n1 expa n2 expb, d')
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = synth ((n, a):g, d, o) t
@@ -69,14 +89,16 @@ synth (g, d, p:o) t = synth (g, p:d, o) t -- generalization of above
 
 ---- Synchronous rules -------------------------
 
-synth (g, d, []) t = -- no more asynchronous propositions, focus
-       observe $ focus (g, d) t
+-- no more asynchronous propositions, focus
+synth (g, d, []) t = 
+    fmap head $ observeManyT 1 $ focus (g, d) t -- todo better?
 
 
-focus :: FocusCtxt -> Type -> Logic (Expr, Delta)
-focus c goal =  decideRight c goal     -- because of laziness it'll only run until the first succeeds (bc of observe), right?
-            <|> decideLeft c goal
-            <|> decideLeftBang c goal
+focus :: FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
+-- because of laziness it'll only run until the first succeeds (bc of observe), right?
+focus c goal =
+    decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal
+
     where
         decideRight c goal =
             case goal of               -- to decide right, goal cannot be atomic
@@ -93,7 +115,7 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
               []   -> empty
               a:g' -> focus' (Just a) (g, din) goal
         
-        focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> Logic (Expr, Delta)
+        focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 
         ---- Right synchronous rules ------------------
 
@@ -119,7 +141,9 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
             guard (null d)
-            let (expa, d') = synth (g, d, []) a
+            vari <- lift get
+            let ((expa, d'), vari') = runState (synth (g, d, []) a) vari
+            lift $ put vari'
             return (BangValue expa, d')
 
         -- all right propositions focused on are synchronous; this pattern matching is extensive
@@ -132,16 +156,18 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
 
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
-            (expb, d') <- focus' (Just ("g", b)) c goal
-            let (expa, d'') = synth (g, d', []) a
-            return (LetIn "i" (App (Var n) expa) expb, d'')
+            vari <- lift get
+            (expb, d') <- focus' (Just (getName vari, b)) c goal
+            let ((expa, d''), vari') = runState (synth (g, d', []) a) (vari+1)
+            lift $ put $ vari' + 1 -- +1 because vari' is used in the next line
+            return (LetIn (getName vari') (App (Var n) expa) expb, d'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do
-            (lf, d') <- focus' (Just ("n", a)) c goal
+            (lf, d') <- focus' (Just (n, a)) c goal
             return (Fst lf, d')
             <|> do
-            (rt, d') <- focus' (Just ("n", b)) c goal
+            (rt, d') <- focus' (Just (n, b)) c goal
             return (Snd rt, d')
 
 
@@ -153,14 +179,22 @@ focus c goal =  decideRight c goal     -- because of laziness it'll only run unt
             return (Var n, d)
 
         ---- left focus is not atomic and not left synchronous, unfocus
-        focus' (Just a) (g, d) goal = return $ synth (g, d, [a]) goal
+        focus' (Just a) (g, d) goal = do
+            vari <- lift get
+            let ((e,d'), vari') = runState (synth (g, d, [a]) goal) vari
+            lift $ put vari'
+            return (e, d')
         
         ---- right focus is not atomic and not synchronous, unfocus
         -- ?? estou a ter tmb alguma difficuldade a visualizar esta situação :)
-        focus' Nothing (g, d) goal = return $ synth (g, d, []) goal
+        focus' Nothing (g, d) goal = do
+            vari <- lift get
+            let ((e,d'), vari') = runState (synth (g, d, []) goal) vari
+            lift $ put vari'
+            return (e, d')
 
 
 
 ---- top level
 
-synthType t = fst $ synth ([], [], []) t
+synthType t = fst $ evalState (synth ([], [], []) t) 0

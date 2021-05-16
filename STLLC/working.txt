@@ -1,0 +1,1 @@
+STLLC "(Bool * Bool) -o (Bool * Bool)"
