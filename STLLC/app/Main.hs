@@ -47,7 +47,6 @@ pevaluate s =
     let ty   = typecheck tree in -- make sure is well typed
     evalExpr tree
 
-
 -- modules
 
 mparse :: String -> IO [Binding] -- module parse
@@ -90,4 +89,4 @@ mevaluate fname = do
 
 main = do
     (t:args) <- getArgs
-    print $ synthType (pcheck t)
+    print $ synthType (parseType t)

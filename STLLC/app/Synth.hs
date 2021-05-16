@@ -23,8 +23,6 @@ synth (г, d, o) (Fun a b) = Abs "x" a $ synth (г, d, ("x", a):o) b
 ---- &R
 synth c (With a b) = WithValue (synth c a) (synth c b)
 
-synth c (Bool) = Tru
-
 -- no more synchronous right propositions, start inverting the ordered context (omega)
 
 

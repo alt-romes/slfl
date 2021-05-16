@@ -270,3 +270,6 @@ parseModule = parse (contents modl)
 
 rightParseExpr :: String -> Expr
 rightParseExpr s = fromRight (error "[Expr Parse]") $ parseExpr s
+
+parseType :: String -> Type
+parseType s = fromRight (error "[Expr Parse]") $ parse (contents ty) "<stdin>" s
