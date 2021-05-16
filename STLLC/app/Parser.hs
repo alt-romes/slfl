@@ -117,8 +117,8 @@ letbangpattern = do
 
 -- Bool
 bool :: Parser Expr 
-bool = (reserved "True" >> return Syntax.Tru)
-   <|> (reserved "False" >> return Syntax.Fls)
+bool = (reserved "true" >> return Syntax.Tru)
+   <|> (reserved "false" >> return Syntax.Fls)
     -- <|> isZero 
 
 letexp :: Parser Expr

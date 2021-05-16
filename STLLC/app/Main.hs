@@ -99,4 +99,5 @@ mevaluate fname = do
 
 main = do
     (t:args) <- getArgs
-    print $ synthType (ptype t)
+    let surroundtype = '(':t ++ ")"
+    print $ synthType (ptype surroundtype)
