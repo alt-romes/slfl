@@ -2,8 +2,8 @@ module Synth where
 
 import Control.Applicative
 import Control.Monad.Logic
-
 import Control.Monad.State
+import Data.Maybe
 
 import Debug.Trace
 
@@ -29,10 +29,9 @@ getName i = variableNames !! i
 isAtomic :: Type -> Bool
 isAtomic t = case t of
                Bool -> True
-               Unit -> True
                _ -> False
 
-synth :: Ctxt -> Type -> State SynthState (Expr, Delta)
+synth :: Ctxt -> Type -> StateT SynthState Maybe (Expr, Delta)
 
 ---- Right asynchronous rules -----------------
 
@@ -101,8 +100,13 @@ synth (g, d, p:o) t = synth (g, p:d, o) t -- generalization of above
 ---- Synchronous rules -------------------------
 
 -- no more asynchronous propositions, focus
-synth (g, d, []) t = 
-    fmap head $ observeManyT 1 $ focus (g, d) t -- todo better?
+synth (g, d, []) t = do
+    vari <- get
+    let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari -- todo better?
+    put vari'
+    if null explist
+       then empty   -- TODO: Isto está a por Nothing na "monad interior?" (ainda é um pouco difícil pensar nisso:) ), suponho que os outros return estão a por Just
+       else return $ head explist
 
 
 focus :: FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
@@ -112,14 +116,14 @@ focus c goal =
 
     where
         decideRight c goal =
-            case goal of               -- to decide right, goal cannot be atomic
-              Bool -> empty
-              _ -> focus' Nothing c goal
+            if isAtomic goal            -- to decide right, goal cannot be atomic
+                then empty
+                else focus' Nothing c goal
 
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              a:din' -> trace ("DLeft + " ++ show a) $ focus' (Just a) (g, din') goal
+              a:din' -> focus' (Just a) (g, din') goal
 
         decideLeftBang (g, din) goal = do
             case g of
@@ -143,19 +147,24 @@ focus c goal =
             
         ---- +R
         focus' Nothing c (Plus a b) = do
-            (il, d') <- trace "try injl" $ focus' Nothing c a
+            (il, d') <- focus' Nothing c a
             return (InjL b il, d')
             <|> do
-            (ir, d') <- trace "try injr" $ focus' Nothing c b
+            (ir, d') <- focus' Nothing c b
             return (InjR a ir, d')
 
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
             guard (null d)
             vari <- lift get
-            let ((expa, d'), vari') = runState (synth (g, d, []) a) vari
-            lift $ put vari'
-            return (BangValue expa, d')
+            -- TODO: Factorizar isto? :)
+            let maybeSynthResult = runStateT (synth (g, d, []) a) vari -- if asynch continuation of synthesis failed, fail to backtrack
+            if isNothing maybeSynthResult
+               then empty
+               else do
+                   let ((expa, d'), vari') = fromJust maybeSynthResult
+                   lift $ put vari'
+                   return (BangValue expa, d')
 
         -- all right propositions focused on are synchronous; this pattern matching should be extensive
 
@@ -171,22 +180,22 @@ focus c goal =
             let nname = getName vari
             lift $ put $ vari + 1
             (expb, d') <- focus' (Just (nname, b)) c goal
-            let ((expa, d''), vari') = runState (synth (g, d', []) a) (vari+1)
-            lift $ put vari'
-            return (LetIn nname (App (Var n) expa) expb, d'')
+            -- TODO: Factorizar isto? :)
+            let maybeSynthResult = runStateT (synth (g, d', []) a) (vari+1)
+            maybe empty (\r -> let ((expa, d''), vari') = r in do {lift $ put vari'; return (LetIn nname (App (Var n) expa) expb, d'')}) maybeSynthResult -- TODO: assim fica mais feio?
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do -- como factorizar este código ? 
             vari <- lift get
             let nname = getName vari
             lift $ put $ vari + 1
-            (lf, d') <- trace "try first" $ focus' (Just (nname, a)) c goal
-            trace ("returned first + " ++ show lf ++ " " ++ show d') $ return (LetIn nname (Fst (Var n)) lf, d') -- ainda me faz um bocadinho confusão pensar nas regras assim, parece mesmo que estamos a complicar mesmo não estando, podemos rever a motivação?
+            (lf, d') <- focus' (Just (nname, a)) c goal
+            return (LetIn nname (Fst (Var n)) lf, d') -- ainda me faz um bocadinho confusão pensar nas regras assim, parece mesmo que estamos a complicar mesmo não estando, podemos rever a motivação?
             <|> do
             vari <- lift get
             let nname = getName vari
             lift $ put $ vari + 1
-            (rt, d') <- trace "try snd" $ focus' (Just (nname, b)) c goal
+            (rt, d') <- focus' (Just (nname, b)) c goal
             return (LetIn nname (Snd (Var n)) rt, d')
 
 
@@ -196,7 +205,7 @@ focus c goal =
         ---- if it is atomic, it'll either be the goal and instanciate it, or fail
         ---- if it's not atomic, and it's not left synchronous, unfocus
         focus' (Just nh@(n, h)) (g, d) goal =
-            if isAtomic h
+            if isAtomic h       -- TODO: estou a criar alguma confusão em relação ao 1 ser ou não atómico
                then do
                    -- left focus is atomic
                    guard (h == goal) -- if is atomic and not the goal, fail
@@ -204,9 +213,14 @@ focus c goal =
                else do
                    ---- left focus is not atomic and not left synchronous, unfocus
                    vari <- lift get
-                   let ((e,d'), vari') = runState (synth (g, d, [nh]) goal) vari
-                   lift $ put vari'
-                   return (e, d')
+                   -- TODO: Factorizar isto? :)
+                   let maybeSynthResult = runStateT (synth (g, d, [nh]) goal) vari
+                   if isNothing maybeSynthResult
+                       then empty
+                       else do
+                           let ((exp, d'), vari') = fromJust maybeSynthResult
+                           lift $ put vari'
+                           return (exp, d')
 
         ---- left focus is not atomic and not left synchronous, unfocus
         -- focus' (Just a) (g, d) goal = do
@@ -222,12 +236,17 @@ focus c goal =
                then empty
                else do
                    vari <- lift get
-                   let ((e,d'), vari') = runState (synth (g, d, []) goal) vari
-                   lift $ put vari'
-                   return (e, d')
+                   -- TODO: Factorizar isto? :)
+                   let maybeSynthResult = runStateT (synth (g, d, []) goal) vari
+                   if isNothing maybeSynthResult
+                       then empty
+                       else do
+                           let ((e,d'), vari') = fromJust maybeSynthResult
+                           lift $ put vari'
+                           return (e, d')
 
 
 
 ---- top level
 
-synthType t = fst $ evalState (synth ([], [], []) t) 0
+synthType t = fst $ fromJust $ evalStateT (synth ([], [], []) t) 0
