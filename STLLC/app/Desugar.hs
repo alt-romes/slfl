@@ -8,17 +8,19 @@ import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 
-data Mult = Linear | Unr | Unknown deriving (Eq)
-newtype Var a = Var Mult deriving (Eq)
+import Debug.Trace
+
+data Mult = Linear | Unr | Unknown deriving (Eq, Show)
+newtype Var a = Var Mult deriving (Eq, Show)
 
 linVar = Desugar.Var Linear
 unVar = Desugar.Var Unr
 unknownVar = Desugar.Var Unknown
 
-type DesugarEnv = [(Name, Desugar.Var Index)]
+type DesugarEnv = [(Name, Desugar.Var Mult)]
 type Desugar = Reader DesugarEnv
 
-inEnv :: (Name, Desugar.Var Index) -> Desugar a -> Desugar a
+inEnv :: (Name, Desugar.Var Mult) -> Desugar a -> Desugar a
 inEnv (x,e) = local (\env -> (x,e):env)
 
 lookupVar :: Name -> Desugar CoreExpr
@@ -78,6 +80,11 @@ desugar (Syntax.LetBang id e1 e2) = do
     e2' <- inEnv (id, unVar) (desugar e2)
     return $ CoreSyntax.LetBang e1' e2'
 
+desugar (Syntax.LetIn id e1 e2) = do
+    e1' <- desugar e1
+    e2' <- inEnv (id, linVar) (desugar e2)
+    return $ CoreSyntax.LetIn e1' e2' -- se quisesse fazer desugar do let in para uma abstração tinha também de passar todo o contexto para o typechecker, porque sem passar mais informação ela é incompleta
+
 desugar (Syntax.IfThenElse e1 e2 e3) = do
     e1' <- desugar e1
     e2' <- desugar e2
@@ -85,11 +92,6 @@ desugar (Syntax.IfThenElse e1 e2 e3) = do
 
 desugar Syntax.Tru = return CoreSyntax.Tru
 desugar Syntax.Fls = return CoreSyntax.Fls
-
-desugar (Syntax.LetIn id e1 e2) = do
-    e1' <- desugar e1
-    abs <- desugar (Syntax.Abs id (typecheck e1') e2)
-    return $ CoreSyntax.App abs e1'
 
 
 desugarModule :: [Binding] -> [CoreBinding]

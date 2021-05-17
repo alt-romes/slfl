@@ -262,7 +262,7 @@ val = do
 top :: Parser Binding
 top = do
   x <- letdecl <|> val
-  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona
+  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!
   return x
 
 modl :: Parser [Binding]

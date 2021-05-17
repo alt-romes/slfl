@@ -29,8 +29,8 @@ data CoreExpr
     | Snd CoreExpr
 
     -- A (+) B
-    | InjL Type CoreExpr    -- inr:A M : A (+) typeof M
-    | InjR Type CoreExpr    -- inl:B M : typeof M (+) A
+    | InjL Type CoreExpr    -- inr A : M has type A (+) typeof M
+    | InjR Type CoreExpr    -- inl M : B has type typeof M (+) A
     | CaseOfPlus CoreExpr CoreExpr CoreExpr -- case M of inl x => N | inr y => P : C
 
     -- !A
@@ -38,6 +38,8 @@ data CoreExpr
     | LetBang CoreExpr CoreExpr
 
     -- Non-canonical
+
+    | LetIn CoreExpr CoreExpr
 
     | IfThenElse CoreExpr CoreExpr CoreExpr
 

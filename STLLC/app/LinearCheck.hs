@@ -42,91 +42,91 @@ lincheck ctxt (FUVar x) = do
 --- -o ---------------------
 
 --  -oI
-lincheck (bdel, fdel) (Abs t1 e) = do
-    (t2, del2) <- lincheck (Just t1:bdel, fdel) e
-    return (Fun t1 t2, del2)
+lincheck (bctx, fctx) (Abs t1 e) = do
+    (t2, ctx2) <- lincheck (Just t1:bctx, fctx) e
+    return (Fun t1 t2, ctx2)
 
 --  -oE
-lincheck del (App e1 e2) = do
-    (Fun t1 t2, del1) <- lincheck del e1
-    (t, del2) <- lincheck del1 e2
+lincheck ctx (App e1 e2) = do
+    (Fun t1 t2, ctx1) <- lincheck ctx e1
+    (t, ctx2) <- lincheck ctx1 e2
     if t == t1
-        then return (t2, del2)
+        then return (t2, ctx2)
         else Nothing
 
 --- * ----------------------
 
 --  *I
-lincheck del (TensorValue e1 e2) = do
-    (t1, del2) <- lincheck del e1
-    (t2, del3) <- lincheck del2 e2
-    return (Tensor t1 t2, del3)
+lincheck ctx (TensorValue e1 e2) = do
+    (t1, ctx2) <- lincheck ctx e1
+    (t2, ctx3) <- lincheck ctx2 e2
+    return (Tensor t1 t2, ctx3)
 
 --  *E
-lincheck del (LetTensor e1 e2) = do
-    (Tensor t1 t2, (bdel', fdel')) <- lincheck del e1
-    (t3, del3) <- lincheck (Just t2:Just t1:bdel', fdel') e2
-    return (t3, del3)
+lincheck ctx (LetTensor e1 e2) = do
+    (Tensor t1 t2, (bctx', fctx')) <- lincheck ctx e1
+    (t3, ctx3) <- lincheck (Just t2:Just t1:bctx', fctx') e2
+    return (t3, ctx3)
 
 --- 1 ----------------------
 
 --  1I
-lincheck del UnitValue = return (Unit, del)
+lincheck ctx UnitValue = return (Unit, ctx)
 
 --  1E
-lincheck del (LetUnit e1 e2) = do
-    (Unit, del2) <- lincheck del e1
-    (t2, del3) <- lincheck del2 e2
-    return (t2, del3)
+lincheck ctx (LetUnit e1 e2) = do
+    (Unit, ctx2) <- lincheck ctx e1
+    (t2, ctx3) <- lincheck ctx2 e2
+    return (t2, ctx3)
 
 --- & ----------------------
 
 --  &I
-lincheck del (WithValue e1 e2) = do
-    (t1, del2) <- lincheck del e1
-    (t2, del3) <- lincheck del e2
-    if equalCtxts del2 del3
-        then return (With t1 t2, del2)
+lincheck ctx (WithValue e1 e2) = do
+    (t1, ctx2) <- lincheck ctx e1
+    (t2, ctx3) <- lincheck ctx e2
+    if equalCtxts ctx2 ctx3
+        then return (With t1 t2, ctx2)
         else Nothing
 
 --  &E
-lincheck del (Fst e) = do
-    (With t1 t2, del2) <- lincheck del e
-    return (t1, del2)
+lincheck ctx (Fst e) = do
+    (With t1 t2, ctx2) <- lincheck ctx e
+    return (t1, ctx2)
 
 --  &E
-lincheck del (Snd e) = do
-    (With t1 t2, del2) <- lincheck del e
-    return (t2, del2)
+lincheck ctx (Snd e) = do
+    (With t1 t2, ctx2) <- lincheck ctx e
+    return (t2, ctx2)
 
 --- + ----------------------
 
 --  +I
-lincheck del (InjL t1 e) = do
-    (t2, del2) <- lincheck del e
-    return (Plus t2 t1, del2)
+lincheck ctx (InjL t1 e) = do
+    (t2, ctx2) <- lincheck ctx e
+    return (Plus t2 t1, ctx2)
 
 --  +I
-lincheck del (InjR t1 e) = do
-    (t2, del2) <- lincheck del e
-    return (Plus t1 t2, del2)
+lincheck ctx (InjR t1 e) = do
+    (t2, ctx2) <- lincheck ctx e
+    return (Plus t1 t2, ctx2)
 
 --  +E
-lincheck del (CaseOfPlus e1 e2 e3) = do
-    (Plus t1 t2, (bdel', fdel')) <- lincheck del e1
-    (t3, del3) <- lincheck (Just t1:bdel', fdel') e2
-    (t4, del4) <- lincheck (Just t2:bdel', fdel') e3
-    if t3 == t4 && equalCtxts del3 del4
-       then return (t4, del4)
+lincheck ctx (CaseOfPlus e1 e2 e3) = do
+    (Plus t1 t2, (bctx', fctx')) <- lincheck ctx e1
+    (t3, ctx3) <- lincheck (Just t1:bctx', fctx') e2
+    (t4, ctx4) <- lincheck (Just t2:bctx', fctx') e3
+    if t3 == t4 && equalCtxts ctx3 ctx4
+       then return (t4, ctx4)
        else Nothing
 
 --- ! ----------------------
 
 --  !I
-lincheck del (BangValue e) = do
-    (t2, del2) <- lincheck del e
-    if equalCtxts del2 del
-        then return (Bang t2, del)
+lincheck ctx (BangValue e) = do
+    (t2, ctx2) <- lincheck ctx e
+    if equalCtxts ctx2 ctx
+        then return (Bang t2, ctx)
         else Nothing
 
 --  !E
@@ -134,18 +134,24 @@ lincheck ctxt (LetBang e1 e2) = do
     (Bang t1, (bctxt', fctxt')) <- lincheck ctxt e1
     lincheck (Just t1:bctxt', fctxt') e2
 
+--- LetIn ------------------
+
+lincheck c (LetIn e1 e2) = do
+    (t1, c'@(bc, fc)) <- lincheck c e1
+    (t2, c'') <- lincheck (Just t1:bc, fc) e2
+    return (t2, c'')
 
 --- Bool -------------------
 
-lincheck del Tru = return (Bool, del)
-lincheck del Fls = return (Bool, del)
+lincheck ctx Tru = return (Bool, ctx)
+lincheck ctx Fls = return (Bool, ctx)
 
-lincheck del (IfThenElse e1 e2 e3) = do
-    (Bool, del1) <- lincheck del e1
-    (t2, del2) <- lincheck del1 e2
-    (t3, del3) <- lincheck del1 e3
-    if t2 == t3 && equalCtxts del2 del3
-       then return (t3, del3)
+lincheck ctx (IfThenElse e1 e2 e3) = do
+    (Bool, ctx1) <- lincheck ctx e1
+    (t2, ctx2) <- lincheck ctx1 e2
+    (t3, ctx3) <- lincheck ctx1 e3
+    if t2 == t3 && equalCtxts ctx2 ctx3
+       then return (t3, ctx3)
        else Nothing
 
 -- end lincheck ------------
@@ -174,6 +180,6 @@ typecheckModule cbs = typecheckModule' cbs []
     where typecheckModule' cbs acc = 
             if null cbs then []
             else let (n, ce):xs = cbs in
-                 let tb = (n, maybe (error ("[Typecheck Module] Failed when parsing " ++ show (n, ce) ++ " with accumulator " ++ show acc)) fst $ lincheck ([], acc) ce) in
+                 let tb = (n, maybe (error ("[Typecheck Module] Failed when checking " ++ show (n, ce) ++ " with accumulator " ++ show acc)) fst $ lincheck ([], acc) ce) in
                      tb:typecheckModule' xs (tb:acc)
 
