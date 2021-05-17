@@ -31,6 +31,37 @@ isAtomic t = case t of
                Bool -> True
                _ -> False
 
+---- subsitute var n with expn in expf
+substitute :: String -> Expr -> Expr -> Expr
+substitute n expn expf =
+    case expf of
+      (Var x) -> if x == n then expn else LetIn n expn expf -- TODO: Aqui devia tmb dizer Let n expn expf ou se não utilizamos a variável podemos discartá-la? Parece me difícil esta situação sequer acontecer, porque se os recursos são lineares... ?
+      _ -> LetIn n expn expf
+-- TODO: Queremos mesmo substituir a expressão em todo o lado?
+-- Estava a pensar que fazia mais sentido apenas substituir expressões que sejam
+-- diretamente "(Var n)", porque se não vamos estar a tornar a expressão mais complicada
+-- ao substituir Var n possivelmente várias vezes em toda a expressão
+--
+-- substitute n expn expf =
+--     case expf of
+--       Var x -> if x == n then expn else expf
+--       Abs x t e -> Abs x t $ substitute n expn e
+--       App e1 e2 -> App (substitute n expn e1) (substitute n expn e2)
+--       TensorValue e1 e2 -> TensorValue (substitute n expn e1) (substitute n expn e2)
+--       LetUnit e1 e2 -> LetUnit (substitute n expn e1) (substitute n expn e2)
+--       WithValue e1 e2 -> WithValue (substitute n expn e1) (substitute n expn e2)
+--       Fst e -> Fst (substitute n expn e)
+--       Snd e -> Snd (substitute n expn e)
+--       InjL t e -> InjL t (substitute n expn e)
+--       InjR t e -> InjR t (substitute n expn e)
+--       CaseOfPlus e1 x e2 y e3 -> CaseOfPlus (substitute n expn e1) x (substitute n expn e2) y (substitute n expn e3)
+--       BangValue e -> BangValue (substitute n expn e)
+--       LetBang x e1 e2 -> LetBang x (substitute n expn e1) (substitute n expn e2)
+--       LetIn x e1 e2 -> LetIn x (substitute n expn e1) (substitute n expn e2)
+--       _ -> expf
+
+---- Synthetizer -----------------------------
+
 synth :: Ctxt -> Type -> StateT SynthState Maybe (Expr, Delta)
 
 ---- Right asynchronous rules -----------------
@@ -187,7 +218,7 @@ focus c goal =
                else do
                    let ((expa, d''), vari') = fromJust maybeSynthResult
                    lift $ put vari'
-                   return (LetIn nname (App (Var n) expa) expb, d'')
+                   return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do -- como factorizar este código ? 
@@ -195,13 +226,13 @@ focus c goal =
             let nname = getName vari
             lift $ put $ vari + 1
             (lf, d') <- focus' (Just (nname, a)) c goal
-            return (LetIn nname (Fst (Var n)) lf, d') -- ainda me faz um bocadinho confusão pensar nas regras assim, parece mesmo que estamos a complicar mesmo não estando, podemos rever a motivação?
+            return (substitute nname (Fst (Var n)) lf, d') -- ainda me faz um bocadinho confusão pensar nas regras assim, parece mesmo que estamos a complicar mesmo não estando, podemos rever a motivação?
             <|> do
             vari <- lift get
             let nname = getName vari
             lift $ put $ vari + 1
             (rt, d') <- focus' (Just (nname, b)) c goal
-            return (LetIn nname (Snd (Var n)) rt, d')
+            return (substitute nname (Snd (Var n)) rt, d')
 
 
         ---- Proposition no longer synchronous --------
@@ -240,6 +271,8 @@ focus c goal =
                    lift $ put vari'
                    return (e, d')
 
+
+-- TODO: Como definimos regras para bool? (IfThenElse)
 
 
 ---- top level
