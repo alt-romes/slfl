@@ -5,7 +5,7 @@ STLLC "Bool -o 1 -o Bool"
 STLLC "(Bool + Bool) -o Bool"
 STLLC '(! Bool) -o Bool'
 STLLC "Bool -o Bool -o (Bool * Bool)"
-STLLC 1
+STLLC "1"
 STLLC "Bool -o (Bool + 1)"
 STLLC "Bool -o (1 + Bool)"
 STLLC "! Bool -o ! (! Bool)"

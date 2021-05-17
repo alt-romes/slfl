@@ -54,33 +54,44 @@ data Pattern
     
     | VanillaPattern String
 
-
+-- showexpr :: Expr -> String
+-- showexpr = showexpr' 0
 instance (Show Expr) where
-    show (Var x) = x
+    show t = showexpr' 0 t
 
-    show (Abs x t e) = "λ" ++ x ++ " : " ++ show t ++ " -> " ++ show e
-    show (App e1 e2) = show e1 ++ " " ++ show e2
+showexpr' :: Int -> Expr -> String -- Use Int (depth) to indent the code
+showexpr' d (Var x) = x
 
-    show (TensorValue e1 e2) = "< " ++ show e1 ++ " * " ++ show e2 ++ " >"
-    show (LetTensor u v e1 e2) = "let " ++ u ++ "*" ++ v ++ " = " ++ show e1 ++ " in " ++ show e2
+showexpr' d (Abs x t e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -> " ++ showexpr' (d+1) e ++ ")"
+showexpr' d (App e1 e2) = showexpr' d e1 ++ " " ++ showexpr' d e2
 
-    show UnitValue = "<>"
-    show (LetUnit e1 e2) = "let _ = " ++ show e1 ++ " in " ++ show e2
+showexpr' d (TensorValue e1 e2) = "<" ++ showexpr' d e1 ++ " * " ++ showexpr' d e2 ++ ">"
+showexpr' d (LetTensor u v e1 e2) = indent d ++ "let " ++ u ++ "*" ++ v ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 
-    show (WithValue e1 e2) = "< " ++ show e1 ++ " & " ++ show e2 ++ " >"
-    show (Fst e) = "fst " ++ show e
-    show (Snd e) = "snd " ++ show e
+showexpr' d UnitValue = "<>"
+showexpr' d (LetUnit e1 e2) = indent d ++ "let _ = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 
-    show (InjL t e) = "inl:" ++ show t ++ " " ++ show e
-    show (InjR t e) = "inr:" ++ show t ++ " " ++ show e
-    show (CaseOfPlus e1 x e2 y e3) = "case " ++ show e1 ++ " of inl " ++ x ++ " -> " ++ show e2 ++ " | inr " ++ y ++ " -> " ++ show e3
+showexpr' d (WithValue e1 e2) = "<" ++ showexpr' d e1 ++ " & " ++ showexpr' d e2 ++ ">"
+showexpr' d (Fst a@(App _ _)) = "fst (" ++ showexpr' d a ++ ")"
+showexpr' d (Snd a@(App _ _)) = "snd (" ++ showexpr' d a ++ ")"
+showexpr' d (Fst e) = "fst " ++ showexpr' d e
+showexpr' d (Snd e) = "snd " ++ showexpr' d e
 
-    show (BangValue e) = "!" ++ show e
-    show (LetBang x e1 e2) = "let !" ++ x ++ " = " ++ show e1 ++ " in " ++ show e2
+showexpr' d (InjL t e) = "inl:" ++ show t ++ " (" ++ showexpr' d e ++ ")"
+showexpr' d (InjR t e) = "inr:" ++ show t ++ " (" ++ showexpr' d e ++ ")"
+showexpr' d (CaseOfPlus e1 x e2 y e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
+                                            indent (d+1) ++ "inl " ++ x ++ " => " ++ showexpr' (d+2) e2 ++
+                                            indent (d+1) ++ "| inr " ++ y ++ " => " ++ showexpr' (d+2) e3
 
-    show (IfThenElse e1 e2 e3) = "if " ++ show e1 ++ " then " ++ show e2 ++ " else " ++ show e3
-    show Tru = "true"
-    show Fls = "false"
+showexpr' d (BangValue e) = "!" ++ showexpr' d e ++ ""
+showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 
-    show (LetIn x e1 e2) = "let " ++ x ++ " = " ++ show e1 ++ " in " ++ show e2
-    
+showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++ 
+                                        indent (d+1) ++ "then " ++ showexpr' (d+1) e2 ++
+                                        indent (d+1) ++ "else " ++ showexpr' (d+1) e3
+showexpr' d Tru = "true"
+showexpr' d Fls = "false"
+
+showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+
+indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '

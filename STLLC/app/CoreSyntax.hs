@@ -57,14 +57,17 @@ data Type
 
     | Bool
     
+    | Atom String
+    
     deriving (Eq)
 
 
 instance (Show Type) where 
     show (Fun t1 t2) = "(" ++ show t1 ++ " -o " ++ show t2 ++ ")"
-    show (Tensor t1 t2) = show t1 ++ " * " ++ show t2
+    show (Tensor t1 t2) = "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
     show Unit = "1"
-    show (With t1 t2) = show t1 ++ " & " ++ show t2
-    show (Plus t1 t2) = show t1 ++ " + " ++ show t2
-    show (Bang t1) = "!" ++ show t1
+    show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"
+    show (Plus t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
+    show (Bang t1) = "(! " ++ show t1 ++ ")"
     show Bool = "Bool"
+    show (Atom x) = x

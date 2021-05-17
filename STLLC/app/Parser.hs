@@ -214,6 +214,12 @@ ty = tylit <|> parens type'
 tylit :: Parser Type 
 tylit =     (reservedOp "1" >> return Unit)
         <|> (reservedOp "Bool" >> return Bool)
+        <|> (reservedOp "A" >> return (Atom "A")) -- TODO: Melhor forma de fazer parse de atomos :)
+        <|> (reservedOp "B" >> return (Atom "B"))
+        <|> (reservedOp "C" >> return (Atom "C"))
+        <|> (reservedOp "D" >> return (Atom "D"))
+        <|> (reservedOp "E" >> return (Atom "E"))
+        <|> (reservedOp "F" >> return (Atom "F"))
         -- <|> (reservedOp "Nat"  >> return Nat )
 
 -- ...---...

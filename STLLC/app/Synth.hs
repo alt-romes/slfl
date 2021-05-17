@@ -1,5 +1,6 @@
 module Synth where
 
+import Data.List
 import Control.Applicative
 import Control.Monad.Logic
 import Control.Monad.State
@@ -7,7 +8,7 @@ import Data.Maybe
 
 import Debug.Trace
 
-import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool))
+import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom))
 import Syntax
 
 type Gamma = [(String, Type)] -- Unrestricted hypothesis
@@ -29,6 +30,7 @@ getName i = variableNames !! i
 isAtomic :: Type -> Bool
 isAtomic t = case t of
                Bool -> True
+               Atom _ -> True
                _ -> False
 
 ---- subsitute var n with expn in expf
@@ -77,7 +79,8 @@ synth (г, d, o) (Fun a b) = do
 ---- &R
 synth c (With a b) = do
     (expa, d') <- synth c a
-    (expb, _) <- synth c a -- ?? DeltaOut from synth a and DeltaOut from synth b should be the same ??
+    (expb, d'') <- synth c b
+    guard (d' == d'') -- TODO: ?? DeltaOut from synth a and DeltaOut from synth b should be the same ??
     return (WithValue expa expb, d')
 
 -- no more synchronous right propositions, start inverting the ordered context (omega)
@@ -114,8 +117,8 @@ synth (g, d, (n, Plus a b):o) t = do
 synth (g, d, (n, Bang a):o) t = do
     vari <- get
     let nname = getName vari
-    (exp, d') <- synth ((nname, a):g, d, o) t
     put $ vari + 1
+    (exp, d') <- synth ((nname, a):g, d, o) t
     return (LetBang nname (Var n) exp, d')
 
 
@@ -154,12 +157,12 @@ focus c goal =
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              a:din' -> focus' (Just a) (g, din') goal
+              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
 
         decideLeftBang (g, din) goal = do
             case g of
               []   -> empty
-              a:g' -> focus' (Just a) (g, din) goal
+              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, din) goal)) empty g
         
         focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 
@@ -211,13 +214,14 @@ focus c goal =
             let nname = getName vari
             lift $ put $ vari + 1
             (expb, d') <- focus' (Just (nname, b)) c goal
+            vari' <- get
             -- TODO: Factorizar isto? :)
-            let maybeSynthResult = runStateT (synth (g, d', []) a) (vari+1)
+            let maybeSynthResult = runStateT (synth (g, d', []) a) vari'
             if isNothing maybeSynthResult
                then empty
                else do
-                   let ((expa, d''), vari') = fromJust maybeSynthResult
-                   lift $ put vari'
+                   let ((expa, d''), vari'') = fromJust maybeSynthResult
+                   lift $ put vari''
                    return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
@@ -277,4 +281,5 @@ focus c goal =
 
 ---- top level
 
+synthType :: Type -> Expr
 synthType t = fst $ fromMaybe (error "[Synth] Failed") (evalStateT (synth ([], [], []) t) 0)
