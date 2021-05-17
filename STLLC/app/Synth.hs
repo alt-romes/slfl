@@ -137,7 +137,7 @@ focus c goal =
         ---- *R
         focus' Nothing c@(g, d) (Tensor a b) = do
             (expa, d') <- focus' Nothing c a  -- important todo: estou a assumir que aqui um possivel empty na chamada se propague e "termine a monad" ali, espero não estar a dizer nada demasiado ao lado. Eu tentei perceber o combinador com o que o prof enviou mas não consegui muito bemm
-            (expb, d'') <- focus' Nothing (g, d') a
+            (expb, d'') <- focus' Nothing (g, d') b
             return (TensorValue expa expb, d'')
 
         ---- 1R
@@ -182,7 +182,12 @@ focus c goal =
             (expb, d') <- focus' (Just (nname, b)) c goal
             -- TODO: Factorizar isto? :)
             let maybeSynthResult = runStateT (synth (g, d', []) a) (vari+1)
-            maybe empty (\r -> let ((expa, d''), vari') = r in do {lift $ put vari'; return (LetIn nname (App (Var n) expa) expb, d'')}) maybeSynthResult -- TODO: assim fica mais feio?
+            if isNothing maybeSynthResult
+               then empty
+               else do
+                   let ((expa, d''), vari') = fromJust maybeSynthResult
+                   lift $ put vari'
+                   return (LetIn nname (App (Var n) expa) expb, d'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do -- como factorizar este código ? 
@@ -222,31 +227,21 @@ focus c goal =
                            lift $ put vari'
                            return (exp, d')
 
-        ---- left focus is not atomic and not left synchronous, unfocus
-        -- focus' (Just a) (g, d) goal = do
-        --     vari <- lift get
-        --     let ((e,d'), vari') = runState (synth (g, d, [a]) goal) vari
-        --     lift $ put vari'
-        --     return (e, d')
-        
-        ---- right focus is not atomic and not synchronous, unfocus. if it is atomic we fail
+        ---- right focus is not synchronous, unfocus. if it is atomic we fail
         -- ?? estou a ter tmb alguma difficuldade a visualizar esta situação :)
         focus' Nothing (g, d) goal = do
-            if isAtomic goal
+            vari <- lift get
+            -- TODO: Factorizar isto? :)
+            let maybeSynthResult = runStateT (synth (g, d, []) goal) vari
+            if isNothing maybeSynthResult
                then empty
                else do
-                   vari <- lift get
-                   -- TODO: Factorizar isto? :)
-                   let maybeSynthResult = runStateT (synth (g, d, []) goal) vari
-                   if isNothing maybeSynthResult
-                       then empty
-                       else do
-                           let ((e,d'), vari') = fromJust maybeSynthResult
-                           lift $ put vari'
-                           return (e, d')
+                   let ((e,d'), vari') = fromJust maybeSynthResult
+                   lift $ put vari'
+                   return (e, d')
 
 
 
 ---- top level
 
-synthType t = fst $ fromJust $ evalStateT (synth ([], [], []) t) 0
+synthType t = fst $ fromMaybe (error "[Synth] Failed") (evalStateT (synth ([], [], []) t) 0)
