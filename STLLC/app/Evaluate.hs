@@ -29,7 +29,7 @@ eval c@(_, fctxt) (FUVar x) = eval c $ fromJust $ lookup x fctxt
 --- -o ---------------------
 
 --  -oI
-eval _ (Abs t e) = Abs t e
+eval _ (Abs t e) = Abs t e      -- TODO: Devia evaluate do interior da função? não devia ser avaliado apenas quando chamado? (lazy)
 
 --  -oE
 eval ctxt@(bctxt, fctxt) (App e1 e2) =

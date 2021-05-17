@@ -69,7 +69,7 @@ mparse fname = do
 
 mdesugar :: String -> IO [CoreBinding]
 mdesugar fname = do
-   pbindings  <- mparse fname
+   pbindings <- mparse fname
    return $ desugarModule pbindings
 
 -- when defining a function you can only use the ones defined above
@@ -88,12 +88,16 @@ mevaluate fname = do
 runmodule :: String -> IO ()
 runmodule fname = do
     p <- mparse fname
+    print "Parsed: "
     print p
     d <- mdesugar fname
+    print "Desugared: "
     print d
     t <- mcheck fname
+    print "Checked: "
     print t
     e <- mevaluate fname
+    print "Evaluated: "
     print e
 
 synthetize :: String -> IO ()
