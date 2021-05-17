@@ -75,7 +75,12 @@ synth (g, d, (n, Plus a b):o) t = do
     return (CaseOfPlus (Var n) n1 expa n2 expb, d')
 
 ---- !L
-synth (g, d, (n, Bang a):o) t = synth ((n, a):g, d, o) t
+synth (g, d, (n, Bang a):o) t = do
+    vari <- get
+    let nname = getName vari
+    (exp, d') <- synth ((nname, a):g, d, o) t
+    put $ vari + 1
+    return (LetBang nname (Var n) exp, d')
 
 
 ---- Synchronous left propositions to Delta ----
@@ -157,10 +162,11 @@ focus c goal =
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
             vari <- lift get
-            (expb, d') <- focus' (Just (getName vari, b)) c goal
+            let nname = getName vari
+            (expb, d') <- focus' (Just (nname, b)) c goal
             let ((expa, d''), vari') = runState (synth (g, d', []) a) (vari+1)
-            lift $ put $ vari' + 1 -- +1 because vari' is used in the next line
-            return (LetIn (getName vari') (App (Var n) expa) expb, d'')
+            lift $ put $ vari'
+            return (LetIn nname (App (Var n) expa) expb, d'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do

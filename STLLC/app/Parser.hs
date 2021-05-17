@@ -221,11 +221,13 @@ type' :: Parser Type
 type' = Ex.buildExpressionParser tyops ty
     where 
         infixOp x f = Ex.Infix (reservedOp x >> return f)
+        prefixOp x f = Ex.Prefix (reservedOp x >> return f)
         tyops = [[
             infixOp "-o" Fun Ex.AssocRight,
             infixOp "*" Tensor Ex.AssocLeft,
             infixOp "&" With Ex.AssocLeft,
-            infixOp "+" Plus Ex.AssocLeft
+            infixOp "+" Plus Ex.AssocLeft,
+            prefixOp "!" Bang
             ]]
 
 -- Parsing modules
