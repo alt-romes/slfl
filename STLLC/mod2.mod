@@ -1,6 +1,7 @@
-let a = (λx : ((A * B) -o C) ->
-    (λy : A ->
-        (λz : B -> x <y * z>)));
+(λx: (A -o (B -o C)) ->
+    (λy : (A * B) ->
+        let z*u = y in
+            let v = x z in v u));
 
 let b = (λx : ((A * B) -o C) ->
     (λy : A ->

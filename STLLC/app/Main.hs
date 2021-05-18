@@ -112,4 +112,5 @@ main = do
       "synth" -> let (arg:oargs) = args in synthetize arg
       "mod" -> let (arg:oargs) = args in runmodule arg
       "module" -> let (arg:oargs) = args in runmodule arg
+      "type" -> let (arg:oargs) = args in do {e <- mcheck arg; print $ snd $ head e}
       _ -> synthetize action
