@@ -100,6 +100,11 @@ runmodule fname = do
     print "Evaluated: "
     print e
 
+synthcomplete :: String -> IO ()
+synthcomplete fname = do
+    targets <- mparse fname
+    print $ synthModMarks targets
+
 synthetize :: String -> IO ()
 synthetize t = do
     let surroundtype = '(':t ++ ")"
@@ -108,9 +113,18 @@ synthetize t = do
 main :: IO ()
 main = do
     (action:args) <- getArgs
+    let arg =
+            (case args of
+               [] -> if null action
+                        then "(A -o A)"
+                        else "llcprogs/main.llc"
+               (arg:oargs) -> arg)
     case action of
-      "synth" -> let (arg:oargs) = args in synthetize arg
-      "mod" -> let (arg:oargs) = args in runmodule arg
-      "module" -> let (arg:oargs) = args in runmodule arg
-      "type" -> let (arg:oargs) = args in do {e <- mcheck arg; print $ snd $ head e}
+      "synth" -> synthetize arg
+      "complete" -> synthcomplete arg
+      "module" -> runmodule arg
+      "type" -> do {e <- mcheck arg;
+                   print $ snd $ head e}
+      "eval" -> do {e <- mevaluate arg;
+                   print e}
       _ -> synthetize action

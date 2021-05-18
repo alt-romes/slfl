@@ -46,6 +46,9 @@ data CoreExpr
     -- Bool
     | Tru
     | Fls
+
+    | TypedPlaceholder Type
+
     deriving (Show, Eq)
 
 

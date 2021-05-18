@@ -123,6 +123,10 @@ eval ctxt (IfThenElse e1 e2 e3) =
         Tru -> eval ctxt e2
         Fls -> eval ctxt e3
 
+--- Typed placeholder for synthesis ---
+
+eval _ (TypedPlaceholder t) = error $ "[Eval] Can't evaluate typed placeholder (synthesis marker): " ++ show t
+
 -- end eval ------------
 
 

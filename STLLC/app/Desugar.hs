@@ -93,6 +93,7 @@ desugar (Syntax.IfThenElse e1 e2 e3) = do
 desugar Syntax.Tru = return CoreSyntax.Tru
 desugar Syntax.Fls = return CoreSyntax.Fls
 
+desugar (Syntax.TypedPlaceholder t) = return $ CoreSyntax.TypedPlaceholder t
 
 desugarModule :: [Binding] -> [CoreBinding]
 desugarModule = map desugarModule'

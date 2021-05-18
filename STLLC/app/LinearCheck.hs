@@ -154,6 +154,10 @@ lincheck ctx (IfThenElse e1 e2 e3) = do
        then return (t3, ctx3)
        else Nothing
 
+--- Typed placeholder (synth marker) ---
+
+lincheck ctx (TypedPlaceholder t) = return (t, ctx)
+
 -- end lincheck ------------
 
 

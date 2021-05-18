@@ -197,6 +197,8 @@ aexp =   parens expr
 
      <|> variable
 
+     <|> typedplaceholder
+
      -- <|> isZero
      -- <|> num 
 
@@ -205,6 +207,14 @@ expr = aexp >>= \x ->
          (many1 aexp >>= \xs -> return (foldl Syntax.App x xs))
          <|> return x
 
+-- Typed placeholder for partial synthesis
+
+typedplaceholder :: Parser Expr
+typedplaceholder = do
+    reservedOp "{{"
+    plhty <- ty
+    reservedOp "}}"
+    return $ Syntax.TypedPlaceholder plhty
 
 -- Parsing Types 
 

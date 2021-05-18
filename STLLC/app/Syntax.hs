@@ -46,6 +46,7 @@ data Expr
     -- Added sugar :)
     | LetIn String Expr Expr
 
+    | TypedPlaceholder Type
 
 data Pattern
     = TensorPattern String String
@@ -93,5 +94,7 @@ showexpr' d Tru = "true"
 showexpr' d Fls = "false"
 
 showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+
+showexpr' d (TypedPlaceholder t) = "{{ " ++ show t ++ " }}"
 
 indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '

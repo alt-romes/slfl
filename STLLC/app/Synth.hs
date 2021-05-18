@@ -1,5 +1,7 @@
+{-# LANGUAGE LambdaCase #-}
 module Synth where
 
+import Data.Bifunctor
 import Data.List
 import Control.Applicative
 import Control.Monad.Logic
@@ -10,6 +12,7 @@ import Debug.Trace
 
 import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom))
 import Syntax
+import Util
 
 type Gamma = [(String, Type)] -- Unrestricted hypothesis
 type Delta = [(String, Type)] -- Linear hypothesis (not left asynchronous)
@@ -35,32 +38,16 @@ isAtomic t = case t of
 
 ---- subsitute var n with expn in expf
 substitute :: String -> Expr -> Expr -> Expr
-substitute n expn expf =
-    case expf of
-      (Var x) -> if x == n then expn else LetIn n expn expf -- TODO: Aqui devia tmb dizer Let n expn expf ou se não utilizamos a variável podemos discartá-la? Parece me difícil esta situação sequer acontecer, porque se os recursos são lineares... ?
-      _ -> LetIn n expn expf
+-- substitute n expn expf =
+--     case expf of
+--       (Var x) -> if x == n then expn else LetIn n expn expf -- TODO: Aqui devia tmb dizer Let n expn expf ou se não utilizamos a variável podemos discartá-la? Parece me difícil esta situação sequer acontecer, porque se os recursos são lineares... ?
+--       _ -> LetIn n expn expf
 -- TODO: Queremos mesmo substituir a expressão em todo o lado?
 -- Estava a pensar que fazia mais sentido apenas substituir expressões que sejam
 -- diretamente "(Var n)", porque se não vamos estar a tornar a expressão mais complicada
 -- ao substituir Var n possivelmente várias vezes em toda a expressão
 --
--- substitute n expn expf =
---     case expf of
---       Var x -> if x == n then expn else expf
---       Abs x t e -> Abs x t $ substitute n expn e
---       App e1 e2 -> App (substitute n expn e1) (substitute n expn e2)
---       TensorValue e1 e2 -> TensorValue (substitute n expn e1) (substitute n expn e2)
---       LetUnit e1 e2 -> LetUnit (substitute n expn e1) (substitute n expn e2)
---       WithValue e1 e2 -> WithValue (substitute n expn e1) (substitute n expn e2)
---       Fst e -> Fst (substitute n expn e)
---       Snd e -> Snd (substitute n expn e)
---       InjL t e -> InjL t (substitute n expn e)
---       InjR t e -> InjR t (substitute n expn e)
---       CaseOfPlus e1 x e2 y e3 -> CaseOfPlus (substitute n expn e1) x (substitute n expn e2) y (substitute n expn e3)
---       BangValue e -> BangValue (substitute n expn e)
---       LetBang x e1 e2 -> LetBang x (substitute n expn e1) (substitute n expn e2)
---       LetIn x e1 e2 -> LetIn x (substitute n expn e1) (substitute n expn e2)
---       _ -> expf
+substitute n expn = editexp (\case {Var _ -> True; _ -> False}) (\v@(Var x) -> if x == n then expn else v)
 
 ---- Synthetizer -----------------------------
 
@@ -282,4 +269,11 @@ focus c goal =
 ---- top level
 
 synthType :: Type -> Expr
-synthType t = fst $ fromMaybe (error "[Synth] Failed") (evalStateT (synth ([], [], []) t) 0)
+synthType t = fst $ fromMaybe (error $ "[Synth] Failed synthesis of: " ++ show t) (evalStateT (synth ([], [], []) t) 0)
+
+---- replace all placeholders in an expression with a synthetized type
+synthMarks :: Expr -> Expr
+synthMarks = editexp (\case {TypedPlaceholder _ -> True; _ -> False}) (\(TypedPlaceholder t) -> synthType t)
+
+synthModMarks :: [Binding] -> [Binding]
+synthModMarks = map (Data.Bifunctor.second synthMarks)

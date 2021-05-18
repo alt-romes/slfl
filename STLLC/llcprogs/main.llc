@@ -1,0 +1,1 @@
+let main = let x = {{ (Bool -o Bool) }} in x

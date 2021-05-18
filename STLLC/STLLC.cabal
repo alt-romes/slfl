@@ -46,4 +46,5 @@ executable STLLC
         LinearCheck,
         Parser,
         Syntax,
-        Synth
+        Synth,
+        Util
