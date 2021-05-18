@@ -2,7 +2,9 @@ module CoreSyntax where
 
 import Prelude hiding (Bool)
 
-data CoreBinding = CoreBinding String CoreExpr deriving (Show)
+data CoreBinding = CoreBinding String CoreExpr
+instance (Show CoreBinding) where
+    show (CoreBinding s e) = s ++ ":\n" ++ show e ++ "\n"
 
 data CoreExpr
 
@@ -49,7 +51,7 @@ data CoreExpr
 
     | TypedMark Type
 
-    deriving (Show, Eq)
+    deriving (Eq)
 
 
 data Type
@@ -76,3 +78,38 @@ instance (Show Type) where
     show (Bang t1) = "(! " ++ show t1 ++ ")"
     show Bool = "Bool"
     show (Atom x) = x
+
+instance (Show CoreExpr) where
+    show e = showexpr' 0 e
+
+showexpr' :: Int -> CoreExpr -> String -- Use Int (depth) to indent the code
+showexpr' d (BLVar x) = "BL(" ++ show x ++ ")"
+showexpr' d (BUVar x) = "BU(" ++ show x ++ ")"
+showexpr' d (FLVar x) = "FL(" ++ show x ++ ")"
+showexpr' d (FUVar x) = "FU(" ++ show x ++ ")"
+showexpr' d (Abs t e) = indent d ++ "(λ" ++ " : " ++ show t ++ " -> " ++ showexpr' (d+1) e ++ ")"
+showexpr' d (App e1 e2) = showexpr' d e1 ++ " " ++ showexpr' d e2
+showexpr' d (TensorValue e1 e2) = "< " ++ showexpr' d e1 ++ " * " ++ showexpr' d e2 ++ " >"
+showexpr' d (LetTensor e1 e2) = indent d ++ "let " ++ "?" ++ "*" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+showexpr' d UnitValue = "<>"
+showexpr' d (LetUnit e1 e2) = indent d ++ "let _ = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+showexpr' d (WithValue e1 e2) = "< " ++ showexpr' d e1 ++ " & " ++ showexpr' d e2 ++ " >"
+showexpr' d (Fst a@(App _ _)) = "fst (" ++ showexpr' d a ++ ")"
+showexpr' d (Snd a@(App _ _)) = "snd (" ++ showexpr' d a ++ ")"
+showexpr' d (Fst e) = "fst " ++ showexpr' d e
+showexpr' d (Snd e) = "snd " ++ showexpr' d e
+showexpr' d (InjL t e) = "inl " ++ showexpr' d e ++ " : " ++ show t
+showexpr' d (InjR t e) = "inr " ++ show t ++ " : " ++ showexpr' d e
+showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
+                                            indent (d+1) ++ "inl " ++ "?" ++ " => " ++ showexpr' (d+2) e2 ++
+                                            indent (d+1) ++ "| inr " ++ "?" ++ " => " ++ showexpr' (d+2) e3
+showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
+showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++ 
+                                        indent (d+1) ++ "then " ++ showexpr' (d+1) e2 ++
+                                        indent (d+1) ++ "else " ++ showexpr' (d+1) e3
+showexpr' d Tru = "true"
+showexpr' d Fls = "false"
+showexpr' d (TypedMark t) = "{{ " ++ show t ++ " }}"
+indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '

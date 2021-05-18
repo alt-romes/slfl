@@ -19,7 +19,7 @@ eval :: Ctxt -> CoreExpr -> CoreExpr
 
 --- hyp --------------------
 
-eval c@(bctxt, _) (BLVar x) = eval c $ bctxt !! x
+eval c@(bctxt, _) (BLVar x) = let a = eval c $ bctxt !! x in trace ("found in " ++ show x ++ " : " ++ show a ++ "\n    in context " ++ show bctxt) a
 
 eval c@(_, fctxt) (FLVar x) = eval c $ fromJust $ lookup x fctxt
 
@@ -48,6 +48,8 @@ eval ctxt (TensorValue e1 e2) =
 
 --  *E
 eval ctxt@(bctxt, fctxt) (LetTensor e1 e2) =
+    let x = eval ctxt e1 in
+        trace ("Evaluated e1 to " ++ show x) $
     let TensorValue e3 e4 = eval ctxt e1 in
     eval (e4:e3:bctxt, fctxt) e2
 
@@ -144,6 +146,6 @@ evalExpr = eval ([], [])
 evalModule :: [CoreBinding] -> CoreExpr
 evalModule cbs =
     case find (\(CoreBinding n _) -> n == "main") cbs of
-      Nothing -> errorWithoutStackTrace "[Eval] No main function defined"
+      Nothing -> errorWithoutStackTrace "[Eval] No main function defined."
       Just (CoreBinding _ exp) -> eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp
 
