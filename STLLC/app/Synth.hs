@@ -268,11 +268,10 @@ focus c goal =
 ---- top level
 
 synthType :: Type -> Expr
-synthType t = fst $ fromMaybe (error $ "[Synth] Failed synthesis of: " ++ show t) (evalStateT (synth ([], [], []) t) 0)
+synthType t = fst $ fromMaybe (errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t) (evalStateT (synth ([], [], []) t) 0)
 
----- replace all placeholders in an expression with a synthetized type
-synthMarks :: Expr -> Expr
-synthMarks = editexp (\case {TypedPlaceholder _ -> True; _ -> False}) (\(TypedPlaceholder t) -> synthType t)
+synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
+synthMarks = editexp (\case {TypedMark _ -> True; _ -> False}) (\(TypedMark t) -> synthType t)
 
-synthModMarks :: [Binding] -> [Binding]
-synthModMarks = map (\(Binding n e) -> Binding n $ synthMarks e)
+synthMarksModule :: [Binding] -> [Binding]
+synthMarksModule = map (\(Binding n e) -> Binding n $ synthMarks e)

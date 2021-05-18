@@ -5,7 +5,7 @@ import CoreSyntax (Type)
 
 data Binding = Binding String Expr
 instance (Show Binding) where
-    show (Binding s e) = "\nlet " ++ s ++ " =\n" ++ show e
+    show (Binding s e) = "let " ++ s ++ " =\n" ++ show e ++ ";\n"
 
 data Expr
 
@@ -48,7 +48,7 @@ data Expr
     -- Added sugar :)
     | LetIn String Expr Expr
 
-    | TypedPlaceholder Type
+    | TypedMark Type
 
 data Pattern
     = TensorPattern String String
@@ -97,6 +97,6 @@ showexpr' d Fls = "false"
 
 showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 
-showexpr' d (TypedPlaceholder t) = "{{ " ++ show t ++ " }}"
+showexpr' d (TypedMark t) = "{{ " ++ show t ++ " }}"
 
 indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '

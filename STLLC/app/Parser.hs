@@ -90,6 +90,7 @@ plus =
     reservedOp ":"
     Syntax.InjR t1 <$> expr
 
+caseplus :: Parser Expr
 caseplus = do
     reserved "case"
     e1 <- expr
@@ -197,7 +198,7 @@ aexp =   parens expr
 
      <|> variable
 
-     <|> typedplaceholder
+     <|> mark
 
      -- <|> isZero
      -- <|> num 
@@ -209,12 +210,12 @@ expr = aexp >>= \x ->
 
 -- Typed placeholder for partial synthesis
 
-typedplaceholder :: Parser Expr
-typedplaceholder = do
+mark :: Parser Expr
+mark = do
     reservedOp "{{"
     plhty <- ty
     reservedOp "}}"
-    return $ Syntax.TypedPlaceholder plhty
+    return $ Syntax.TypedMark plhty
 
 -- Parsing Types 
 
@@ -265,9 +266,7 @@ letdecl = do
   return $ Binding name $ foldr (uncurry Syntax.Abs) body args
 
 val :: Parser Binding
-val = do
-  ex <- expr
-  return $ Binding "main" ex
+val = Binding "main" <$> expr
 
 top :: Parser Binding
 top = do
@@ -278,13 +277,22 @@ top = do
 modl :: Parser [Binding]
 modl = many top
 
--- Toplevel
 
-parseExpr :: String -> Either ParseError Expr
-parseExpr = parse (contents expr) "<stdin>"
 
-parseModule :: FilePath -> String -> Either ParseError [Binding]
-parseModule = parse (contents modl)
+---- TOP LEVEL ------------
 
-parseType :: String -> Either ParseError Type
-parseType = parse (contents ty) "<stdin>"
+parseExpr :: String -> Expr
+parseExpr i = case parse (contents expr) "<stdin>" i of
+                Left x -> errorWithoutStackTrace $ "[Expr Parse] Failed: " ++ show x
+                Right x -> x
+
+parseModule :: FilePath -> String -> [Binding]
+parseModule f i = case parse (contents modl) f i of
+                    Left x -> errorWithoutStackTrace $ "[Module Parse] Failed: " ++ show x
+                    Right x -> x
+
+parseType :: String -> Type
+parseType i = case parse (contents ty) "<stdin>" i of
+                Left x -> errorWithoutStackTrace $ "[Type Parse] Failed: " ++ show x
+                Right x -> x
+

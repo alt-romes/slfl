@@ -33,6 +33,7 @@ lookupVar x = do
                 Unr -> return $ BUVar $ fromJust $ elemIndex (x, Desugar.Var mult) env
         Nothing -> return $ FLVar x
 
+
 desugar :: Expr -> Desugar CoreExpr
 desugar (Syntax.Var x) = lookupVar x
     
@@ -93,7 +94,13 @@ desugar (Syntax.IfThenElse e1 e2 e3) = do
 desugar Syntax.Tru = return CoreSyntax.Tru
 desugar Syntax.Fls = return CoreSyntax.Fls
 
-desugar (Syntax.TypedPlaceholder t) = return $ CoreSyntax.TypedPlaceholder t
+desugar (Syntax.TypedMark t) = return $ CoreSyntax.TypedMark t
+
+
+---- TOP LEVEL ----
+
+desugarExpr :: Expr -> CoreExpr
+desugarExpr exp = runReader (desugar exp) []
 
 desugarModule :: [Binding] -> [CoreBinding]
 desugarModule = map desugarModule'

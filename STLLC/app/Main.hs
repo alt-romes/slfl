@@ -19,96 +19,75 @@ import System.IO
 
 import Text.Parsec
 
-process :: String -> IO ()
-process line =
-  let res = parseExpr line in
-  case res of
-    Left err -> print err
-    Right ex -> print ex
+-- process :: String -> IO ()
+-- process line = print $ parseExpr line
 
-interpret :: IO ()
-interpret = runInputT defaultSettings loop 
-    where 
-    loop = do 
-        minput <- getInputLine "> "
-        case minput of 
-            Nothing -> outputStrLn "Bye."
-            Just input -> liftIO (process input) >> loop
+-- interpret :: IO ()
+-- interpret = runInputT defaultSettings loop 
+--     where 
+--     loop = do 
+--         minput <- getInputLine "> "
+--         case minput of 
+--             Nothing -> outputStrLn "Bye."
+--             Just input -> liftIO (process input) >> loop
 
-rparse :: String -> Expr
-rparse s = case parseExpr s of
-             Left x -> error $ "[Expr Parse] Failed: " ++ show x
-             Right x -> x
 
-pdesugar :: String -> CoreExpr
-pdesugar s = runReader (desugar $ rparse s) []
+---- Single Expressions
 
-pcheck :: String -> Type
-pcheck s = typecheck $ pdesugar s
+mainparse :: String -> Expr
+mainparse = parseExpr
 
-pevaluate :: String -> CoreExpr
-pevaluate s =
-    let tree = pdesugar s in
-    let ty   = typecheck tree in -- make sure is well typed
-    evalExpr tree
+maindesugar :: String -> CoreExpr
+maindesugar = desugarExpr . mainparse
 
-ptype :: String -> Type
-ptype s = case parseType s of
-             Left x -> error $ "[Expr Parse] Failed: " ++ show x
-             Right x -> x
+maintypecheck :: String -> Type
+maintypecheck = typecheckExpr . maindesugar
 
--- modules
+maineval :: String -> CoreExpr
+maineval = evalExpr . maindesugar
 
-mparse :: String -> IO [Binding] -- module parse
-mparse fname = do
+mainsynth :: String -> Expr
+mainsynth t =
+    let surroundtype = '(':t ++ ")" in
+        synthType (parseType surroundtype)
+
+-- TODO: Se eu chamasse _ <- maintypecheck s; e depois e <- maineval s; ele apenas ia correr (desugarExpr . parseExpr) uma vez por causa de memoization certo?
+
+
+
+---- Modules
+
+mainparseModule :: String -> IO [Binding]
+mainparseModule fname = do
     input <- readFile fname
-    let pmod = parseModule fname input in
-        case pmod of
-          Left x -> do { print x; error "[Module Parse] Failed" }
-          Right x -> return x
+    return $ parseModule fname input
 
-mdesugar :: String -> IO [CoreBinding]
-mdesugar fname = do
-   pbindings <- mparse fname
-   return $ desugarModule pbindings
+maindesugarModule :: String -> IO [CoreBinding]
+maindesugarModule fname = do
+   bindings <- mainparseModule fname
+   return $ desugarModule bindings
 
 -- when defining a function you can only use the ones defined above
 
-mcheck :: String -> IO [TypeBinding]
-mcheck fname = do
-    cbindings <- mdesugar fname
+maintypecheckModule :: String -> IO [TypeBinding]
+maintypecheckModule fname = do
+    cbindings <- maindesugarModule fname
     return $ typecheckModule cbindings
 
-mevaluate :: String -> IO CoreExpr
-mevaluate fname = do
-    cbindings <- mdesugar fname
+mainevalModule :: String -> IO CoreExpr
+mainevalModule fname = do
+    cbindings <- maindesugarModule fname
     let _ = typecheckModule cbindings in -- make sure module is well typed
-        return $ evaluateModule cbindings
+        return $ evalModule cbindings
 
-runmodule :: String -> IO ()
-runmodule fname = do
-    p <- mparse fname
-    print "Parsed: "
-    print p
-    d <- mdesugar fname
-    print "Desugared: "
-    print d
-    t <- mcheck fname
-    print "Checked: "
-    print t
-    e <- mevaluate fname
-    print "Evaluated: "
-    print e
+mainsynthMarksModule :: String -> IO [Binding]
+mainsynthMarksModule fname = do
+    targets <- mainparseModule fname
+    return $ synthMarksModule targets
 
-synthcomplete :: String -> IO ()
-synthcomplete fname = do
-    targets <- mparse fname
-    print $ synthModMarks targets
 
-synthetize :: String -> IO ()
-synthetize t = do
-    let surroundtype = '(':t ++ ")"
-    print $ synthType (ptype surroundtype)
+
+---- Main
 
 main :: IO ()
 main = do
@@ -120,11 +99,9 @@ main = do
                         else "llcprogs/main.llc"
                (arg:oargs) -> arg)
     case action of
-      "synth" -> synthetize arg
-      "complete" -> synthcomplete arg
-      "module" -> runmodule arg
-      "type" -> do {e <- mcheck arg;
-                   print $ snd $ head e}
-      "eval" -> do {e <- mevaluate arg;
-                   print e}
-      _ -> synthetize action
+      "synth" -> print $ mainsynth arg
+      "complete" -> mainsynthMarksModule arg >>= mapM_ print 
+      "desugar" -> maindesugarModule arg >>= mapM_ print
+      "type" -> maintypecheckModule arg >>= mapM_ print
+      "eval" -> mainevalModule arg >>= print
+      _ -> print $ mainsynth action

@@ -47,7 +47,7 @@ data CoreExpr
     | Tru
     | Fls
 
-    | TypedPlaceholder Type
+    | TypedMark Type
 
     deriving (Show, Eq)
 

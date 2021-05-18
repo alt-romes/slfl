@@ -6,8 +6,9 @@ import Debug.Trace
 
 import CoreSyntax
 
-type TypeBinding = (String, Type)
-
+data TypeBinding = TypeBinding String Type
+instance (Show TypeBinding) where
+    show (TypeBinding s e) = s ++ ":\n    " ++ show e ++ "\n"
 
 type Index = Int
 type Name = String
@@ -156,7 +157,7 @@ lincheck ctx (IfThenElse e1 e2 e3) = do
 
 --- Typed placeholder (synth marker) ---
 
-lincheck ctx (TypedPlaceholder t) = return (t, ctx)
+lincheck ctx (TypedMark t) = return (t, ctx)
 
 -- end lincheck ------------
 
@@ -173,17 +174,18 @@ findDelete x ((y,t):xs) acc =
 equalCtxts :: Ctxt -> Ctxt -> Bool
 equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb)
 
--- top level ---------------
 
-typecheck :: CoreExpr -> Type
-typecheck e = maybe (error "[Typecheck] Failed") fst (lincheck ([], []) e)
 
+---- TOP LEVEL ------------
+
+typecheckExpr :: CoreExpr -> Type
+typecheckExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") fst (lincheck ([], []) e)
 
 typecheckModule :: [CoreBinding] -> [TypeBinding]
 typecheckModule cbs = typecheckModule' cbs []
     where typecheckModule' cbs acc = 
             if null cbs then []
             else let b@(CoreBinding n ce):xs = cbs in
-                 let tb = (n, maybe (error ("[Typecheck Module] Failed when checking " ++ show b ++ " with accumulator " ++ show acc)) fst $ lincheck ([], acc) ce) in
+                 let tb = TypeBinding n $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) fst $ lincheck ([], map (\(TypeBinding n t) -> (n, t)) acc) ce in
                      tb:typecheckModule' xs (tb:acc)
 

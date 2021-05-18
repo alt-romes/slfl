@@ -107,11 +107,15 @@ eval ctxt (BangValue e) =
     BangValue e'
 
 --  !E
-eval ctxt (LetBang e1 e2) =
+eval ctxt@(bctxt, fctxt) (LetBang e1 e2) =
     let BangValue e1' = eval ctxt e1 in
-    let (bctxt, fctxt) = ctxt in
     eval (e1':bctxt, fctxt) e2
 
+--- LetIn -----------------
+
+eval ctxt@(bctxt, fctxt) (LetIn e1 e2) =
+    let e1v = eval ctxt e1 in
+    eval (e1v:bctxt, fctxt) e2
 
 --- Bool -------------------
 
@@ -124,22 +128,22 @@ eval ctxt (IfThenElse e1 e2 e3) =
         Tru -> eval ctxt e2
         Fls -> eval ctxt e3
 
---- Typed placeholder for synthesis ---
+--- Typed mark for synthesis ---
 
-eval _ (TypedPlaceholder t) = error $ "[Eval] Can't evaluate typed placeholder (synthesis marker): " ++ show t
+eval _ (TypedMark t) = errorWithoutStackTrace $ "[Eval] Can't eval typed synthesis marker:\n    " ++ show t
 
 -- end eval ------------
 
 
 
--- top level ---------------
+---- TOP LEVEL ------------
 
 evalExpr :: CoreExpr -> CoreExpr
 evalExpr = eval ([], [])
 
-evaluateModule :: [CoreBinding] -> CoreExpr
-evaluateModule cbs =
+evalModule :: [CoreBinding] -> CoreExpr
+evalModule cbs =
     case find (\(CoreBinding n _) -> n == "main") cbs of
-      Nothing -> error "[Eval] No main function defined"
+      Nothing -> errorWithoutStackTrace "[Eval] No main function defined"
       Just (CoreBinding _ exp) -> eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp
 
