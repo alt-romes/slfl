@@ -2,7 +2,7 @@ module CoreSyntax where
 
 import Prelude hiding (Bool)
 
-type CoreBinding = (String, CoreExpr)
+data CoreBinding = CoreBinding String CoreExpr deriving (Show)
 
 data CoreExpr
 

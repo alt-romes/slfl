@@ -262,12 +262,12 @@ letdecl = do
   args <- many argument
   reservedOp "="
   body <- expr
-  return (name, foldr (uncurry Syntax.Abs) body args)
+  return $ Binding name $ foldr (uncurry Syntax.Abs) body args
 
 val :: Parser Binding
 val = do
   ex <- expr
-  return ("main", ex)
+  return $ Binding "main" ex
 
 top :: Parser Binding
 top = do

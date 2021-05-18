@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 module Synth where
 
-import Data.Bifunctor
 import Data.List
 import Control.Applicative
 import Control.Monad.Logic
@@ -276,4 +275,4 @@ synthMarks :: Expr -> Expr
 synthMarks = editexp (\case {TypedPlaceholder _ -> True; _ -> False}) (\(TypedPlaceholder t) -> synthType t)
 
 synthModMarks :: [Binding] -> [Binding]
-synthModMarks = map (Data.Bifunctor.second synthMarks)
+synthModMarks = map (\(Binding n e) -> Binding n $ synthMarks e)

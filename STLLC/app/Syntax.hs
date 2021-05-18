@@ -3,7 +3,9 @@ module Syntax where
 import Prelude hiding (Bool)
 import CoreSyntax (Type)
 
-type Binding = (String, Expr)
+data Binding = Binding String Expr
+instance (Show Binding) where
+    show (Binding s e) = "\nlet " ++ s ++ " =\n" ++ show e
 
 data Expr
 

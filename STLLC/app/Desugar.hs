@@ -97,5 +97,5 @@ desugar (Syntax.TypedPlaceholder t) = return $ CoreSyntax.TypedPlaceholder t
 
 desugarModule :: [Binding] -> [CoreBinding]
 desugarModule = map desugarModule'
-    where desugarModule' (name, exp) = (name, runReader (desugar exp) []) 
+    where desugarModule' (Binding name exp) = CoreBinding name $ runReader (desugar exp) [] 
 

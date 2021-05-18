@@ -183,7 +183,7 @@ typecheckModule :: [CoreBinding] -> [TypeBinding]
 typecheckModule cbs = typecheckModule' cbs []
     where typecheckModule' cbs acc = 
             if null cbs then []
-            else let (n, ce):xs = cbs in
-                 let tb = (n, maybe (error ("[Typecheck Module] Failed when checking " ++ show (n, ce) ++ " with accumulator " ++ show acc)) fst $ lincheck ([], acc) ce) in
+            else let b@(CoreBinding n ce):xs = cbs in
+                 let tb = (n, maybe (error ("[Typecheck Module] Failed when checking " ++ show b ++ " with accumulator " ++ show acc)) fst $ lincheck ([], acc) ce) in
                      tb:typecheckModule' xs (tb:acc)
 

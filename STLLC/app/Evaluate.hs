@@ -1,5 +1,6 @@
 module Evaluate where
 
+import Data.List
 import Data.Maybe
 
 import CoreSyntax
@@ -138,7 +139,7 @@ evalExpr = eval ([], [])
 
 evaluateModule :: [CoreBinding] -> CoreExpr
 evaluateModule cbs =
-    case lookup "main" cbs of
+    case find (\(CoreBinding n _) -> n == "main") cbs of
       Nothing -> error "[Eval] No main function defined"
-      Just exp -> eval ([], cbs) exp
+      Just (CoreBinding _ exp) -> eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp
 
