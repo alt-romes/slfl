@@ -1,0 +1,3 @@
+# (λx : (Bool * Bool) -> let z*u = x in z) < true * false >
+# (\x : (Bool * Bool) -> \y : Bool -> < x * y >) 
+(\x : Bool -> \y : Bool -> < x * y >) true false

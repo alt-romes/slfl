@@ -4,5 +4,5 @@ let other =
 let main =
 let f = (λx : (Bool * Bool) -> 
     (λy : Bool -> 
-        let z*u = x in z)) in f < true * false > true;
+        let z*u = x in z)) in f < true * false > false;
 

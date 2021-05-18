@@ -51,7 +51,7 @@ data CoreExpr
 
     | TypedMark Type
 
-    deriving (Eq)
+    deriving (Eq, Show)
 
 
 data Type
@@ -79,8 +79,8 @@ instance (Show Type) where
     show Bool = "Bool"
     show (Atom x) = x
 
-instance (Show CoreExpr) where
-    show e = showexpr' 0 e
+-- instance (Show CoreExpr) where
+--     show e = showexpr' 0 e
 
 showexpr' :: Int -> CoreExpr -> String -- Use Int (depth) to indent the code
 showexpr' d (BLVar x) = "BL(" ++ show x ++ ")"

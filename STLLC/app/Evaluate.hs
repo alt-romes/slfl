@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Evaluate where
 
 import Data.List
@@ -5,6 +6,7 @@ import Data.Maybe
 
 import CoreSyntax
 import LinearCheck hiding (BoundCtxt, FreeCtxt, Ctxt, equalCtxts)
+import Util
 
 import Debug.Trace
 
@@ -14,12 +16,20 @@ type Ctxt = (BoundCtxt, FreeCtxt)
 
 -- Note: the typechecker should make sure the expression is valid 
 
+-- TODO IMPORTANT : A avaliação de redexes está todo todo errado, e é preciso ser refeito. Hoje sou incapaz de o resolver :)
+-- reduce :: Ctxt -> CoreExpr -> CoreExpr -> CoreExpr
+-- reduce ctxt expr repl = editcoreexp (\case {BLVar _ -> True; BUVar _ -> True; App _ _ -> True; _ -> False}) (\case {
+--                 BLVar x -> if x == 0 then repl else BLVar x;
+--                 BUVar x -> if x == 0 then repl else BUVar x;
+--                 a@(App _ _) -> eval ctxt a;         -- TODO: Nem sei se está horrível mas já estava desesperado com os redexes... Possívelmente temos de reescrever isto
+--                 e -> e}) expr                       -- NOTA: Não funciona
+
 -- eval --- Ctxt, CoreExpr -> CoreExpr 
 eval :: Ctxt -> CoreExpr -> CoreExpr
 
 --- hyp --------------------
 
-eval c@(bctxt, _) (BLVar x) = let a = eval c $ bctxt !! x in trace ("found in " ++ show x ++ " : " ++ show a ++ "\n    in context " ++ show bctxt) a
+eval c@(bctxt, _) (BLVar x) = eval c $ bctxt !! x
 
 eval c@(_, fctxt) (FLVar x) = eval c $ fromJust $ lookup x fctxt
 
@@ -31,16 +41,19 @@ eval c@(_, fctxt) (FUVar x) = eval c $ fromJust $ lookup x fctxt
 
 --  -oI
 eval _ (Abs t e) = Abs t e      -- TODO: Devia evaluate do interior da função? não devia ser avaliado apenas quando chamado? (lazy)
+                                -- TODO: Já estou mais confuso ainda sobre avaliação aqui porque tinha um erro na applicação, e sobre contextos vazios ou não vazios :) temos de rever
+                                -- NOTA: Entretanto percebi os meus erros, e estou a usar um reduce, estou há demasiadas horas nisto, acho que já dei tantas voltas que não há recuperação possível LOL
 
 --  -oE
-eval ctxt@(bctxt, fctxt) (App e1 e2) =
-    let Abs _ e1' = eval ctxt e1 in
+eval ctxt@(bctxt, fctxt) (App e1 e2) = -- TODO: Ver se está teoricamente OK
     let v = eval ctxt e2 in
-    eval (v:bctxt, fctxt) e1'
+    let (Abs _ e1') = eval ctxt (reduce ctxt e1 v) in -- TODO: Está tudo errado e é mesmo preciso ser refeito
+        eval (bctxt, fctxt) e1'
 
 --- * ----------------------
 
 --  *I
+--
 eval ctxt (TensorValue e1 e2) =
     let e1' = eval ctxt e1 in
     let e2' = eval ctxt e2 in
@@ -48,8 +61,6 @@ eval ctxt (TensorValue e1 e2) =
 
 --  *E
 eval ctxt@(bctxt, fctxt) (LetTensor e1 e2) =
-    let x = eval ctxt e1 in
-        trace ("Evaluated e1 to " ++ show x) $
     let TensorValue e3 e4 = eval ctxt e1 in
     eval (e4:e3:bctxt, fctxt) e2
 
