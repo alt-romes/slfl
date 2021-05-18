@@ -1,4 +1,0 @@
-pdesugar "True"
-pdesugar "False"
-pdesugar "False True"
-pdesugar "if True then False else True"

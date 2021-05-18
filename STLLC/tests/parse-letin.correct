@@ -1,2 +1,0 @@
-Right (LetIn "x" (Var "a") (Var "b"))
-Leaving GHCi.

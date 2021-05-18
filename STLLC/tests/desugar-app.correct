@@ -1,7 +1,0 @@
-App (FLVar "a") (FLVar "b")
-App (App (FLVar "a") (FLVar "b")) (FLVar "c")
-App (App (App (App (App (FLVar "a") (FLVar "b")) (FLVar "c")) (FLVar "d")) (FLVar "e")) (FLVar "f")
-App (Abs Bool (BLVar 0)) (FLVar "x")
-App (Abs Bool (BLVar 0)) (FLVar "y")
-App (Abs (Bool -o Bool) (App (BLVar 0) (FLVar "y"))) (FLVar "y")
-Leaving GHCi.

@@ -1,2 +1,0 @@
-Right (IfThenElse (Var "a") (Var "b") (Var "c"))
-Leaving GHCi.

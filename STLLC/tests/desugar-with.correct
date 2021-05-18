@@ -1,9 +1,0 @@
-WithValue (FLVar "a") (FLVar "b")
-WithValue (FLVar "a") (FLVar "b")
-WithValue (FLVar "a") (FLVar "b")
-Fst (WithValue (FLVar "a") (FLVar "b"))
-Fst (Fst (App (FLVar "a") (Fst (FLVar "a"))))
-Fst (App (Fst (FLVar "a")) (Fst (FLVar "a")))
-Snd (App (Fst (FLVar "a")) (Snd (FLVar "a")))
-Snd (App (Snd (FLVar "a")) (Snd (FLVar "a")))
-Leaving GHCi.

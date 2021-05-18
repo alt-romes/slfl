@@ -1,7 +1,0 @@
-Right (App (Var "a") (Var "b"))
-Right (App (App (Var "a") (Var "b")) (Var "c"))
-Right (App (App (App (App (App (Var "a") (Var "b")) (Var "c")) (Var "d")) (Var "e")) (Var "f"))
-Right (App (Abs "x" Bool (Var "x")) (Var "x"))
-Right (App (Abs "x" Bool (Var "x")) (Var "y"))
-Right (App (Abs "x" (Bool -o Bool) (App (Var "x") (Var "y"))) (Var "y"))
-Leaving GHCi.

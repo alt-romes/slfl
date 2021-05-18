@@ -1,8 +1,0 @@
-Right UnitValue
-Right (TensorValue UnitValue UnitValue)
-Right (TensorValue UnitValue UnitValue)
-Right (TensorValue UnitValue UnitValue)
-Left "<stdin>" (line 1, column 3):
-Right (LetUnit (Var "a") (Var "b"))
-Right (LetUnit (LetUnit (Var "c") (Var "d")) (Var "b"))
-Leaving GHCi.

@@ -1,7 +1,0 @@
-UnitValue
-TensorValue UnitValue UnitValue
-TensorValue UnitValue UnitValue
-TensorValue UnitValue UnitValue
-LetUnit (FLVar "a") (FLVar "b")
-LetUnit (LetUnit (FLVar "c") (FLVar "d")) (FLVar "b")
-Leaving GHCi.

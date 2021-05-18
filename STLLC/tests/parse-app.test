@@ -1,6 +1,0 @@
-parseExpr "a b"
-parseExpr "a b c"
-parseExpr "a b c d e f"
-parseExpr "(\\x : Bool -> x) x"
-parseExpr "(\\x : Bool -> x) y"
-parseExpr "(\\x : Bool -o Bool -> x y) y"

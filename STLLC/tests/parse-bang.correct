@@ -1,3 +1,0 @@
-Right (BangValue (Var "b"))
-Right (LetBang "a" (Var "b") (Var "c"))
-Leaving GHCi.

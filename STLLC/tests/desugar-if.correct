@@ -1,2 +1,0 @@
-IfThenElse (FLVar "a") (FLVar "b") (FLVar "c")
-Leaving GHCi.

@@ -1,6 +1,0 @@
-pdesugar "<>"
-pdesugar "< <> * <> >"
-pdesugar "< <> * <>>"
-pdesugar "< <>* <>>"
-pdesugar "let _ = a in b"
-pdesugar "let _ = let _ = c in d in b"

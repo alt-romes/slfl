@@ -1,8 +1,0 @@
-pdesugar "<a&b>"
-pdesugar "< a & b >"
-pdesugar "< a&b >"
-pdesugar "fst <a&b>"
-pdesugar "fst (fst a fst a)"
-pdesugar "fst (fst a) fst a"
-pdesugar "snd (fst a) snd a"
-pdesugar "snd (snd a) snd a"
