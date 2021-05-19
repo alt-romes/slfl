@@ -1,2 +1,2 @@
 let other = {{ (Bool -o Bool) }};
-let main = let f = {{ ((Bool * Bool) -o Bool -o Bool) }} in f <true*false> true
+let main = let f = {{ ((Bool -o Bool) -o Bool -o Bool) }} in f other true
