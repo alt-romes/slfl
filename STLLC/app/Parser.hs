@@ -211,11 +211,18 @@ expr = aexp >>= \x ->
 -- Typed placeholder for partial synthesis
 
 mark :: Parser Expr
-mark = do
-    reservedOp "{{"
-    plhty <- ty
-    reservedOp "}}"
-    return $ Syntax.TypedMark plhty
+mark = reservedOp "{{" >> (typedmark <|> emptymark)
+    where
+        typedmark = do
+            plhty <- ty
+            reservedOp "}}"
+            return $ Syntax.Mark (Just plhty)
+
+        emptymark = do
+            reservedOp "..."
+            reservedOp "}}"
+            return $ Syntax.Mark Nothing
+
 
 -- Parsing Types 
 

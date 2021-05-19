@@ -15,6 +15,7 @@ data CoreExpr
 
     -- A -o B
     | Abs Type CoreExpr     -- \x:T -> M . with Bruijn indices
+    | UntypedAbs CoreExpr
     | App CoreExpr CoreExpr -- M N
 
     -- A (*) B
@@ -49,7 +50,7 @@ data CoreExpr
     | Tru
     | Fls
 
-    | TypedMark Type
+    | Mark (Maybe Type)
 
     deriving (Eq, Show)
 
@@ -111,5 +112,5 @@ showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++
                                         indent (d+1) ++ "else " ++ showexpr' (d+1) e3
 showexpr' d Tru = "true"
 showexpr' d Fls = "false"
-showexpr' d (TypedMark t) = "{{ " ++ show t ++ " }}"
+showexpr' d (Mark t) = "{{ " ++ show t ++ " }}"
 indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '

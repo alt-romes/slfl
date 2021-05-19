@@ -155,9 +155,9 @@ lincheck ctx (IfThenElse e1 e2 e3) = do
        then return (t3, ctx3)
        else Nothing
 
---- Typed placeholder (synth marker) ---
+--- Synth marker ---
 
-lincheck ctx (TypedMark t) = return (t, ctx)
+lincheck ctx (Mark t) = return (fromMaybe (errorWithoutStackTrace "[Typecheck] Can't typecheck not-typed marks") t, ctx)
 
 -- end lincheck ------------
 

@@ -94,7 +94,7 @@ desugar (Syntax.IfThenElse e1 e2 e3) = do
 desugar Syntax.Tru = return CoreSyntax.Tru
 desugar Syntax.Fls = return CoreSyntax.Fls
 
-desugar (Syntax.TypedMark t) = return $ CoreSyntax.TypedMark t
+desugar (Syntax.Mark t) = return $ CoreSyntax.Mark t
 
 
 ---- TOP LEVEL ----

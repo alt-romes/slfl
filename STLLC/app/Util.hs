@@ -5,10 +5,10 @@ import Syntax
 
 ---- Apply a function to edit certain expression constructors arbitrarily deep in the expression
 
--- TODO: Tentei, mas não percebi se aqui podia ser um functor, porque estou a iterar toda a árvore, mas como tenho o fmap seria (a -> a) -> a -> a, em vez de -> f a -> f a (porque faria o Expr ser instance of Functor certo ?) não parecia funcionar
+-- TODO : http://dev.stephendiehl.com/fun/007_path.html#traversals
 
 editexp :: (Expr -> Bool) -> (Expr -> Expr) -> Expr -> Expr
-editexp c f e = if c e then f e else editexp' c f e         -- POSSIBLE TODO: Refactor to remove condition?
+editexp c f e = if c e then f e else editexp' c f e
     where
         editexp' c f (Syntax.Abs x t e) = Syntax.Abs x t $ editexp c f e
         editexp' c f (Syntax.App e1 e2) = Syntax.App (editexp c f e1) (editexp c f e2)
@@ -26,23 +26,3 @@ editexp c f e = if c e then f e else editexp' c f e         -- POSSIBLE TODO: Re
         editexp' c f (Syntax.IfThenElse e1 e2 e3) = Syntax.IfThenElse (editexp c f e1) (editexp c f e2) (editexp c f e3)
         editexp' c f (Syntax.LetIn x e1 e2) = Syntax.LetIn x (editexp c f e1) (editexp c f e2)
         editexp' c f e = e      -- atomic expressions
-
-editcoreexp :: (CoreExpr -> Bool) -> (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
-editcoreexp c f e = if c e then f e else editcoreexp' c f e
-    where
-        editcoreexp' c f (CoreSyntax.Abs t e) = CoreSyntax.Abs t $ editcoreexp c f e
-        editcoreexp' c f (CoreSyntax.App e1 e2) = CoreSyntax.App (editcoreexp c f e1) (editcoreexp c f e2)
-        editcoreexp' c f (CoreSyntax.TensorValue e1 e2) = CoreSyntax.TensorValue (editcoreexp c f e1) (editcoreexp c f e2)
-        editcoreexp' c f (CoreSyntax.LetTensor e1 e2) = CoreSyntax.LetTensor (editcoreexp c f e1) (editcoreexp c f e2)
-        editcoreexp' c f (CoreSyntax.LetUnit e1 e2) = CoreSyntax.LetUnit (editcoreexp c f e1) (editcoreexp c f e2)
-        editcoreexp' c f (CoreSyntax.WithValue e1 e2) = CoreSyntax.WithValue (editcoreexp c f e1) (editcoreexp c f e2)
-        editcoreexp' c f (CoreSyntax.Fst e) = CoreSyntax.Fst $ editcoreexp c f e
-        editcoreexp' c f (CoreSyntax.Snd e) = CoreSyntax.Snd $ editcoreexp c f e
-        editcoreexp' c f (CoreSyntax.InjL t e) = CoreSyntax.InjL t $ editcoreexp c f e
-        editcoreexp' c f (CoreSyntax.InjR t e) = CoreSyntax.InjR t $ editcoreexp c f e
-        editcoreexp' c f (CoreSyntax.CaseOfPlus e1 e2 e3) = CoreSyntax.CaseOfPlus (editcoreexp c f e1) (editcoreexp c f e2) (editcoreexp c f e3)
-        editcoreexp' c f (CoreSyntax.BangValue e) = CoreSyntax.BangValue (editcoreexp c f e)
-        editcoreexp' c f (CoreSyntax.LetBang e1 e2) = CoreSyntax.LetBang (editcoreexp c f e1) (editcoreexp c f e2)
-        editcoreexp' c f (CoreSyntax.IfThenElse e1 e2 e3) = CoreSyntax.IfThenElse (editcoreexp c f e1) (editcoreexp c f e2) (editcoreexp c f e3)
-        editcoreexp' c f (CoreSyntax.LetIn e1 e2) = CoreSyntax.LetIn (editcoreexp c f e1) (editcoreexp c f e2)
-        editcoreexp' c f e = e      -- atomic expressions

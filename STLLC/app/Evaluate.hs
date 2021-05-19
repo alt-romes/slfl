@@ -10,19 +10,36 @@ import Util
 
 import Debug.Trace
 
+-- TODO: https://hackage.haskell.org/package/containers-0.4.0.0/docs/Data-Map.html
+
 type BoundCtxt = [CoreExpr]
 type FreeCtxt = [(Name, CoreExpr)]
 type Ctxt = (BoundCtxt, FreeCtxt)
 
 -- Note: the typechecker should make sure the expression is valid 
 
--- TODO IMPORTANT : A avaliação de redexes está todo todo errado, e é preciso ser refeito. Hoje sou incapaz de o resolver :)
--- reduce :: Ctxt -> CoreExpr -> CoreExpr -> CoreExpr
--- reduce ctxt expr repl = editcoreexp (\case {BLVar _ -> True; BUVar _ -> True; App _ _ -> True; _ -> False}) (\case {
---                 BLVar x -> if x == 0 then repl else BLVar x;
---                 BUVar x -> if x == 0 then repl else BUVar x;
---                 a@(App _ _) -> eval ctxt a;         -- TODO: Nem sei se está horrível mas já estava desesperado com os redexes... Possívelmente temos de reescrever isto
---                 e -> e}) expr                       -- NOTA: Não funciona
+substitute :: CoreExpr -> CoreExpr -> CoreExpr
+substitute = substitute' 0
+    where
+        substitute' :: Int -> CoreExpr -> CoreExpr -> CoreExpr
+        substitute' d bl@(BLVar x) v = if x == d then v else bl
+        substitute' d bu@(BUVar x) v = if x == d then v else bu
+        substitute' d (Abs t e) v = Abs t $ substitute' (d+1) e v
+        substitute' d (App e1 e2) v = App (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (TensorValue e1 e2) v = TensorValue (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (LetTensor e1 e2) v = LetTensor (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (LetUnit e1 e2) v = LetUnit (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (WithValue e1 e2) v = WithValue (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (Fst e) v = Fst $ substitute' d e v
+        substitute' d (Snd e) v = Snd $ substitute' d e v
+        substitute' d (InjL t e) v = InjL t $ substitute' d e v
+        substitute' d (InjR t e) v = InjR t $ substitute' d e v
+        substitute' d (CaseOfPlus e1 e2 e3) v = CaseOfPlus (substitute' d e1 v) (substitute' d e2 v) (substitute' d e3 v)
+        substitute' d (BangValue e) v = BangValue (substitute' d e v)
+        substitute' d (LetBang e1 e2) v = LetBang (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (IfThenElse e1 e2 e3) v = IfThenElse (substitute' d e1 v) (substitute' d e2 v) (substitute' d e3 v)
+        substitute' d (LetIn e1 e2) v = LetIn (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d e v = e      -- atomic expressions
 
 -- eval --- Ctxt, CoreExpr -> CoreExpr 
 eval :: Ctxt -> CoreExpr -> CoreExpr
@@ -40,15 +57,14 @@ eval c@(_, fctxt) (FUVar x) = eval c $ fromJust $ lookup x fctxt
 --- -o ---------------------
 
 --  -oI
-eval _ (Abs t e) = Abs t e      -- TODO: Devia evaluate do interior da função? não devia ser avaliado apenas quando chamado? (lazy)
-                                -- TODO: Já estou mais confuso ainda sobre avaliação aqui porque tinha um erro na applicação, e sobre contextos vazios ou não vazios :) temos de rever
-                                -- NOTA: Entretanto percebi os meus erros, e estou a usar um reduce, estou há demasiadas horas nisto, acho que já dei tantas voltas que não há recuperação possível LOL
+eval _ (Abs t e) = Abs t e
 
 --  -oE
-eval ctxt@(bctxt, fctxt) (App e1 e2) = -- TODO: Ver se está teoricamente OK
+eval ctxt@(bctxt, fctxt) (App e1 e2) =
+    let (Abs _ e1') = eval ctxt e1 in
     let v = eval ctxt e2 in
-    let (Abs _ e1') = eval ctxt (reduce ctxt e1 v) in -- TODO: Está tudo errado e é mesmo preciso ser refeito
-        eval (bctxt, fctxt) e1'
+        let e1'' = substitute e1' v in
+            eval (v:bctxt, fctxt) e1''
 
 --- * ----------------------
 
@@ -141,9 +157,9 @@ eval ctxt (IfThenElse e1 e2 e3) =
         Tru -> eval ctxt e2
         Fls -> eval ctxt e3
 
---- Typed mark for synthesis ---
+--- Mark for synthesis ---
 
-eval _ (TypedMark t) = errorWithoutStackTrace $ "[Eval] Can't eval typed synthesis marker:\n    " ++ show t
+eval _ (Mark t) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
 
 -- end eval ------------
 
