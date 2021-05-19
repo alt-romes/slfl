@@ -109,6 +109,11 @@ synth (g, d, (n, Bang a):o) t = do
     return (LetBang nname (Var n) exp, d')
 
 
+----- Non-canonical right sync rules ---------
+
+-- synth (g, d, (n, Bool):o) t = do
+--     (expa, d') <- synth (g, d, (n1, a):o) t
+
 ---- Synchronous left propositions to Delta ----
 
 synth (g, d, p:o) t = synth (g, p:d, o) t
@@ -121,11 +126,12 @@ synth (g, d, p:o) t = synth (g, p:d, o) t
 -- no more asynchronous propositions, focus
 synth (g, d, []) t = do
     vari <- get
-    let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari -- todo better?
+    let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari
     put vari'
     if null explist
        then empty
-       else return $ head explist
+       else return $ head explist -- TODO: Não é preciso garantir que o contexto aqui de entrada tmb é igual ao de saída?
+                                  -- Ou alguma vez sai algo a mais do focus do que aquilo que lá metemos? Que exemplo? :)
 
 
 focus :: FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
@@ -175,19 +181,17 @@ focus c goal =
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
             vari <- lift get
-            -- TODO: Factorizar isto? :)
             let maybeSynthResult = runStateT (synth (g, d, []) a) vari -- if asynch continuation of synthesis failed, fail to backtrack
-            if isNothing maybeSynthResult
-               then empty
-               else do
-                   let ((expa, d'), vari') = fromJust maybeSynthResult
-                   lift $ put vari'
-                   -- TODO: Podemos ver alguns exemplos disto? vvvvv
-                   guard (d == d') -- To introduce a Bang the delta context must be empty, which in resource management translates to not consuming anything from the delta context (TODO right?)
-                   return (BangValue expa, d')
+           -- TODO: Podemos ver alguns exemplos disto? vvvvv (context ter de ser vazio e quando não é etc)
+            maybe empty (\((expa, d'), vari') -> do {lift $ put vari'; guard (d == d'); return (BangValue expa, d')}) maybeSynthResult
 
         -- all right propositions focused on are synchronous; this pattern matching should be extensive
 
+        ----- Non-canonical right sync rules ---------
+
+        focus' Nothing (g, d) Bool = do
+            return (Tru, d) <|> return (Fls, d)
+        
 
         ---- Left synchronous rules -------------------
 
@@ -198,14 +202,8 @@ focus c goal =
             lift $ put $ vari + 1
             (expb, d') <- focus' (Just (nname, b)) c goal
             vari' <- get
-            -- TODO: Factorizar isto? :)
             let maybeSynthResult = runStateT (synth (g, d', []) a) vari'
-            if isNothing maybeSynthResult
-               then empty
-               else do
-                   let ((expa, d''), vari'') = fromJust maybeSynthResult
-                   lift $ put vari''
-                   return (substitute nname (App (Var n) expa) expb, d'')
+            maybe empty (\((expa, d''), vari'') -> lift $ put vari'' >> return (substitute nname (App (Var n) expa) expb, d'')) maybeSynthResult
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do
@@ -234,25 +232,16 @@ focus c goal =
                else do
                    ---- left focus is not atomic and not left synchronous, unfocus
                    vari <- lift get
-                   -- TODO: Factorizar isto? :)
                    let maybeSynthResult = runStateT (synth (g, d, [nh]) goal) vari
-                   if isNothing maybeSynthResult
-                       then empty
-                       else do
-                           let ((exp, d'), vari') = fromJust maybeSynthResult
-                           lift $ put vari'
-                           return (exp, d')
+                   maybe empty (\((exp, d'), vari') -> lift $ put vari' >> return (exp, d')) maybeSynthResult
 
         ---- right focus is not synchronous, unfocus. if it is atomic we fail
         focus' Nothing (g, d) goal = do
             vari <- lift get
-            -- TODO: Factorizar isto? :)
             let maybeSynthResult = runStateT (synth (g, d, []) goal) vari
-            maybe empty (\((e,d'), vari') -> do { lift $ put vari'; return (e, d'); }) maybeSynthResult
+            maybe empty (\((e,d'), vari') -> lift $ put vari' >> return (e, d')) maybeSynthResult
 
 
-
--- TODO: Como definimos regras para bool? (IfThenElse)
 
 
 ---- top level
