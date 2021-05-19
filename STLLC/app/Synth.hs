@@ -162,7 +162,6 @@ focus c goal =
 
         ---- 1R
         focus' Nothing c@(g, d) Unit = do
-            guard (null d)
             return (UnitValue, d)
             
         ---- +R
@@ -175,7 +174,6 @@ focus c goal =
 
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
-            guard (null d)
             vari <- lift get
             -- TODO: Factorizar isto? :)
             let maybeSynthResult = runStateT (synth (g, d, []) a) vari -- if asynch continuation of synthesis failed, fail to backtrack
@@ -184,6 +182,8 @@ focus c goal =
                else do
                    let ((expa, d'), vari') = fromJust maybeSynthResult
                    lift $ put vari'
+                   -- TODO: Podemos ver alguns exemplos disto? vvvvv
+                   guard (d == d') -- To introduce a Bang the delta context must be empty, which in resource management translates to not consuming anything from the delta context (TODO right?)
                    return (BangValue expa, d')
 
         -- all right propositions focused on are synchronous; this pattern matching should be extensive
