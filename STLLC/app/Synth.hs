@@ -47,7 +47,7 @@ substitute n expn = editexp (\case {Var _ -> True; _ -> False}) (\v@(Var x) -> i
 
 ---- Synthetizer -----------------------------
 
-synth :: Ctxt -> Type -> StateT SynthState Maybe (Expr, Delta)
+synth :: Ctxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 
 ---- Right asynchronous rules -----------------
 
@@ -126,7 +126,7 @@ synth (g, d, p:o) t = synth (g, p:d, o) t
 -- no more asynchronous propositions, focus
 synth (g, d, []) t = do
     vari <- get
-    let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari
+    let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari -- TODO: Agora que tudo é LogicT, será que faz mais sentido "propagar" tudo, ou assim será mais eficiente? :)
     put vari'
     if null explist
        then empty
@@ -180,10 +180,10 @@ focus c goal =
 
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
-            vari <- lift get
-            let maybeSynthResult = runStateT (synth (g, d, []) a) vari -- if asynch continuation of synthesis failed, fail to backtrack
-           -- TODO: Podemos ver alguns exemplos disto? vvvvv (context ter de ser vazio e quando não é etc)
-            maybe empty (\((expa, d'), vari') -> do {lift $ put vari'; guard (d == d'); return (BangValue expa, d')}) maybeSynthResult
+            (expa, d') <- synth (g, d, []) a
+            guard (d == d')
+            return (BangValue expa, d')
+           -- TODO: Podemos ver alguns exemplos disto? (context ter de ser vazio e quando não é para gerar Bangsetc)
 
         -- all right propositions focused on are synchronous; this pattern matching should be extensive
 
@@ -197,13 +197,12 @@ focus c goal =
 
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
-            vari <- lift get
+            vari <- lift get -- TODO: Parece que estes lifts não fazem nada :P Se tivesse só get acho q tmb funcionava
             let nname = getName vari
             lift $ put $ vari + 1
-            (expb, d') <- focus' (Just (nname, b)) c goal
-            vari' <- get
-            let maybeSynthResult = runStateT (synth (g, d', []) a) vari'
-            maybe empty (\((expa, d''), vari'') -> lift $ put vari'' >> return (substitute nname (App (Var n) expa) expb, d'')) maybeSynthResult
+            (expb, d')  <- focus' (Just (nname, b)) c goal
+            (expa, d'') <- synth (g, d', []) a
+            return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do
@@ -229,17 +228,14 @@ focus c goal =
                    -- left focus is atomic
                    guard (h == goal) -- if is atomic and not the goal, fail
                    return (Var n, d)
-               else do
+               else
                    ---- left focus is not atomic and not left synchronous, unfocus
-                   vari <- lift get
-                   let maybeSynthResult = runStateT (synth (g, d, [nh]) goal) vari
-                   maybe empty (\((exp, d'), vari') -> lift $ put vari' >> return (exp, d')) maybeSynthResult
+                   synth (g, d, [nh]) goal
 
         ---- right focus is not synchronous, unfocus. if it is atomic we fail
         focus' Nothing (g, d) goal = do
-            vari <- lift get
-            let maybeSynthResult = runStateT (synth (g, d, []) goal) vari
-            maybe empty (\((e,d'), vari') -> lift $ put vari' >> return (e, d')) maybeSynthResult
+            (e, d') <- synth (g, d, []) goal
+            return (e, d')
 
 
 
@@ -248,7 +244,10 @@ focus c goal =
 
 synthType :: Type -> Expr
 -- TODO : Print error se snd != []
-synthType t = fst $ fromMaybe (errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t) (evalStateT (synth ([], [], []) t) 0)
+synthType t = let res = evalState (observeManyT 1 $ synth ([], [], []) t) 0 in
+                  if null res
+                     then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
+                     else fst $ head res
 
 synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
 synthMarks = editexp (\case {Mark _ -> True; _ -> False}) (\(Mark t) -> synthType $ fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
