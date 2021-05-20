@@ -31,7 +31,7 @@ getName i = variableNames !! i
 
 isAtomic :: Type -> Bool
 isAtomic t = case t of
-               Bool -> True
+               Bool -> True -- TODO: Como há regras para Bool, Bool já não é atómico?
                Atom _ -> True
                _ -> False
 
@@ -112,7 +112,10 @@ synth (g, d, (n, Bang a):o) t = do
 ----- Non-canonical right sync rules ---------
 
 -- synth (g, d, (n, Bool):o) t = do
---     (expa, d') <- synth (g, d, (n1, a):o) t
+--     (expa, d') <- synth (g, d, o) t
+--     (expb, d'') <- synth (g, d, o) t
+--     guard (d' == d'')
+--     return (IfThenElse (Var n) expa expb, d')
 
 ---- Synchronous left propositions to Delta ----
 
@@ -125,12 +128,20 @@ synth (g, d, p:o) t = synth (g, p:d, o) t
 
 -- no more asynchronous propositions, focus
 synth (g, d, []) t = do
-    vari <- get
-    let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari -- TODO: Agora que tudo é LogicT, será que faz mais sentido "propagar" tudo, ou assim será mais eficiente? :)
-    put vari'
-    if null explist
-       then empty
-       else return $ head explist -- TODO: Não é preciso garantir que o contexto aqui de entrada tmb é igual ao de saída?
+    focus (g, d) t -- Se fizer assim fica num loop infinito
+    -- TODO: Verify: Já não pode haver aqui um breakpoint específico com o runState observeMany,
+    -- porque se este pode funcinonar sem prob, chegar lá atrás, dar backtrack, e volta para aqui,
+    -- e volta a falhar, porque lá dentro é como se nunca tivesse nada falhado da primeira forma.
+    -- É preciso conectar . Só fico sem certezas enquanto ao backtracking, se é feito por etapas ou se
+    -- é juntada uma lista gigante de alternativas <|> <|> <|> e depois se vai testando, bem, em geral
+    -- eu devia era confiar que isto funciona e fica rápido ahahah
+    -- vari <- get
+    -- let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari -- TODO: Agora que tudo é LogicT, será que faz mais sentido "propagar" tudo, ou assim será mais eficiente? :)
+    --                                                                        -- É que faz sentido definir este como um ponto de backtrack, mas suponho que se tivermos uma logict continua, provavelmente o backtrack também é feito de forma inteligente, ...? :) Também podemos comparar tempo XD
+    -- put vari'
+    -- if null explist
+    --    then trace "empty" empty
+    --    else return $ head explist -- TODO: Não é preciso garantir que o contexto aqui de entrada tmb é igual ao de saída?
                                   -- Ou alguma vez sai algo a mais do focus do que aquilo que lá metemos? Que exemplo? :)
 
 
@@ -148,7 +159,6 @@ focus c goal =
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              -- a:b:c:[]
               _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
 
         decideLeftBang (g, din) goal = do
@@ -189,8 +199,7 @@ focus c goal =
 
         ----- Non-canonical right sync rules ---------
 
-        focus' Nothing (g, d) Bool = do
-            return (Tru, d) <|> return (Fls, d)
+        -- focus' Nothing (g, d) Bool = return (Tru, d) <|> return (Fls, d)
         
 
         ---- Left synchronous rules -------------------
@@ -212,6 +221,7 @@ focus c goal =
             do
                 (lf, d') <- focus' (Just (nname, a)) c goal
                 return (substitute nname (Fst (Var n)) lf, d')
+                -- note: whitespace is sensitive and I can't make it prettier ;) 
                 <|> do
                 (rt, d') <- focus' (Just (nname, b)) c goal
                 return (substitute nname (Snd (Var n)) rt, d')
@@ -243,7 +253,7 @@ focus c goal =
 ---- top level
 
 synthType :: Type -> Expr
--- TODO : Print error se snd != []
+-- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
 synthType t = let res = evalState (observeManyT 1 $ synth ([], [], []) t) 0 in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t

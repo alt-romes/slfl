@@ -1,0 +1,31 @@
+(λx : (A -o (B -o C)) -> 
+    (λy : (A * B) -> 
+        let z*u = y in x z u))
+(λx : ((A * B) -o C) -> 
+    (λy : A -> 
+        (λz : B -> x < y * z >)))
+(λx : (A -o (B & C)) -> < 
+    (λy : A -> fst (x y)) & 
+    (λv : A -> snd (x v)) >)
+(λx : ((A -o B) & (A -o C)) -> 
+    (λy : A -> < fst x y & snd x y >))
+(λx : ((A + B) -o C) -> < 
+    (λy : A -> x inl y : B) & 
+    (λu : B -> x inr A : u) >)
+(λx : ((A -o C) & (B -o C)) -> 
+    (λy : (A + B) -> 
+        case y of 
+            inl z => fst x z
+            | inr u => snd x u))
+(λx : (! (A & B)) -> 
+    let !y = x in < ! fst y * ! snd y >)
+(λx : ((! A) * (! B)) -> 
+    let y*z = x in 
+        let !u = z in 
+            let !v = y in ! < v & u >)
+(λx : (A * 1) -> 
+    let y*z = x in 
+        let _ = z in y)
+(λx : A -> < x * <> >)
+(λx : (A & A) -> fst x)
+(λx : A -> < x & x >)
