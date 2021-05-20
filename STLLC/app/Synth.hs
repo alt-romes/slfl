@@ -31,7 +31,7 @@ getName i = variableNames !! i
 
 isAtomic :: Type -> Bool
 isAtomic t = case t of
-               Bool -> True -- TODO: Como há regras para Bool, Bool já não é atómico?
+               -- Bool -> True -- TODO: Como há regras para Bool, Bool já não é atómico?
                Atom _ -> True
                _ -> False
 
@@ -111,11 +111,12 @@ synth (g, d, (n, Bang a):o) t = do
 
 ----- Non-canonical right sync rules ---------
 
--- synth (g, d, (n, Bool):o) t = do
---     (expa, d') <- synth (g, d, o) t
---     (expb, d'') <- synth (g, d, o) t
---     guard (d' == d'')
---     return (IfThenElse (Var n) expa expb, d')
+-- TODO: Verificar: Como eliminamos o booleano asynchronamente, nunca vamos ter uma situação em que temos de usar uma hipótese para introduzir um bool, eles vão ser sempre eliminados do \omega e sempre introduzidos como True ou False, (se bem que vai ser sempre true porque não temos tipos mais específicos), certo? :)
+synth (g, d, (n, Bool):o) t = do
+    (expa, d') <- synth (g, d, o) t
+    (expb, d'') <- synth (g, d, o) t
+    guard (d' == d'')
+    return (IfThenElse (Var n) expa expb, d')
 
 ---- Synchronous left propositions to Delta ----
 
@@ -199,7 +200,7 @@ focus c goal =
 
         ----- Non-canonical right sync rules ---------
 
-        -- focus' Nothing (g, d) Bool = return (Tru, d) <|> return (Fls, d)
+        focus' Nothing (g, d) Bool = return (Tru, d) <|> return (Fls, d)
         
 
         ---- Left synchronous rules -------------------
