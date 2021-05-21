@@ -14,7 +14,7 @@ data CoreExpr
     | FUVar String          -- free unrestricted var
 
     -- A -o B
-    | Abs Type CoreExpr     -- \x:T -> M . with Bruijn indices
+    | Abs (Maybe Type) CoreExpr     -- \x:T -> M . with Bruijn indices
     | UntypedAbs CoreExpr
     | App CoreExpr CoreExpr -- M N
 
@@ -32,8 +32,8 @@ data CoreExpr
     | Snd CoreExpr
 
     -- A (+) B
-    | InjL Type CoreExpr    -- inr A : M has type A (+) typeof M
-    | InjR Type CoreExpr    -- inl M : B has type typeof M (+) A
+    | InjL (Maybe Type) CoreExpr    -- inr A : M has type A (+) typeof M
+    | InjR (Maybe Type) CoreExpr    -- inl M : B has type typeof M (+) A
     | CaseOfPlus CoreExpr CoreExpr CoreExpr -- case M of inl x => N | inr y => P : C
 
     -- !A
@@ -66,6 +66,8 @@ data Type
     | Bool
     
     | Atom String
+
+    | TypeVar Int       -- Type variable (uninterprted type) used for reconstruction
     
     deriving (Eq)
 

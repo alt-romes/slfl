@@ -111,7 +111,6 @@ synth (g, d, (n, Bang a):o) t = do
 
 ----- Non-canonical right sync rules ---------
 
--- TODO: Verificar: Como eliminamos o booleano asynchronamente, nunca vamos ter uma situação em que temos de usar uma hipótese para introduzir um bool, eles vão ser sempre eliminados do \omega e sempre introduzidos como True ou False, (se bem que vai ser sempre true porque não temos tipos mais específicos), certo? :)
 synth (g, d, (n, Bool):o) t = do
     (expa, d') <- synth (g, d, o) t
     (expb, d'') <- synth (g, d, o) t
@@ -253,15 +252,18 @@ focus c goal =
 
 ---- top level
 
-synthType :: Type -> Expr
+synthOneType :: Type -> Expr
+synthOneType t = head $ synthType t
+
+synthType :: Type -> [Expr]
 -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
-synthType t = let res = evalState (observeManyT 1 $ synth ([], [], []) t) 0 in
+synthType t = let res = evalState (observeAllT $ synth ([], [], []) t) 0 in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
-                     else fst $ head res
+                     else map fst res
 
 synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks = editexp (\case {Mark _ -> True; _ -> False}) (\(Mark t) -> synthType $ fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
+synthMarks = editexp (\case {Mark _ -> True; _ -> False}) (\(Mark t) -> synthOneType $ fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
 
 synthMarksModule :: [Binding] -> [Binding]
 synthMarksModule = map (\(Binding n e) -> Binding n $ synthMarks e)

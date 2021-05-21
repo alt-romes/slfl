@@ -1,2 +1,4 @@
-let other = {{ (Bool -o Bool) }};
-let main = let f = {{ ((Bool -o Bool) -o Bool -o Bool) }} in f other true
+let fola = (\x : Bool -> if x then false else true);
+
+let main = {{ ... }} fola
+

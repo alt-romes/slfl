@@ -47,4 +47,5 @@ executable STLLC
         Parser,
         Syntax,
         Synth,
+        Typechecker,
         Util

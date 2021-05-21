@@ -10,7 +10,6 @@ data TypeBinding = TypeBinding String Type
 instance (Show TypeBinding) where
     show (TypeBinding s e) = s ++ ":\n    " ++ show e ++ "\n"
 
-type Index = Int
 type Name = String
 
 type BoundCtxt = [Maybe Type]
