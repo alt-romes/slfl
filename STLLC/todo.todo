@@ -1,0 +1,1 @@
+1) Neste momento a inferência de tipos vai gerar tipos polimórficos? como (Bool -o a). Como é que sintetiso ou instancio "a" ?

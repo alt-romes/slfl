@@ -55,6 +55,10 @@ mainsynth t =
 
 -- TODO: Se eu chamasse _ <- maintypecheck s; e depois e <- maineval s; ele apenas ia correr (desugarExpr . parseExpr) uma vez por causa de memoization certo?
 
+mainsynthAll :: String -> [Expr]
+mainsynthAll t =
+    let surroundtype = '(':t ++ ")" in
+        synthAllType (parseType surroundtype)
 
 
 ---- Modules
@@ -87,7 +91,7 @@ mainsynthMarksModule fname = do
     bindings <- mainparseModule fname
     ctbindings <- maindesugarModule fname -- TODO: por causa tb de memoization aqui não faz mal chamar tudo de novo em vez de aproveitar os resultados do primeiro parse right
     let nbindings = copyMarksTypesModule bindings ctbindings -- copy marks types to the non-desugared expression from the desugared+inferred expression 
-    return $ trace ("BINDINGS: " ++ show bindings ++ "\nCORE BINDINGS: " ++ show ctbindings ++ "\nNEW BINDINGS: " ++ show nbindings) $ synthMarksModule nbindings
+    return $ synthMarksModule nbindings
 
 
 
@@ -105,6 +109,7 @@ main = do
     case action of
       "synth" -> print $ mainsynth arg
       "complete" -> mainsynthMarksModule arg >>= mapM_ print 
+      "all" -> print $ mainsynthAll arg
       "desugar" -> maindesugarModule arg >>= mapM_ print
       "type" -> maintypecheckModule arg >>= mapM_ print
       "eval" -> mainevalModule arg >>= print

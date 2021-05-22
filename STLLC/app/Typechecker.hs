@@ -1,5 +1,8 @@
 module Typechecker where
 
+-- TODO: Inference with free vars isn't working.
+-- {{ ... }} (\x -> x) works, but let what = {{ ... }}; let main = what (\x -> x); doesn't
+
 import Control.Applicative
 import Data.Maybe
 import Control.Monad.State
@@ -206,9 +209,6 @@ type Subst = Map.Map Int Type
 
 class Substitutable a where
     apply :: Subst -> a -> a
-
-instance Substitutable Constraint where
-    apply s (Constraint u v) = Constraint (apply s u) (apply s v)
 
 instance Substitutable Type where
     apply s (Fun t1 t2) = Fun (apply s t1) (apply s t2)

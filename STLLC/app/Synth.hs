@@ -9,7 +9,7 @@ import Data.Maybe
 
 import Debug.Trace
 
-import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom))
+import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar))
 import Syntax
 import Util
 
@@ -23,11 +23,11 @@ type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 type SynthState = Int  -- variable number to be used, note: should we also use the state monad for the delta context???
 
 
-variableNames :: [String]
-variableNames = ["x", "y", "z", "u", "v", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+letters :: [String]
+letters = [1..] >>= flip replicateM ['a'..'z']
 
 getName :: Int -> String
-getName i = variableNames !! i
+getName i = letters !! i
 
 isAtomic :: Type -> Bool
 isAtomic t = case t of
@@ -37,11 +37,6 @@ isAtomic t = case t of
 
 ---- subsitute var n with expn in expf
 substitute :: String -> Expr -> Expr -> Expr
--- substitute'''''' n expn expf =
---     case expf of
---       (Var x) -> if x == n then expn else LetIn n expn expf
---       _ -> LetIn n expn expf
---
 -- Propositions tend to appear only once due to linearity
 substitute n expn = editexp (\case {Var _ -> True; _ -> False}) (\v@(Var x) -> if x == n then expn else v)
 
@@ -128,22 +123,7 @@ synth (g, d, p:o) t = synth (g, p:d, o) t
 
 -- no more asynchronous propositions, focus
 synth (g, d, []) t = do
-    focus (g, d) t -- Se fizer assim fica num loop infinito
-    -- TODO: Verify: Já não pode haver aqui um breakpoint específico com o runState observeMany,
-    -- porque se este pode funcinonar sem prob, chegar lá atrás, dar backtrack, e volta para aqui,
-    -- e volta a falhar, porque lá dentro é como se nunca tivesse nada falhado da primeira forma.
-    -- É preciso conectar . Só fico sem certezas enquanto ao backtracking, se é feito por etapas ou se
-    -- é juntada uma lista gigante de alternativas <|> <|> <|> e depois se vai testando, bem, em geral
-    -- eu devia era confiar que isto funciona e fica rápido ahahah
-    -- vari <- get
-    -- let (explist, vari') = runState (observeManyT 1 $ focus (g, d) t) vari -- TODO: Agora que tudo é LogicT, será que faz mais sentido "propagar" tudo, ou assim será mais eficiente? :)
-    --                                                                        -- É que faz sentido definir este como um ponto de backtrack, mas suponho que se tivermos uma logict continua, provavelmente o backtrack também é feito de forma inteligente, ...? :) Também podemos comparar tempo XD
-    -- put vari'
-    -- if null explist
-    --    then trace "empty" empty
-    --    else return $ head explist -- TODO: Não é preciso garantir que o contexto aqui de entrada tmb é igual ao de saída?
-                                  -- Ou alguma vez sai algo a mais do focus do que aquilo que lá metemos? Que exemplo? :)
-
+    focus (g, d) t
 
 focus :: FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 -- because of laziness it'll only run until the first succeeds (bc of observe)
@@ -151,6 +131,7 @@ focus c goal =
     decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal
 
     where
+
         decideRight c goal =
             if isAtomic goal            -- to decide right, goal cannot be atomic
                 then empty
@@ -200,7 +181,7 @@ focus c goal =
         ----- Non-canonical right sync rules ---------
 
         focus' Nothing (g, d) Bool = return (Tru, d) <|> return (Fls, d)
-        
+
 
         ---- Left synchronous rules -------------------
 

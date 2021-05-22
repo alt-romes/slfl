@@ -1,4 +1,7 @@
 let fola = (\x -> if x then <> else <>);
 
-let main = {{ ... }} fola
+let id = (\x -> x true);
 
+let wtf = {{ ... }};
+
+let main = wtf fola
