@@ -5,7 +5,6 @@ import Data.List
 import Data.Maybe
 
 import CoreSyntax
-import LinearCheck hiding (BoundCtxt, FreeCtxt, Ctxt, equalCtxts)
 import Util
 
 import Debug.Trace
@@ -13,7 +12,7 @@ import Debug.Trace
 -- TODO: https://hackage.haskell.org/package/containers-0.4.0.0/docs/Data-Map.html
 
 type BoundCtxt = [CoreExpr]
-type FreeCtxt = [(Name, CoreExpr)]
+type FreeCtxt = [(String, CoreExpr)]
 type Ctxt = (BoundCtxt, FreeCtxt)
 
 -- Note: the typechecker should make sure the expression is valid 
@@ -159,7 +158,7 @@ eval ctxt (IfThenElse e1 e2 e3) =
 
 --- Mark for synthesis ---
 
-eval _ (Mark t) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
+eval _ (Mark _ t) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
 
 -- end eval ------------
 

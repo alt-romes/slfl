@@ -1,11 +1,12 @@
 module Lexer where
 
 import Text.Parsec
-import Text.Parsec.String
 import qualified Text.Parsec.Token as Tok
 import Text.Parsec.Language
 
-lexer :: Tok.TokenParser ()
+type Parser = Parsec String Int
+
+lexer :: Tok.TokenParser Int
 lexer = Tok.makeTokenParser style
   where ops = ["\\", "λ", ":", "->", "*", "=", "&", "=>", "|", "-o", "&", "+", "1", "Bool", "!", "..."]
         names = ["true", "false", "let", "in", "fst", "snd", "inl", "inr", "case", "of", "if", "then", "else", "_"]

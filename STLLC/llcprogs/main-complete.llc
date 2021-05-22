@@ -1,8 +1,0 @@
-let other =
-(λx : Bool -> x);
-
-let main =
-let f = (λx : (Bool * Bool) -> 
-    (λy : Bool -> 
-        let z*u = x in z)) in f < true * false > false;
-

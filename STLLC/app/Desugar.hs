@@ -2,13 +2,14 @@ module Desugar where
 
 import CoreSyntax
 import Syntax
-import LinearCheck 
 
 import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 
 import Debug.Trace
+
+type Name = String
 
 data Mult = Linear | Unr | Unknown deriving (Eq, Show)
 newtype Var a = Var Mult deriving (Eq, Show)
@@ -94,7 +95,7 @@ desugar (Syntax.IfThenElse e1 e2 e3) = do
 desugar Syntax.Tru = return CoreSyntax.Tru
 desugar Syntax.Fls = return CoreSyntax.Fls
 
-desugar (Syntax.Mark t) = return $ CoreSyntax.Mark t
+desugar (Syntax.Mark i t) = return $ CoreSyntax.Mark i t
 
 
 ---- TOP LEVEL ----

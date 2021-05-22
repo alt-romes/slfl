@@ -1,6 +1,7 @@
 module CoreSyntax where 
 
 import Prelude hiding (Bool)
+import Control.Monad
 
 data CoreBinding = CoreBinding String CoreExpr
 instance (Show CoreBinding) where
@@ -15,7 +16,6 @@ data CoreExpr
 
     -- A -o B
     | Abs (Maybe Type) CoreExpr     -- \x:T -> M . with Bruijn indices
-    | UntypedAbs CoreExpr
     | App CoreExpr CoreExpr -- M N
 
     -- A (*) B
@@ -50,9 +50,9 @@ data CoreExpr
     | Tru
     | Fls
 
-    | Mark (Maybe Type)
+    | Mark Int (Maybe Type)
 
-    deriving (Eq, Show)
+    deriving (Eq)
 
 
 data Type
@@ -81,9 +81,10 @@ instance (Show Type) where
     show (Bang t1) = "(! " ++ show t1 ++ ")"
     show Bool = "Bool"
     show (Atom x) = x
+    show (TypeVar x) = letters !! x
 
--- instance (Show CoreExpr) where
---     show e = showexpr' 0 e
+instance (Show CoreExpr) where
+    show e = showexpr' 0 e
 
 showexpr' :: Int -> CoreExpr -> String -- Use Int (depth) to indent the code
 showexpr' d (BLVar x) = "BL(" ++ show x ++ ")"
@@ -114,5 +115,11 @@ showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++
                                         indent (d+1) ++ "else " ++ showexpr' (d+1) e3
 showexpr' d Tru = "true"
 showexpr' d Fls = "false"
-showexpr' d (Mark t) = "{{ " ++ show t ++ " }}"
+showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
 indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
+
+
+---- Util
+
+letters :: [String]
+letters = [1..] >>= flip replicateM ['a'..'z']

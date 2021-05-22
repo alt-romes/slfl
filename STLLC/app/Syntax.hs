@@ -12,7 +12,7 @@ data Expr
     = Var String
 
     -- A -o B
-    | Abs String Type Expr     -- \x:T -> M . with Bruijn indices
+    | Abs String (Maybe Type) Expr     -- \x:T -> M . with Bruijn indices
     | App Expr Expr     -- M N
 
     -- A (*) B
@@ -29,8 +29,8 @@ data Expr
     | Snd Expr
 
     -- A (+) B
-    | InjL Type Expr    -- inl:B M : typeof M (+) A
-    | InjR Type Expr    -- inr:A M : A (+) typeof M
+    | InjL (Maybe Type) Expr    -- inl:B M : typeof M (+) A
+    | InjR (Maybe Type) Expr    -- inr:A M : A (+) typeof M
     | CaseOfPlus Expr String Expr String Expr -- case M of inl x => N | inr y => P : C
 
     -- !A
@@ -47,7 +47,7 @@ data Expr
     | Tru
     | Fls
 
-    | Mark (Maybe Type)
+    | Mark Int (Maybe Type)
 
     -- Added sugar :)
     -- não temos :)
@@ -88,5 +88,5 @@ instance (Show Expr) where
                                                     indent (d+1) ++ "else " ++ showexpr' (d+1) e3
             showexpr' d Tru = "true"
             showexpr' d Fls = "false"
-            showexpr' d (Mark t) = "{{ " ++ show t ++ " }}"
+            showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
             indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '

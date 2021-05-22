@@ -4,6 +4,8 @@ import Control.Applicative
 import Data.Maybe
 import Control.Monad.State
 import Data.Bifunctor
+import qualified Data.Map as Map
+import Debug.Trace
 
 import CoreSyntax
 
@@ -15,7 +17,11 @@ type BoundCtxt = [Maybe Type]
 type FreeCtxt = [(String, Type)]
 type Ctxt = (BoundCtxt, FreeCtxt)
 
-data Constraint = Constraint Type Type -- e.g. [X -> Y] [X -> Y -> X]
+data Constraint = Constraint Type Type -- e.g. [X => Y]
+instance Show Constraint where
+    show (Constraint t t') = "[" ++ show t ++ " => " ++ show t' ++ "]"
+
+type Substitution = (Type, CoreExpr) -> (Type, CoreExpr) -- F to replace all type variables with interpreted types
 
 
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
@@ -55,9 +61,10 @@ typeconstraint constraints (bctx, fctx) (Abs t1 e) = do
 typeconstraint constraints ctx (App e1 e2) = do
     vari <- get
     put (vari+1)
+    let tv = TypeVar vari
     (t1, ce1, ctx1, constraints') <- typeconstraint constraints ctx e1
     (t2, ce2, ctx2, constraints'') <- typeconstraint constraints' ctx1 e2
-    return (t2, App ce1 ce2, ctx2, Constraint t1 (Fun t2 (TypeVar vari)):constraints'')
+    return (tv, App ce1 ce2, ctx2, Constraint t1 (Fun t2 tv):constraints'')
 
 --- * ----------------------
 
@@ -187,18 +194,106 @@ typeconstraint constraints ctx (IfThenElse e1 e2 e3) = do
 
 --- Synth marker ---
 
-typeconstraint constraints ctx (Mark t) = do
+typeconstraint constraints ctx (Mark i t) = do
     vari <- get
     put $ vari + 1
     let t' = fromMaybe (TypeVar vari) t
-    return (t', Mark (Just t'), ctx, constraints)
+    return (t', Mark i (Just t'), ctx, constraints)
 
--- end typeconstrain ------------
+--- end typeconstraint ----------
 
--- solveconstraints :: [Constraint] -> 
+type Subst = Map.Map Int Type
+
+class Substitutable a where
+    apply :: Subst -> a -> a
+
+instance Substitutable Constraint where
+    apply s (Constraint u v) = Constraint (apply s u) (apply s v)
+
+instance Substitutable Type where
+    apply s (Fun t1 t2) = Fun (apply s t1) (apply s t2)
+    apply s (Tensor t1 t2) = Tensor (apply s t1) (apply s t2)
+    apply s (With t1 t2) = With (apply s t1) (apply s t2)
+    apply s (Plus t1 t2) = Plus (apply s t1) (apply s t2)
+    apply s (Bang t) = Bang (apply s t)
+    apply s t@(TypeVar i) = Map.findWithDefault t i s
+    apply s t = t
+
+instance Substitutable CoreExpr where
+    apply s (Abs (Just t) e) = Abs (return $ apply s t) (apply s e)
+    apply s (App e1 e2) = App (apply s e1) (apply s e2)
+    apply s (TensorValue e1 e2) = TensorValue (apply s e1) (apply s e2)
+    apply s (LetTensor e1 e2) = LetTensor (apply s e1) (apply s e2)
+    apply s (LetUnit e1 e2) = LetUnit (apply s e1) (apply s e2)
+    apply s (WithValue e1 e2) = WithValue (apply s e1) (apply s e2)
+    apply s (Fst e) = Fst (apply s e)
+    apply s (Snd e) = Snd (apply s e)
+    apply s (InjL (Just t) e) = InjL (return $ apply s t) (apply s e)
+    apply s (InjR (Just t) e) = InjR (return $ apply s t) (apply s e)
+    apply s (CaseOfPlus e1 e2 e3) = CaseOfPlus (apply s e1) (apply s e2) (apply s e3)
+    apply s (Mark i (Just t)) = Mark i (return $ apply s t)
+    apply s e = e
+
+instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
+    apply s (x, y) = (apply s x, apply s y)
+
+ftv :: [Int] -> Type -> [Int]
+ftv acc (Fun t t') = ftv acc t ++ ftv acc t'
+ftv acc (Tensor t t') = ftv acc t ++ ftv acc t'
+ftv acc (With t t') = ftv acc t ++ ftv acc t'
+ftv acc (Plus t t') = ftv acc t ++ ftv acc t'
+ftv acc (Bang t) = ftv acc t
+ftv acc (TypeVar x) = x:acc
+ftv acc t = acc
+
+unify :: Type -> Type -> Maybe Subst 
+unify Bool Bool = Just Map.empty
+unify (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
+unify Unit Unit = Just Map.empty
+unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
+unify (TypeVar x) y = if x `notElem` ftv [] y then Just $ Map.singleton x y else Nothing
+unify x (TypeVar y) = if y `notElem` ftv [] x then Just $ Map.singleton y x else Nothing
+unify (Fun t1 t2) (Fun t1' t2') = do
+    s  <- unify t1 t1'
+    s' <- unify (apply s t2) (apply s t2')
+    return $ compose s' s
+unify (Tensor t1 t2) (Tensor t1' t2') = do
+    s  <- unify t1 t1'
+    s' <- unify (apply s t2) (apply s t2')
+    return $ compose s' s
+unify (With t1 t2) (With t1' t2') = do
+    s  <- unify t1 t1'
+    s' <- unify (apply s t2) (apply s t2')
+    return $ compose s' s
+unify (Plus t1 t2) (Plus t1' t2') = do
+    s  <- unify t1 t1'
+    s' <- unify (apply s t2) (apply s t2')
+    return $ compose s' s
+unify (Bang x) (Bang y) = unify x y
+unify _ _ = Nothing
+
+compose :: Subst -> Subst -> Subst
+s1 `compose` s2 = Map.map (apply s1) s2 `Map.union` s1
+
+solveconstraints :: Subst -> [Constraint] -> Maybe Subst -- w/ substitution accumulator and list of constraints generate a substitution
+solveconstraints subs constr =
+    case constr of
+      [] -> return subs
+      Constraint t1 t2:cs -> do
+          s <- unify t1 t2
+          solveconstraints (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
 
 
--- util --------------------
+typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr)
+typeinfer fc e = do
+    (ctype, cexp, _, constraints) <- evalStateT (typeconstraint [] ([], fc) e) 0
+    s <- solveconstraints Map.empty constraints
+    let (ctype', cexp') = apply (trace (show s) s) (ctype, cexp)
+    return (ctype', cexp')
+        
+
+
+--- util -------------------
 
 findDelete :: (Eq a) => a -> [(a, b)] -> [(a, b)] -> (Maybe b, [(a, b)])
 findDelete _ [] _ = (Nothing, [])
@@ -213,14 +308,27 @@ equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb)
 
 ---- TOP LEVEL ------------
 
+typeinferExpr :: CoreExpr -> CoreExpr
+typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") snd (typeinfer [] e)
+
+typeinferModule :: [CoreBinding] -> [CoreBinding] -- typecheck and use inferred types
+typeinferModule cbs = typeinferModule' cbs []
+    where typeinferModule' cbs acc = 
+            if null cbs then []
+            else let b@(CoreBinding n ce):xs = cbs in
+                     let (btype, bexpr) = fromMaybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
+                         let cb = CoreBinding n bexpr in
+                             let tb = TypeBinding n btype in
+                                 cb:typeinferModule' xs (tb:acc)
+
 typecheckExpr :: CoreExpr -> Type
-typecheckExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") fst (typecheck ([], []) e)
+typecheckExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") fst (typeinfer [] e)
 
 typecheckModule :: [CoreBinding] -> [TypeBinding]
 typecheckModule cbs = typecheckModule' cbs []
     where typecheckModule' cbs acc = 
             if null cbs then []
             else let b@(CoreBinding n ce):xs = cbs in
-                 let tb = TypeBinding n $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) fst $ typecheck ([], map (\(TypeBinding n t) -> (n, t)) acc) ce in
+                 let tb = TypeBinding n $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) fst $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
                      tb:typecheckModule' xs (tb:acc)
 

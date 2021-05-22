@@ -58,7 +58,7 @@ synth (г, d, o) (Fun a b) = do
     put $ vari + 1
     (exp, d') <- synth (г, d, (name, a):o) b
     guard (name `notElem` map fst d')
-    return (Abs name a exp, d')
+    return (Abs name (Just a) exp, d')
 
 ---- &R
 synth c (With a b) = do
@@ -183,10 +183,10 @@ focus c goal =
         ---- +R
         focus' Nothing c (Plus a b) = do
             (il, d') <- focus' Nothing c a
-            return (InjL b il, d')
+            return (InjL (Just b) il, d')
             <|> do
             (ir, d') <- focus' Nothing c b
-            return (InjR a ir, d')
+            return (InjR (Just a) ir, d')
 
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
@@ -252,18 +252,18 @@ focus c goal =
 
 ---- top level
 
-synthOneType :: Type -> Expr
-synthOneType t = head $ synthType t
-
-synthType :: Type -> [Expr]
+synthAllType :: Type -> [Expr]
 -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
-synthType t = let res = evalState (observeAllT $ synth ([], [], []) t) 0 in
+synthAllType t = let res = evalState (observeAllT $ synth ([], [], []) t) 0 in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res
 
+synthType :: Type -> Expr
+synthType t = head $ synthAllType t
+
 synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks = editexp (\case {Mark _ -> True; _ -> False}) (\(Mark t) -> synthOneType $ fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
+synthMarks = editexp (\case {Mark _ _ -> True; _ -> False}) (\(Mark _ t) -> synthType $ fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
 
 synthMarksModule :: [Binding] -> [Binding]
 synthMarksModule = map (\(Binding n e) -> Binding n $ synthMarks e)

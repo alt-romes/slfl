@@ -7,9 +7,9 @@ import CoreSyntax
 import Syntax
 
 import Text.Parsec
-import Text.Parsec.String 
 import qualified Text.Parsec.Expr as Ex 
 
+import Data.Maybe
 import Data.Either
 import Debug.Trace
 
@@ -23,8 +23,7 @@ lambda :: Parser Expr
 lambda = do 
     reservedOp "\\" <|> reservedOp "λ"
     x <- identifier
-    reservedOp ":"
-    t <- type' 
+    t <- option Nothing (do { reservedOp ":"; Just <$> ty })
     reservedOp "->"
     Syntax.Abs x t <$> expr
 
@@ -76,18 +75,15 @@ proj =
 -- A (+) B
 plus :: Parser Expr
 plus =
-    -- TODO: How to merge into 1 do block?
     do
     reserved "inl"
     e1 <- expr
-    reservedOp ":"
-    t1 <- type'
+    t1 <- option Nothing (do { reservedOp ":"; Just <$> ty })
     return $ Syntax.InjL t1 e1
     <|> 
     do
     reserved "inr"
-    t1 <- type'
-    reservedOp ":"
+    t1 <- option Nothing (do { t <- ty; reservedOp ":"; return $ Just t})
     Syntax.InjR t1 <$> expr
 
 caseplus :: Parser Expr
@@ -216,12 +212,16 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
         typedmark = do
             plhty <- ty
             reservedOp "}}"
-            return $ Syntax.Mark (Just plhty)
+            i <- getState
+            putState $ i+1
+            return $ Syntax.Mark i (Just plhty)
 
         emptymark = do
             reservedOp "..."
             reservedOp "}}"
-            return $ Syntax.Mark Nothing
+            i <- getState
+            putState $ i+1
+            return $ Syntax.Mark i Nothing
 
 
 -- Parsing Types 
@@ -256,11 +256,10 @@ type' = Ex.buildExpressionParser tyops ty
 
 -- Parsing modules
 
-argument :: Parser (String, Type)
+argument :: Parser (String, Maybe Type)
 argument = do
     argname <- identifier
-    reservedOp ":"
-    argtype <- ty
+    argtype <- option Nothing (do { reservedOp ":"; Just <$> ty})
     return (argname, argtype)
 
 letdecl :: Parser Binding
@@ -289,17 +288,17 @@ modl = many top
 ---- TOP LEVEL ------------
 
 parseExpr :: String -> Expr
-parseExpr i = case parse (contents expr) "<stdin>" i of
+parseExpr i = case runParser (contents expr) 0 "<stdin>" i of
                 Left x -> errorWithoutStackTrace $ "[Expr Parse] Failed: " ++ show x
                 Right x -> x
 
 parseModule :: FilePath -> String -> [Binding]
-parseModule f i = case parse (contents modl) f i of
+parseModule f i = case runParser (contents modl) 0 f i of
                     Left x -> errorWithoutStackTrace $ "[Module Parse] Failed: " ++ show x
                     Right x -> x
 
 parseType :: String -> Type
-parseType i = case parse (contents ty) "<stdin>" i of
+parseType i = case runParser (contents ty) 0 "<stdin>" i of
                 Left x -> errorWithoutStackTrace $ "[Type Parse] Failed: " ++ show x
                 Right x -> x
 

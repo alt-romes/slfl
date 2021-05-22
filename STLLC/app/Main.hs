@@ -4,9 +4,10 @@ import CoreSyntax
 import Syntax
 import Parser
 import Desugar
-import LinearCheck
+import Typechecker
 import Evaluate
 import Synth
+import Util
 
 import Data.Either
 import Control.Monad.Reader
@@ -17,7 +18,8 @@ import System.Console.Haskeline
 import System.Environment
 import System.IO
 
-import Text.Parsec
+-- import Text.Parsec
+import Debug.Trace
 
 -- process :: String -> IO ()
 -- process line = print $ parseExpr line
@@ -65,7 +67,8 @@ mainparseModule fname = do
 maindesugarModule :: String -> IO [CoreBinding]
 maindesugarModule fname = do
    bindings <- mainparseModule fname
-   return $ desugarModule bindings
+   let cbindings = desugarModule bindings -- Desugaring is automatically followed by typechecking+inference
+   return $ typeinferModule cbindings
 
 -- when defining a function you can only use the ones defined above
 
@@ -77,13 +80,14 @@ maintypecheckModule fname = do
 mainevalModule :: String -> IO CoreExpr
 mainevalModule fname = do
     cbindings <- maindesugarModule fname
-    let _ = typecheckModule cbindings in -- make sure module is well typed
-        return $ evalModule cbindings
+    return $ evalModule cbindings
 
 mainsynthMarksModule :: String -> IO [Binding]
 mainsynthMarksModule fname = do
-    targets <- mainparseModule fname
-    return $ synthMarksModule targets
+    bindings <- mainparseModule fname
+    ctbindings <- maindesugarModule fname -- TODO: por causa tb de memoization aqui não faz mal chamar tudo de novo em vez de aproveitar os resultados do primeiro parse right
+    let nbindings = copyMarksTypesModule bindings ctbindings -- copy marks types to the non-desugared expression from the desugared+inferred expression 
+    return $ trace ("BINDINGS: " ++ show bindings ++ "\nCORE BINDINGS: " ++ show ctbindings ++ "\nNEW BINDINGS: " ++ show nbindings) $ synthMarksModule nbindings
 
 
 

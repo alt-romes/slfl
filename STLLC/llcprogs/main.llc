@@ -1,4 +1,4 @@
-let fola = (\x : Bool -> if x then false else true);
+let fola = (\x -> if x then <> else <>);
 
 let main = {{ ... }} fola
 
