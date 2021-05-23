@@ -1,8 +1,5 @@
 module Typechecker where
 
--- TODO: Inference with free vars isn't working.
--- {{ ... }} (\x -> x) works, but let what = {{ ... }}; let main = what (\x -> x); doesn't
-
 import Control.Applicative
 import Data.Maybe
 import Control.Monad.State
@@ -292,10 +289,10 @@ solveconstraints subs constr =
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst)
 typeinfer fc e = do
-    (ctype, cexp, _, constraints) <- trace ("getting constraints with free vars: " ++ show fc) evalStateT (typeconstraint [] ([], fc) e) (length fc)
-    s <- trace ("constraints generated: " ++ show constraints) solveconstraints Map.empty constraints
+    (ctype, cexp, _, constraints) <- evalStateT (typeconstraint [] ([], fc) e) (length fc)
+    s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
-    return (ctype', trace ("generated exp is " ++ show cexp') cexp', s)
+    return (ctype', cexp', s)
         
 
 --- util -------------------

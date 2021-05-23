@@ -4,4 +4,4 @@ let id = (\x -o x true);
 
 let wtf = {{ ... }};
 
-let main = wtf fola
+let main = (\x : Bool -o x) (wtf fola)
