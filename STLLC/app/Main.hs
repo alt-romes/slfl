@@ -113,4 +113,5 @@ main = do
       "desugar" -> maindesugarModule arg >>= mapM_ print
       "type" -> maintypecheckModule arg >>= mapM_ print
       "eval" -> mainevalModule arg >>= print
+      "parse" -> mainparseModule arg >>= print
       _ -> print $ mainsynth action

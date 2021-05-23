@@ -250,13 +250,13 @@ unify :: Type -> Type -> Maybe Subst
 unify Bool Bool = Just Map.empty
 unify (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unify Unit Unit = Just Map.empty
-unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
+unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (TypeVar y)
 unify (TypeVar x) y = if x `notElem` ftv [] y then Just $ Map.singleton x y else Nothing
 unify x (TypeVar y) = if y `notElem` ftv [] x then Just $ Map.singleton y x else Nothing
 unify (Fun t1 t2) (Fun t1' t2') = do
     s  <- unify t1 t1'
     s' <- unify (apply s t2) (apply s t2')
-    return $ compose s' s
+    trace ("unified successfully " ++ show (Fun t1 t2) ++ " and " ++ show (Fun t1' t2')) $ return $ compose s' s
 unify (Tensor t1 t2) (Tensor t1' t2') = do
     s  <- unify t1 t1'
     s' <- unify (apply s t2) (apply s t2')
@@ -273,23 +273,23 @@ unify (Bang x) (Bang y) = unify x y
 unify _ _ = Nothing
 
 compose :: Subst -> Subst -> Subst
-s1 `compose` s2 = Map.map (apply s1) s2 `Map.union` s1
+s' `compose` s = Map.map (apply s') s `Map.union` s'
 
 solveconstraints :: Subst -> [Constraint] -> Maybe Subst -- w/ substitution accumulator and list of constraints generate a substitution
 solveconstraints subs constr =
     case constr of
       [] -> return subs
       Constraint t1 t2:cs -> do
-          s <- unify t1 t2
-          solveconstraints (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
+          s <- trace ("unifying " ++ show t1 ++ " and " ++ show t2) unify t1 t2
+          trace ("result of unifying :: " ++ show s) $ solveconstraints (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
 
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr)
 typeinfer fc e = do
     (ctype, cexp, _, constraints) <- evalStateT (typeconstraint [] ([], fc) e) 0
-    s <- solveconstraints Map.empty constraints
-    let (ctype', cexp') = apply (trace (show s) s) (ctype, cexp)
-    return (ctype', cexp')
+    s <- trace ("All constraints: " ++ show constraints) solveconstraints Map.empty constraints
+    let (ctype', cexp') = apply s (ctype, cexp)
+    return (trace "type inference didn't fail" ctype', cexp')
         
 
 
@@ -302,7 +302,7 @@ findDelete x ((y,t):xs) acc =
     else findDelete x xs ((y,t):acc)
 
 equalCtxts :: Ctxt -> Ctxt -> Bool
-equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb)
+equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb) || trace "[Typecheck] Failed in resource management" False
 
 
 

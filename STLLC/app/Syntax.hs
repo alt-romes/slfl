@@ -50,6 +50,9 @@ data Expr
     | Mark Int (Maybe Type)
 
     -- Added sugar :)
+
+    | UnrestrictedAbs String (Maybe Type) Expr
+
     -- não temos :)
 
 data Pattern
@@ -58,6 +61,7 @@ data Pattern
     | BangPattern String
     
     | VanillaPattern String
+
 
 instance (Show Expr) where
     show e = showexpr' 0 e
@@ -89,4 +93,6 @@ instance (Show Expr) where
             showexpr' d Tru = "true"
             showexpr' d Fls = "false"
             showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
+            showexpr' d (UnrestrictedAbs x t e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -> " ++ showexpr' (d+1) e ++ ")"
+
             indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '

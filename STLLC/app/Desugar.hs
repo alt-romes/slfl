@@ -97,6 +97,9 @@ desugar Syntax.Fls = return CoreSyntax.Fls
 
 desugar (Syntax.Mark i t) = return $ CoreSyntax.Mark i t
 
+desugar (Syntax.UnrestrictedAbs i (Just t) e) = desugar (Syntax.Abs i (Just $ Bang t) (Syntax.LetBang i (Syntax.Var i) e))
+desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Syntax.LetBang i (Syntax.Var i) e))
+
 
 ---- TOP LEVEL ----
 

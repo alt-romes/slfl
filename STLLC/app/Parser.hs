@@ -24,8 +24,7 @@ lambda = do
     reservedOp "\\" <|> reservedOp "λ"
     x <- identifier
     t <- option Nothing (do { reservedOp ":"; Just <$> ty })
-    reservedOp "->"
-    Syntax.Abs x t <$> expr
+    try (do { reservedOp "-o"; Syntax.Abs x t <$> expr }) <|> do {reservedOp "->"; Syntax.UnrestrictedAbs x t <$> expr }
 
 -- A (*) B
 tensor :: Parser Expr
