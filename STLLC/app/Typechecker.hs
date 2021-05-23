@@ -164,7 +164,7 @@ typeconstraint constraints ctx (BangValue e) = do
     (t2, ce, ctx2, constraints') <- typeconstraint constraints ctx e
     if equalCtxts ctx2 ctx
         then return (Bang t2, BangValue ce, ctx, constraints')
-        else empty
+        else empty -- TODO: Assim (\x -o !x) não é sintetisado, mas se calhar o tipo inferido de x devia ser !a
 
 --  !E
 typeconstraint constraints ctxt (LetBang e1 e2) = do
@@ -234,6 +234,12 @@ instance Substitutable CoreExpr where
     apply s (Mark i (Just t)) = Mark i (return $ apply s t)
     apply s e = e
 
+instance Substitutable CoreBinding where
+    apply s (CoreBinding n e') = CoreBinding n (apply s e')
+
+instance Substitutable a => Substitutable [a] where
+    apply s l = map (apply s) l
+
 instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
     apply s (x, y) = (apply s x, apply s y)
 
@@ -256,7 +262,7 @@ unify x (TypeVar y) = if y `notElem` ftv [] x then Just $ Map.singleton y x else
 unify (Fun t1 t2) (Fun t1' t2') = do
     s  <- unify t1 t1'
     s' <- unify (apply s t2) (apply s t2')
-    trace ("unified successfully " ++ show (Fun t1 t2) ++ " and " ++ show (Fun t1' t2')) $ return $ compose s' s
+    return $ compose s' s
 unify (Tensor t1 t2) (Tensor t1' t2') = do
     s  <- unify t1 t1'
     s' <- unify (apply s t2) (apply s t2')
@@ -280,18 +286,17 @@ solveconstraints subs constr =
     case constr of
       [] -> return subs
       Constraint t1 t2:cs -> do
-          s <- trace ("unifying " ++ show t1 ++ " and " ++ show t2) unify t1 t2
-          trace ("result of unifying :: " ++ show s) $ solveconstraints (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
+          s <- unify t1 t2
+          solveconstraints (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
 
 
-typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr)
+typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst)
 typeinfer fc e = do
-    (ctype, cexp, _, constraints) <- evalStateT (typeconstraint [] ([], fc) e) 0
-    s <- trace ("All constraints: " ++ show constraints) solveconstraints Map.empty constraints
+    (ctype, cexp, _, constraints) <- trace ("getting constraints with free vars: " ++ show fc) evalStateT (typeconstraint [] ([], fc) e) (length fc)
+    s <- trace ("constraints generated: " ++ show constraints) solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
-    return (trace "type inference didn't fail" ctype', cexp')
+    return (ctype', trace ("generated exp is " ++ show cexp') cexp', s)
         
-
 
 --- util -------------------
 
@@ -302,33 +307,37 @@ findDelete x ((y,t):xs) acc =
     else findDelete x xs ((y,t):acc)
 
 equalCtxts :: Ctxt -> Ctxt -> Bool
-equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb) || trace "[Typecheck] Failed in resource management" False
+equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb) || trace "[Typecheck] Failed resource management." False
 
 
 
 ---- TOP LEVEL ------------
 
 typeinferExpr :: CoreExpr -> CoreExpr
-typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") snd (typeinfer [] e)
+typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _) -> ce) (typeinfer [] e)
 
 typeinferModule :: [CoreBinding] -> [CoreBinding] -- typecheck and use inferred types
-typeinferModule cbs = typeinferModule' cbs []
-    where typeinferModule' cbs acc = 
-            if null cbs then []
+typeinferModule cbs = let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.empty in
+                          let fin = apply finalsubst finalcbs in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+                            trace ("final subs: " ++ show finalsubst ++ " and final expr: " ++ show finalcbs ++ " resulting in !!! " ++ show fin) fin
+    where
+        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Subst -> ([CoreBinding], Subst)
+        typeinferModule' cbs acc sbs = -- TODO: Refactor, it works but it's too confusing as of now?
+            if null cbs then ([], sbs)
             else let b@(CoreBinding n ce):xs = cbs in
-                     let (btype, bexpr) = fromMaybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
+                     let (btype, bexpr, subs) = fromMaybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
                          let cb = CoreBinding n bexpr in
                              let tb = TypeBinding n btype in
-                                 cb:typeinferModule' xs (tb:acc)
+                                 first (cb :) $ typeinferModule' xs (tb:acc) subs
 
 typecheckExpr :: CoreExpr -> Type
-typecheckExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") fst (typeinfer [] e)
+typecheckExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e)
 
 typecheckModule :: [CoreBinding] -> [TypeBinding]
 typecheckModule cbs = typecheckModule' cbs []
     where typecheckModule' cbs acc = 
             if null cbs then []
             else let b@(CoreBinding n ce):xs = cbs in
-                 let tb = TypeBinding n $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) fst $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
+                 let tb = TypeBinding n $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) (\(t, _, _) -> t) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
                      tb:typecheckModule' xs (tb:acc)
 

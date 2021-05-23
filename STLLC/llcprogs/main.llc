@@ -1,6 +1,6 @@
-let fola = (\x -> if x then <> else <>);
+let fola = (\x -o if x then <> else <>);
 
-let id = (\x -> x true);
+let id = (\x -o x true);
 
 let wtf = {{ ... }};
 
