@@ -317,18 +317,18 @@ typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _) -> ce) (typeinfer [] e)
 
 typeinferModule :: [CoreBinding] -> [CoreBinding] -- typecheck and use inferred types
-typeinferModule cbs = let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.empty in
-                          let fin = apply finalsubst finalcbs in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
-                            trace ("final subs: " ++ show finalsubst ++ " and final expr: " ++ show finalcbs ++ " resulting in !!! " ++ show fin) fin
+typeinferModule cbs = let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+                          apply finalsubst finalcbs
     where
         typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Subst -> ([CoreBinding], Subst)
-        typeinferModule' cbs acc sbs = -- TODO: Refactor, it works but it's too confusing as of now?
-            if null cbs then ([], sbs)
-            else let b@(CoreBinding n ce):xs = cbs in
-                     let (btype, bexpr, subs) = fromMaybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
-                         let cb = CoreBinding n bexpr in
-                             let tb = TypeBinding n btype in
-                                 first (cb :) $ typeinferModule' xs (tb:acc) subs
+        typeinferModule' corebindings acc subst =
+            case corebindings of
+              [] -> ([], subst)
+              b@(CoreBinding n ce):corebindings' -> do
+                 let (btype, bexpr, subst') =
+                         fromMaybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) $
+                             typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce
+                 first (CoreBinding n bexpr :) $ typeinferModule' corebindings' (TypeBinding n btype:acc) subst'
 
 typecheckExpr :: CoreExpr -> Type
 typecheckExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e)
