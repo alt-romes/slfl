@@ -3,7 +3,7 @@ const fs = require("fs");
 const tmp = require("tmp");
 const execSync = require("child_process").execSync;
 
-const port = 8000;
+const port = 25565;
 
 // Remove all controlled temporary objects on process exit
 tmp.setGracefulCleanup();
@@ -19,8 +19,8 @@ const server = http.createServer(function (req, res) {
                 return;
             }
 
-            res.writeHead(200);
             res.setHeader("Content-Type", "text/html");
+            res.writeHead(200);
             res.end(data);
         });
     else if (req.method == "POST") {
@@ -39,10 +39,12 @@ const server = http.createServer(function (req, res) {
             // Write body to tmp file
             const tmpf = tmp.fileSync();
             fs.writeSync(tmpf.fd, body);
+
+            console.log("Body:\n" + body);
             
             var pout;
             try {
-                pout = execSync("/usr/bin/env STLLC complete " + tmpf.name);
+                pout = "" + execSync("/usr/bin/env STLLC complete " + tmpf.name);
             }
             catch (err) {
                 
@@ -51,20 +53,15 @@ const server = http.createServer(function (req, res) {
                 err = err.replace(` "`+ tmpf.name + `"`, "");      // Remove tmpfile name
                 
                 res.writeHead(400);
-                res.end(`{"result": null, "error": "` + err + `"}`);
+                res.end(JSON.stringify({result: null, error: err}));
 
-                // Manually delete tmp file
-                tmpf.removeCallback();
                 return;
             }
-
-            // Manually delete tmp file
-            tmpf.removeCallback();
             
             console.log("Synthetized: " + pout);
 
             res.writeHead(200);
-            res.end(`{"result": "` + pout + `", "error": null}`);
+            res.end(JSON.stringify({result: pout, error: null}));
         });
     }
 

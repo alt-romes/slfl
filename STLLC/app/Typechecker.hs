@@ -184,6 +184,7 @@ typeconstraint constraints c (LetIn e1 e2) = do
 typeconstraint constraints ctx Tru = return (Bool, Tru, ctx, constraints)
 typeconstraint constraints ctx Fls = return (Bool, Fls, ctx, constraints)
 
+-- TODO: if true then { ... } else false should synthetize a bool, but doesn't...
 typeconstraint constraints ctx (IfThenElse e1 e2 e3) = do
     (t1, ce1, ctx1, constraints') <- typeconstraint constraints ctx e1
     (t2, ce2, ctx2, constraints'') <- typeconstraint constraints' ctx1 e2
