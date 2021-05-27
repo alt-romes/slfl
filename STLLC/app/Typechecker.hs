@@ -25,7 +25,7 @@ instance Show Constraint where
 
 type Substitution = (Type, CoreExpr) -> (Type, CoreExpr) -- F to replace all type variables with interpreted types
 
-type Infer = WriterT [Constraint] (StateT Int Maybe)
+type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
 typeconstraint :: Ctxt -> CoreExpr -> Infer (Type, CoreExpr, Ctxt)
@@ -34,36 +34,36 @@ typeconstraint :: Ctxt -> CoreExpr -> Infer (Type, CoreExpr, Ctxt)
 
 typeconstraint ctxt ce@(BLVar x) = do
     let (pre, maybet:end) = splitAt x $ fst ctxt
-    t <- lift $ lift maybet
+    t <- lift $ lift $ lift maybet
     return (t, ce, (pre ++ Nothing:end, snd ctxt))
 
 typeconstraint (bctxt, fctxt) ce@(FLVar x) = do
     let (maybet, fctxt') = findDelete x fctxt []
-    t <- lift $ lift maybet
+    t <- lift $ lift $ lift maybet
     return (t, ce, (bctxt, fctxt'))
 
 typeconstraint ctxt ce@(BUVar x) = do
-    t <- lift $ lift $ fst ctxt !! x
+    t <- lift $ lift $ lift $ fst ctxt !! x
     return (t, ce, ctxt)
 
 typeconstraint ctxt ce@(FUVar x) = do
-    t <- lift $ lift $ lookup x $ snd ctxt
+    t <- lift $ lift $ lift $ lookup x $ snd ctxt
     return (t, ce, ctxt)
 
 --- -o ---------------------
 
 --  -oI
 typeconstraint (bctx, fctx) (Abs t1 e) = do
-    vari <- get
-    put $ vari + 1
+    vari <- lift $ lift get
+    lift $ lift $ put $ vari + 1
     let t1' = fromMaybe (TypeVar vari) t1
     (t2, ce, ctx2) <- typeconstraint (Just t1':bctx, fctx) e
     return (Fun t1' t2, Abs (Just t1') ce, ctx2)
 
 --  -oE
 typeconstraint ctx (App e1 e2) = do
-    vari <- get
-    put (vari+1)
+    vari <- lift $ lift get
+    lift $ lift $ put (vari+1)
     let tv = TypeVar vari
     (t1, ce1, ctx1) <- typeconstraint ctx e1
     (t2, ce2, ctx2) <- typeconstraint ctx1 e2
@@ -79,10 +79,10 @@ typeconstraint ctx (TensorValue e1 e2) = do
 
 --  *E
 typeconstraint ctx (LetTensor e1 e2) = do
-    vari <- get
+    vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
-    put $ vari+2
+    lift $ lift $ put $ vari+2
     (t, ce1, (bctx', fctx')) <- typeconstraint ctx e1
     (t3, ce2, ctx3) <- typeconstraint (Just tv2:Just tv1:bctx', fctx') e2
     writer ((t3, LetTensor ce1 ce2, ctx3), [Constraint t (Tensor tv1 tv2)])
@@ -110,19 +110,19 @@ typeconstraint ctx (WithValue e1 e2) = do
 
 --  &E
 typeconstraint ctx (Fst e) = do
-    vari <- get
+    vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
-    put $ vari+2
+    lift $ lift $ put $ vari+2
     (t, ce, ctx2) <- typeconstraint ctx e
     writer ((tv1, Fst ce, ctx2), [Constraint t (With tv1 tv2)])
 
 --  &E
 typeconstraint ctx (Snd e) = do
-    vari <- get
+    vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
-    put $ vari+2
+    lift $ lift $ put $ vari+2
     (t, ce, ctx2) <- typeconstraint ctx e
     writer ((tv2, Snd ce, ctx2), [Constraint t (With tv1 tv2)])
 
@@ -130,16 +130,16 @@ typeconstraint ctx (Snd e) = do
 
 --  +I
 typeconstraint ctx (InjL t1 e) = do 
-    vari <- get
-    put $ vari+1 -- TODO: Assim as variáveis de tipo vão avançar mesmo que não sejam usadas, é OK não é? para não repetir código e fazer patternmatch do nothing e just t separado
+    vari <- lift $ lift get
+    lift $ lift $ put $ vari+1 -- TODO: Assim as variáveis de tipo vão avançar mesmo que não sejam usadas, é OK não é? para não repetir código e fazer patternmatch do nothing e just t separado
     let t1' = fromMaybe (TypeVar vari) t1
     (t2, ce, ctx2) <- typeconstraint ctx e
     return (Plus t2 t1', InjL (Just t1') ce, ctx2)
 
 --  +I
 typeconstraint ctx (InjR t1 e) = do
-    vari <- get
-    put $ vari+1 -- TODO: Assim as variáveis de tipo vão avançar mesmo que não sejam usadas, é OK não é? para não repetir código e fazer patternmatch do nothing e just t separado
+    vari <- lift $ lift get
+    lift $ lift $ put $ vari+1 -- TODO: Assim as variáveis de tipo vão avançar mesmo que não sejam usadas, é OK não é? para não repetir código e fazer patternmatch do nothing e just t separado
     let t1' = fromMaybe (TypeVar vari) t1
     (t2, ce, ctx2) <- typeconstraint ctx e
     return (Plus t1' t2, InjR (Just t1') ce, ctx2)
@@ -147,10 +147,10 @@ typeconstraint ctx (InjR t1 e) = do
 --  +E
 typeconstraint ctx (CaseOfPlus e1 e2 e3) = do
     (pt, ce1, (bctx', fctx')) <- typeconstraint ctx e1
-    vari <- get
+    vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
-    put $ vari+2
+    lift $ lift $ put $ vari+2
     (t3, ce2, ctx3) <- typeconstraint (Just tv1:bctx', fctx') e2
     (t4, ce3, ctx4) <- typeconstraint (Just tv2:bctx', fctx') e3
     if equalCtxts ctx3 ctx4
@@ -169,8 +169,8 @@ typeconstraint ctx (BangValue e) = do
 --  !E
 typeconstraint ctxt (LetBang e1 e2) = do
     (t1, ce1, (bctxt', fctxt')) <- typeconstraint ctxt e1
-    vari <- get
-    put $ vari + 1
+    vari <- lift $ lift get
+    lift $ lift $ put $ vari + 1
     let tv1 = TypeVar vari
     (t2, ce2, ctxt'') <- typeconstraint (Just tv1:bctxt', fctxt') e2
     writer ((t2, LetBang ce1 ce2, ctxt''), [Constraint t1 (Bang tv1)])
@@ -185,8 +185,8 @@ typeconstraint c (LetIn e1 e2) = do
 --- Synth marker ---
 
 typeconstraint ctx (Mark i t) = do
-    vari <- get
-    put $ vari + 1
+    vari <- lift $ lift get
+    lift $ lift $ put $ vari + 1
     let t' = fromMaybe (TypeVar vari) t
     return (t', Mark i (Just t'), ctx)
 
@@ -206,8 +206,8 @@ typeconstraint ctx (IfThenElse e1 e2 e3) = do
 
 typeconstraint ctx (SumValue mts (t, e)) = do
     types <- mapM (\(s, mt) -> do
-        vari <- get
-        put $ vari + 1
+        vari <- lift $ lift get
+        lift $ lift $ put $ vari + 1
         let t' = fromMaybe (TypeVar vari) mt
         return (s, t')) mts
     (t2, ce, ctx2) <- typeconstraint ctx e
@@ -216,9 +216,9 @@ typeconstraint ctx (SumValue mts (t, e)) = do
 typeconstraint ctx (CaseOfSum e exps) = do
     (st, ce, (bctx', fctx')) <- typeconstraint ctx e
     inferredexps <- mapM (\(s, ex) -> do
-        vari <- get
+        vari <- lift $ lift get
         let tv = TypeVar vari
-        put $ vari + 1
+        lift $ lift $ put $ vari + 1
         (t', ce, ctx') <- typeconstraint (Just tv:bctx', fctx') ex
         return (t', s, ce, ctx')
         ) exps
@@ -332,7 +332,7 @@ solveconstraints subs constr =
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst)
 typeinfer fc e = do
-    ((ctype, cexp, _), constraints) <- evalStateT (runWriterT $ typeconstraint ([], fc) e) (length fc)
+    ((ctype, cexp, _), constraints) <- evalStateT (evalStateT (runWriterT $ typeconstraint ([], fc) e) ([], fc)) (length fc)
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
     return (ctype', cexp', s)
