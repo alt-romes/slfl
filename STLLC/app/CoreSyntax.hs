@@ -44,13 +44,16 @@ data CoreExpr
 
     | LetIn CoreExpr CoreExpr
 
-    | IfThenElse CoreExpr CoreExpr CoreExpr
+    | Mark Int (Maybe Type)
 
     -- Bool
     | Tru
     | Fls
+    | IfThenElse CoreExpr CoreExpr CoreExpr
 
-    | Mark Int (Maybe Type)
+    -- Sum types
+    | SumValue [(String, Maybe Type)] (String, CoreExpr)
+    | CaseOfSum CoreExpr [(String, CoreExpr)]
 
     deriving (Eq)
 
@@ -63,11 +66,13 @@ data Type
     | Plus Type Type    -- A + B    -- additive disjunction
     | Bang Type         -- !A       -- exponential
 
+    | TypeVar Int       -- Type variable (uninterprted type) used for reconstruction
+
     | Bool
     
     | Atom String
 
-    | TypeVar Int       -- Type variable (uninterprted type) used for reconstruction
+    | Sum [(String, Type)] -- TODO: Os Sum Type deviam ter as labels também ? 
     
     deriving (Eq)
 
@@ -82,6 +87,7 @@ instance (Show Type) where
     show Bool = "Bool"
     show (Atom x) = x
     show (TypeVar x) = letters !! x
+    show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
 
 instance (Show CoreExpr) where
     show e = showexpr' 0 e
@@ -110,12 +116,21 @@ showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " o
 showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
 showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
 showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++ 
                                         indent (d+1) ++ "then " ++ showexpr' (d+1) e2 ++
                                         indent (d+1) ++ "else " ++ showexpr' (d+1) e3
 showexpr' d Tru = "true"
 showexpr' d Fls = "false"
-showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
+showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
+    foldl (\p (s, Just t) -> p ++ indent (d+2) ++ s ++ " : " ++ show t ++ ";") "" mts
+    ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
+    ++ indent (d+1) ++ "}"
+showexpr' d (CaseOfSum e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+    indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " => " ++ showexpr' (d+2) e1 ++
+        foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
+            "| " ++ t ++ " " ++ "?" ++ " => " ++
+                showexpr' (d+2) ex) "" exps
 indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
 
 

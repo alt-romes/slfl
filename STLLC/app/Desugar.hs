@@ -87,6 +87,8 @@ desugar (Syntax.LetIn id e1 e2) = do
     e2' <- inEnv (id, linVar) (desugar e2)
     return $ CoreSyntax.LetIn e1' e2' -- se quisesse fazer desugar do let in para uma abstração tinha também de passar todo o contexto para o typechecker, porque sem passar mais informação ela é incompleta
 
+desugar (Syntax.Mark i t) = return $ CoreSyntax.Mark i t
+
 desugar (Syntax.IfThenElse e1 e2 e3) = do
     e1' <- desugar e1
     e2' <- desugar e2
@@ -95,7 +97,17 @@ desugar (Syntax.IfThenElse e1 e2 e3) = do
 desugar Syntax.Tru = return CoreSyntax.Tru
 desugar Syntax.Fls = return CoreSyntax.Fls
 
-desugar (Syntax.Mark i t) = return $ CoreSyntax.Mark i t
+
+-- | SumValue [(String, Maybe Type)] (String, Expr)
+-- | CaseOfSum Expr [(String, String, Expr)]
+
+desugar (Syntax.SumValue mts (t, e)) = do
+    e' <- desugar e
+    return $ CoreSyntax.SumValue mts (t, e')
+desugar (Syntax.CaseOfSum e exps) = do
+    e' <- desugar e
+    exps' <- mapM (\(t, i, ex) -> do {ex' <- inEnv (i, linVar) (desugar ex); return (t, ex')}) exps
+    return $ CoreSyntax.CaseOfSum e' exps'
 
 desugar (Syntax.UnrestrictedAbs i (Just t) e) = desugar (Syntax.Abs i (Just $ Bang t) (Syntax.LetBang i (Syntax.Var i) e))
 desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Syntax.LetBang i (Syntax.Var i) e))

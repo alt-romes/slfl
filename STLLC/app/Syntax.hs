@@ -1,5 +1,7 @@
 module Syntax where 
 
+import Data.Maybe
+
 import Prelude hiding (Bool)
 import CoreSyntax (Type)
 
@@ -41,13 +43,17 @@ data Expr
 
     | LetIn String Expr Expr
 
+    | Mark Int (Maybe Type)
+
     | IfThenElse Expr Expr Expr
 
     -- Bool
     | Tru
     | Fls
 
-    | Mark Int (Maybe Type)
+    -- Sum types
+    | SumValue [(String, Maybe Type)] (String, Expr)
+    | CaseOfSum Expr [(String, String, Expr)]
 
     -- Added sugar :)
 
@@ -83,17 +89,28 @@ instance (Show Expr) where
             showexpr' d (InjL t e) = "inl " ++ showexpr' d e ++ " : " ++ show t
             showexpr' d (InjR t e) = "inr " ++ show t ++ " : " ++ showexpr' d e
             showexpr' d (CaseOfPlus e1 x e2 y e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
-                                                        indent (d+1) ++ "inl " ++ x ++ " => " ++ showexpr' (d+2) e2 ++
+                                                        indent (d+1) ++ "  inl " ++ x ++ " => " ++ showexpr' (d+2) e2 ++
                                                         indent (d+1) ++ "| inr " ++ y ++ " => " ++ showexpr' (d+2) e3
             showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
             showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+            showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
             showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++ 
                                                     indent (d+1) ++ "then " ++ showexpr' (d+1) e2 ++
                                                     indent (d+1) ++ "else " ++ showexpr' (d+1) e3
             showexpr' d Tru = "true"
             showexpr' d Fls = "false"
-            showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
+            -- | CaseOfSum Expr [(String, String, Expr)]
+            showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
+                foldl (\p (s, mt) -> p ++ indent (d+2) ++ s ++ maybe "" (\t -> " : " ++ show t) mt ++ ";") "" mts
+                ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
+                ++ indent (d+1) ++ "}"
+            showexpr' d (CaseOfSum e ((tag, id, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+                                                        indent (d+1) ++ "  " ++ tag ++ " " ++ id ++ " => " ++ showexpr' (d+2) e1 ++
+                                                        foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
+                                                            "| " ++ t ++ " " ++ i ++ " => " ++
+                                                                showexpr' (d+2) ex) "" exps
+
             showexpr' d (UnrestrictedAbs x (Just t) e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -> " ++ showexpr' (d+1) e ++ ")"
             showexpr' d (UnrestrictedAbs x Nothing e) = indent d ++ "(λ" ++ x ++ " -> " ++ showexpr' (d+1) e ++ ")"
 

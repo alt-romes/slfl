@@ -1,0 +1,10 @@
+let x = (union {red: Bool; green true;});
+let main = case x of
+red b =>
+        if b
+            then true
+            else true
+    | green c =>
+        if c
+            then true
+            else true

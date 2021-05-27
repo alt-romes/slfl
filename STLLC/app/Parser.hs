@@ -1,6 +1,6 @@
 module Parser where
 
-import Prelude hiding (Bool)
+import Prelude hiding (Bool, sum)
 
 import Lexer
 import CoreSyntax
@@ -146,11 +146,51 @@ ite = do
     Syntax.IfThenElse cond tr <$> expr
 
 
--- Parsing sugar expressions
-
 -- let x = M in N
 letinpattern :: Parser Pattern
 letinpattern = VanillaPattern <$> identifier
+
+
+sumtypebranch :: Parser (String, Maybe Type)
+sumtypebranch = do
+    tag <- identifier
+    t <- option Nothing (do { reservedOp ":"; Just <$> ty })
+    reservedOp ";"
+    return (tag, t)
+
+sum :: Parser Expr
+sum = do
+    reserved "union"
+    reservedOp "{"
+    cls1 <- many (try sumtypebranch)
+    tag <- identifier
+    e <- expr
+    reservedOp ";"
+    cls2 <- many (try sumtypebranch)
+    reservedOp "}"
+    return $ Syntax.SumValue (cls1 ++ cls2) (tag, e)
+
+casebranch :: Parser (String, String, Expr)
+casebranch = do
+    tag <- identifier
+    id <- identifier
+    reservedOp "=>"
+    e <- expr
+    return (tag, id, e)
+
+casesum :: Parser Expr
+casesum = do 
+    reserved "case"
+    e1 <- expr
+    reserved "of"
+    c1 <- casebranch
+    cls <- many (do {reservedOp "|"; casebranch})
+    return $ Syntax.CaseOfSum e1 (c1:cls)
+
+
+caseof :: Parser Expr
+caseof = try caseplus
+      <|> casesum
 
 
 -- num :: Parser Expr 
@@ -181,7 +221,8 @@ aexp =   parens expr
      <|> proj
 
      <|> plus
-     <|> caseplus
+     <|> sum
+     <|> caseof
 
      <|> bang
 
@@ -258,6 +299,7 @@ type' = Ex.buildExpressionParser tyops ty
             infixOp "+" Plus Ex.AssocLeft,
             prefixOp "!" Bang
             ]]
+
 
 -- Parsing modules
 

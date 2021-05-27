@@ -145,6 +145,10 @@ eval ctxt@(bctxt, fctxt) (LetIn e1 e2) =
     let e1v = eval ctxt e1 in
     eval (e1v:bctxt, fctxt) e2
 
+--- Mark for synthesis ---
+
+eval _ (Mark _ t) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
+
 --- Bool -------------------
 
 eval ctxt Tru = Tru
@@ -156,9 +160,26 @@ eval ctxt (IfThenElse e1 e2 e3) =
         Tru -> eval ctxt e2
         Fls -> eval ctxt e3
 
---- Mark for synthesis ---
+--- Sum Type ---------------
 
-eval _ (Mark _ t) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
+--  +I
+eval ctxt (InjL t e) =
+    let e' = eval ctxt e in
+    InjL t e'
+
+--  +I
+eval ctxt (InjR t e) =
+    let e' = eval ctxt e in
+    InjR t e'
+
+--  +E
+eval ctxt (CaseOfPlus e1 e2 e3) =
+    let e1' = eval ctxt e1 in
+    let (bctxt, fctxt) = ctxt in
+    case e1' of
+        (InjL t e) -> eval (e1':bctxt, fctxt) e2
+        (InjR t e) -> eval (e1':bctxt, fctxt) e3
+
 
 -- end eval ------------
 

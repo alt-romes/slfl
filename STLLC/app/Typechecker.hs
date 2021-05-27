@@ -2,6 +2,7 @@ module Typechecker where
 
 import Control.Applicative
 import Data.Maybe
+import Data.List (sortBy)
 import Control.Monad.State
 import Data.Bifunctor
 import qualified Data.Map as Map
@@ -148,10 +149,10 @@ typeconstraint constraints ctx (CaseOfPlus e1 e2 e3) = do
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
     put $ vari+2
-    (t3, ce2, ctx3, constraints') <- typeconstraint constraints' (Just tv1:bctx', fctx') e2
-    (t4, ce3, ctx4, constraints'') <- typeconstraint constraints' (Just tv2:bctx', fctx') e3
+    (t3, ce2, ctx3, constraints'') <- typeconstraint constraints' (Just tv1:bctx', fctx') e2
+    (t4, ce3, ctx4, constraints''') <- typeconstraint constraints'' (Just tv2:bctx', fctx') e3
     if equalCtxts ctx3 ctx4
-       then return (t4, CaseOfPlus ce1 ce2 ce3, ctx4, Constraint t3 t4:Constraint pt (Plus tv1 tv2):constraints'')
+       then return (t4, CaseOfPlus ce1 ce2 ce3, ctx4, Constraint t3 t4:Constraint pt (Plus tv1 tv2):constraints''')
        else empty
 
 --- ! ----------------------
@@ -179,6 +180,14 @@ typeconstraint constraints c (LetIn e1 e2) = do
     (t2, ce2, c'', constraints'') <- typeconstraint constraints' (Just t1:bc, fc) e2
     return (t2, LetIn ce1 ce2, c'', constraints'')
 
+--- Synth marker ---
+
+typeconstraint constraints ctx (Mark i t) = do
+    vari <- get
+    put $ vari + 1
+    let t' = fromMaybe (TypeVar vari) t
+    return (t', Mark i (Just t'), ctx, constraints)
+
 --- Bool -------------------
 
 typeconstraint constraints ctx Tru = return (Bool, Tru, ctx, constraints)
@@ -193,13 +202,29 @@ typeconstraint constraints ctx (IfThenElse e1 e2 e3) = do
        then return (t3, IfThenElse ce1 ce2 ce3, ctx3, Constraint t2 t3:Constraint t1 Bool:constraints'')
        else empty
 
---- Synth marker ---
+typeconstraint constraints ctx (SumValue mts (t, e)) = do
+    types <- mapM (\(s, mt) -> do
+        vari <- get
+        put $ vari + 1
+        let t' = fromMaybe (TypeVar vari) mt
+        return (s, t')) mts
+    (t2, ce, ctx2, constraints') <- typeconstraint constraints ctx e
+    return (Sum ((t, t2):types), SumValue (map (second Just) types) (t, ce), ctx2, constraints')
 
-typeconstraint constraints ctx (Mark i t) = do
-    vari <- get
-    put $ vari + 1
-    let t' = fromMaybe (TypeVar vari) t
-    return (t', Mark i (Just t'), ctx, constraints)
+typeconstraint constraints ctx (CaseOfSum e exps) = do
+    (st, ce, (bctx', fctx'), constraints') <- typeconstraint constraints ctx e
+    inferredexps <- mapM (\(s, ex) -> do
+        vari <- get
+        let tv = TypeVar vari
+        put $ vari + 1
+        (t', ce, ctx', constraints'') <- typeconstraint constraints' (Just tv:bctx', fctx') ex
+        return (t', s, ce, ctx', constraints'')
+        ) exps
+    -- TODO: Probably doable in a more idiomatic way, like making an inference monad instead of all these function parameters
+    let (t1', s1, ce1, ctx1', constraints1'') = head inferredexps
+    if all ((== ctx1') . (\(_,_,_,c,_) -> c)) (tail inferredexps)
+       then return (t1', CaseOfSum ce (map (\(_,s,c,_,_) -> (s,c)) inferredexps), ctx1', map (\(t'',_,_,_,_) -> Constraint t1' t'') (tail inferredexps) ++ Constraint st (Sum (map (\(t,s,_,_,_) -> (s, t)) inferredexps)):constraints1'' ++ concatMap (\(_,_,_,_,c) -> c) (tail inferredexps))
+       else empty
 
 --- end typeconstraint ----------
 
@@ -215,6 +240,7 @@ instance Substitutable Type where
     apply s (Plus t1 t2) = Plus (apply s t1) (apply s t2)
     apply s (Bang t) = Bang (apply s t)
     apply s t@(TypeVar i) = Map.findWithDefault t i s
+    apply s (Sum tl) = Sum $ map (second $ apply s) tl
     apply s t = t
 
 instance Substitutable CoreExpr where
@@ -230,10 +256,16 @@ instance Substitutable CoreExpr where
     apply s (InjR (Just t) e) = InjR (return $ apply s t) (apply s e)
     apply s (CaseOfPlus e1 e2 e3) = CaseOfPlus (apply s e1) (apply s e2) (apply s e3)
     apply s (Mark i (Just t)) = Mark i (return $ apply s t)
+    apply s (SumValue tl (i, e)) = SumValue (map (second $ apply s) tl) (i, apply s e)
+    apply s (CaseOfSum e el) = CaseOfSum (apply s e) (map (second $ apply s) el)
     apply s e = e
 
 instance Substitutable CoreBinding where
     apply s (CoreBinding n e') = CoreBinding n (apply s e')
+
+instance Substitutable a => Substitutable (Maybe a) where
+    apply s Nothing = Nothing
+    apply s (Just t) = Just (apply s t)
 
 instance Substitutable a => Substitutable [a] where
     apply s l = map (apply s) l
@@ -248,6 +280,8 @@ ftv acc (With t t') = ftv acc t ++ ftv acc t'
 ftv acc (Plus t t') = ftv acc t ++ ftv acc t'
 ftv acc (Bang t) = ftv acc t
 ftv acc (TypeVar x) = x:acc
+ftv acc (Sum []) = acc
+ftv acc (Sum ((i, t):ts)) = ftv acc t ++ ftv acc (Sum ts)
 ftv acc t = acc
 
 unify :: Type -> Type -> Maybe Subst 
@@ -274,7 +308,13 @@ unify (Plus t1 t2) (Plus t1' t2') = do
     s' <- unify (apply s t2) (apply s t2')
     return $ compose s' s
 unify (Bang x) (Bang y) = unify x y
-unify _ _ = Nothing
+unify (Sum xtl) (Sum ytl) = do
+    let xtl' = sortBy (\(a,_) (b,_) -> compare a b) xtl
+    let ytl' = sortBy (\(a,_) (b,_) -> compare a b) ytl
+    let maybesubs = zipWith (\x y -> snd x `unify` snd y) xtl' ytl'
+    foldM (\p n -> compose p <$> n) Map.empty maybesubs
+
+nify _ _ = Nothing
 
 compose :: Subst -> Subst -> Subst
 s' `compose` s = Map.map (apply s') s `Map.union` s'
