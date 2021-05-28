@@ -197,10 +197,10 @@ focus c goal =
 
         ---- Left synchronous rules -------------------
 
-        focusScheme (Just (n, Forall [] t)) c@(g,d) goal = 
-            focus' (Just (n,t)) c@(g,d) goal 
+        -- focusScheme (Just (n, Forall [] t)) c@(g,d) goal = 
+        --     focus' (Just (n,t)) c@(g,d) goal 
 
-        focusScheme (Just (n, Forall ids t)) c@(g,d) goal = 
+        -- focusScheme (Just (n, Forall ids t)) c@(g,d) goal = 
             -- 1o "instanciar" ids em t com vars existenciais
             -- focar no t instanciado (saiem constraints tambem)
             -- tentar resolver constraints 

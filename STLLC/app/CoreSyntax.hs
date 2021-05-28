@@ -78,6 +78,7 @@ data Type
     deriving (Eq)
 
 data Scheme = Forall [Int] Type 
+    deriving (Eq)
 
 
 

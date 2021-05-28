@@ -108,10 +108,14 @@ main = do
                (arg:oargs) -> arg)
     case action of
       "synth" -> print $ mainsynth arg
-      "complete" -> mainsynthMarksModule arg >>= mapM_ print 
       "all" -> print $ mainsynthAll arg
+      "complete" -> mainsynthMarksModule arg >>= mapM_ print 
+      "fdesugar" -> print $ maindesugar arg
       "desugar" -> maindesugarModule arg >>= mapM_ print
+      "ftype" -> print $ maintypecheck arg
       "type" -> maintypecheckModule arg >>= mapM_ print
+      "feval" -> print $ maineval arg
       "eval" -> mainevalModule arg >>= print
+      "fparse" -> print $ mainparse arg
       "parse" -> mainparseModule arg >>= print
       _ -> print $ mainsynth action
