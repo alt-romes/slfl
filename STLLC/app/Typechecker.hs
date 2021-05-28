@@ -28,204 +28,234 @@ type Substitution = (Type, CoreExpr) -> (Type, CoreExpr) -- F to replace all typ
 type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
-typeconstraint :: Ctxt -> CoreExpr -> Infer (Type, CoreExpr, Ctxt)
+typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
 --- hyp --------------------
 
-typeconstraint ctxt ce@(BLVar x) = do
-    let (pre, maybet:end) = splitAt x $ fst ctxt
+typeconstraint ce@(BLVar x) = do
+    ctx <- get
+    let (pre, maybet:end) = splitAt x $ fst ctx
     t <- lift $ lift $ lift maybet
-    return (t, ce, (pre ++ Nothing:end, snd ctxt))
+    put (pre ++ Nothing:end, snd ctx)
+    return (t, ce)
 
-typeconstraint (bctxt, fctxt) ce@(FLVar x) = do
-    let (maybet, fctxt') = findDelete x fctxt []
+typeconstraint ce@(FLVar x) = do
+    (bctx, fctx) <- get
+    let (maybet, fctx') = findDelete x fctx []
     t <- lift $ lift $ lift maybet
-    return (t, ce, (bctxt, fctxt'))
+    put (bctx, fctx')
+    return (t, ce)
 
-typeconstraint ctxt ce@(BUVar x) = do
-    t <- lift $ lift $ lift $ fst ctxt !! x
-    return (t, ce, ctxt)
+typeconstraint ce@(BUVar x) = do
+    ctx <- get
+    t <- lift $ lift $ lift $ fst ctx !! x
+    return (t, ce)
 
-typeconstraint ctxt ce@(FUVar x) = do
-    t <- lift $ lift $ lift $ lookup x $ snd ctxt
-    return (t, ce, ctxt)
+typeconstraint ce@(FUVar x) = do
+    ctx <- get
+    t <- lift $ lift $ lift $ lookup x $ snd ctx
+    return (t, ce)
 
 --- -o ---------------------
 
 --  -oI
-typeconstraint (bctx, fctx) (Abs t1 e) = do
+typeconstraint (Abs t1 e) = do
     vari <- lift $ lift get
     lift $ lift $ put $ vari + 1
     let t1' = fromMaybe (TypeVar vari) t1
-    (t2, ce, ctx2) <- typeconstraint (Just t1':bctx, fctx) e
-    return (Fun t1' t2, Abs (Just t1') ce, ctx2)
+    (bctx, fctx) <- get
+    put (Just t1':bctx, fctx)
+    (t2, ce) <- typeconstraint e
+    return (Fun t1' t2, Abs (Just t1') ce)
 
 --  -oE
-typeconstraint ctx (App e1 e2) = do
+typeconstraint (App e1 e2) = do
     vari <- lift $ lift get
     lift $ lift $ put (vari+1)
     let tv = TypeVar vari
-    (t1, ce1, ctx1) <- typeconstraint ctx e1
-    (t2, ce2, ctx2) <- typeconstraint ctx1 e2
-    writer ((tv, App ce1 ce2, ctx2), [Constraint t1 (Fun t2 tv)])
+    (t1, ce1) <- typeconstraint e1
+    (t2, ce2) <- typeconstraint e2
+    writer ((tv, App ce1 ce2), [Constraint t1 (Fun t2 tv)])
 
 --- * ----------------------
 
 --  *I
-typeconstraint ctx (TensorValue e1 e2) = do
-    (t1, ce1, ctx2) <- typeconstraint ctx e1
-    (t2, ce2, ctx3) <- typeconstraint ctx2 e2
-    return (Tensor t1 t2, TensorValue ce1 ce2, ctx3)
+typeconstraint (TensorValue e1 e2) = do
+    (t1, ce1) <- typeconstraint e1
+    (t2, ce2) <- typeconstraint e2
+    return (Tensor t1 t2, TensorValue ce1 ce2)
 
 --  *E
-typeconstraint ctx (LetTensor e1 e2) = do
+typeconstraint (LetTensor e1 e2) = do
     vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
     lift $ lift $ put $ vari+2
-    (t, ce1, (bctx', fctx')) <- typeconstraint ctx e1
-    (t3, ce2, ctx3) <- typeconstraint (Just tv2:Just tv1:bctx', fctx') e2
-    writer ((t3, LetTensor ce1 ce2, ctx3), [Constraint t (Tensor tv1 tv2)])
+    (t, ce1) <- typeconstraint e1
+    (bctx, fctx) <- get
+    put (Just tv2:Just tv1:bctx, fctx)
+    (t3, ce2) <- typeconstraint e2
+    writer ((t3, LetTensor ce1 ce2), [Constraint t (Tensor tv1 tv2)])
 
 --- 1 ----------------------
 
 --  1I
-typeconstraint ctx UnitValue = return (Unit, UnitValue, ctx)
+typeconstraint UnitValue = return (Unit, UnitValue)
 
 --  1E
-typeconstraint ctx (LetUnit e1 e2) = do
-    (t1, ce1, ctx2) <- typeconstraint ctx e1
-    (t2, ce2, ctx3) <- typeconstraint ctx2 e2
-    writer ((t2, LetUnit ce1 ce2, ctx3), [Constraint t1 Unit])
+typeconstraint (LetUnit e1 e2) = do
+    (t1, ce1) <- typeconstraint e1
+    (t2, ce2) <- typeconstraint e2
+    writer ((t2, LetUnit ce1 ce2), [Constraint t1 Unit])
 
 --- & ----------------------
 
 --  &I
-typeconstraint ctx (WithValue e1 e2) = do
-    (t1, ce1, ctx2) <- typeconstraint ctx e1
-    (t2, ce2, ctx3) <- typeconstraint ctx e2
+typeconstraint (WithValue e1 e2) = do
+    (t1, ce1) <- typeconstraint e1
+    ctx2 <- get
+    (t2, ce2) <- typeconstraint e2
+    ctx3 <- get
     if equalCtxts ctx2 ctx3
-        then return (With t1 t2, WithValue ce1 ce2, ctx2)
+        then return (With t1 t2, WithValue ce1 ce2)
         else empty
 
 --  &E
-typeconstraint ctx (Fst e) = do
+typeconstraint (Fst e) = do
     vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
     lift $ lift $ put $ vari+2
-    (t, ce, ctx2) <- typeconstraint ctx e
-    writer ((tv1, Fst ce, ctx2), [Constraint t (With tv1 tv2)])
+    (t, ce) <- typeconstraint e
+    writer ((tv1, Fst ce), [Constraint t (With tv1 tv2)])
 
 --  &E
-typeconstraint ctx (Snd e) = do
+typeconstraint (Snd e) = do
     vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
     lift $ lift $ put $ vari+2
-    (t, ce, ctx2) <- typeconstraint ctx e
-    writer ((tv2, Snd ce, ctx2), [Constraint t (With tv1 tv2)])
+    (t, ce) <- typeconstraint e
+    writer ((tv2, Snd ce), [Constraint t (With tv1 tv2)])
 
 --- + ----------------------
 
 --  +I
-typeconstraint ctx (InjL t1 e) = do 
+typeconstraint (InjL t1 e) = do 
     vari <- lift $ lift get
     lift $ lift $ put $ vari+1 -- TODO: Assim as variáveis de tipo vão avançar mesmo que não sejam usadas, é OK não é? para não repetir código e fazer patternmatch do nothing e just t separado
     let t1' = fromMaybe (TypeVar vari) t1
-    (t2, ce, ctx2) <- typeconstraint ctx e
-    return (Plus t2 t1', InjL (Just t1') ce, ctx2)
+    (t2, ce) <- typeconstraint e
+    return (Plus t2 t1', InjL (Just t1') ce)
 
 --  +I
-typeconstraint ctx (InjR t1 e) = do
+typeconstraint (InjR t1 e) = do
     vari <- lift $ lift get
     lift $ lift $ put $ vari+1 -- TODO: Assim as variáveis de tipo vão avançar mesmo que não sejam usadas, é OK não é? para não repetir código e fazer patternmatch do nothing e just t separado
     let t1' = fromMaybe (TypeVar vari) t1
-    (t2, ce, ctx2) <- typeconstraint ctx e
-    return (Plus t1' t2, InjR (Just t1') ce, ctx2)
+    (t2, ce) <- typeconstraint e
+    return (Plus t1' t2, InjR (Just t1') ce)
 
 --  +E
-typeconstraint ctx (CaseOfPlus e1 e2 e3) = do
-    (pt, ce1, (bctx', fctx')) <- typeconstraint ctx e1
+typeconstraint (CaseOfPlus e1 e2 e3) = do
+    (pt, ce1) <- typeconstraint e1
     vari <- lift $ lift get
     let tv1 = TypeVar vari
     let tv2 = TypeVar $ vari+1
     lift $ lift $ put $ vari+2
-    (t3, ce2, ctx3) <- typeconstraint (Just tv1:bctx', fctx') e2
-    (t4, ce3, ctx4) <- typeconstraint (Just tv2:bctx', fctx') e3
+    (bctx, fctx) <- get
+    put (Just tv1:bctx, fctx)
+    (t3, ce2) <- typeconstraint  e2
+    ctx3 <- get
+    put (Just tv2:bctx, fctx)
+    (t4, ce3) <- typeconstraint  e3
+    ctx4 <- get
     if equalCtxts ctx3 ctx4
-       then writer ((t4, CaseOfPlus ce1 ce2 ce3, ctx4), [Constraint t3 t4, Constraint pt (Plus tv1 tv2)])
+       then writer ((t4, CaseOfPlus ce1 ce2 ce3), [Constraint t3 t4, Constraint pt (Plus tv1 tv2)])
        else empty
 
 --- ! ----------------------
 
 --  !I
-typeconstraint ctx (BangValue e) = do
-    (t2, ce, ctx2) <- typeconstraint ctx e
+typeconstraint (BangValue e) = do
+    ctx <- get
+    (t2, ce) <- typeconstraint e
+    ctx2 <- get
     if equalCtxts ctx2 ctx
-        then return (Bang t2, BangValue ce, ctx)
+        then return (Bang t2, BangValue ce)
         else empty -- TODO: Assim (\x -o !x) não é sintetisado, mas se calhar o tipo inferido de x devia ser !a
 
 --  !E
-typeconstraint ctxt (LetBang e1 e2) = do
-    (t1, ce1, (bctxt', fctxt')) <- typeconstraint ctxt e1
+typeconstraint (LetBang e1 e2) = do
+    (t1, ce1) <- typeconstraint e1
     vari <- lift $ lift get
     lift $ lift $ put $ vari + 1
     let tv1 = TypeVar vari
-    (t2, ce2, ctxt'') <- typeconstraint (Just tv1:bctxt', fctxt') e2
-    writer ((t2, LetBang ce1 ce2, ctxt''), [Constraint t1 (Bang tv1)])
+    (bctx, fctx) <- get
+    put (Just tv1:bctx, fctx)
+    (t2, ce2) <- typeconstraint e2
+    writer ((t2, LetBang ce1 ce2), [Constraint t1 (Bang tv1)])
 
 --- LetIn ------------------
 
-typeconstraint c (LetIn e1 e2) = do
-    (t1, ce1, c'@(bc, fc)) <- typeconstraint c e1
-    (t2, ce2, c'') <- typeconstraint (Just t1:bc, fc) e2
-    return (t2, LetIn ce1 ce2, c'')
+typeconstraint (LetIn e1 e2) = do
+    (t1, ce1) <- typeconstraint e1
+    (bctx, fctx) <- get
+    put (Just t1:bctx, fctx)
+    (t2, ce2) <- typeconstraint e2
+    return (t2, LetIn ce1 ce2)
 
 --- Synth marker ---
 
-typeconstraint ctx (Mark i t) = do
+typeconstraint (Mark i t) = do
     vari <- lift $ lift get
     lift $ lift $ put $ vari + 1
     let t' = fromMaybe (TypeVar vari) t
-    return (t', Mark i (Just t'), ctx)
+    return (t', Mark i (Just t'))
 
 --- Bool -------------------
 
-typeconstraint ctx Tru = return (Bool, Tru, ctx)
-typeconstraint ctx Fls = return (Bool, Fls, ctx)
+typeconstraint Tru = return (Bool, Tru)
+typeconstraint Fls = return (Bool, Fls)
 
 -- TODO: if true then { ... } else false should synthetize a bool, but doesn't...
-typeconstraint ctx (IfThenElse e1 e2 e3) = do
-    (t1, ce1, ctx1) <- typeconstraint ctx e1
-    (t2, ce2, ctx2) <- typeconstraint ctx1 e2
-    (t3, ce3, ctx3) <- typeconstraint ctx1 e3
+typeconstraint (IfThenElse e1 e2 e3) = do
+    (t1, ce1) <- typeconstraint e1
+    ctx1 <- get
+    (t2, ce2) <- typeconstraint e2
+    ctx2 <- get
+    put ctx1
+    (t3, ce3) <- typeconstraint e3
+    ctx3 <- get
     if equalCtxts ctx2 ctx3
-       then writer ((t3, IfThenElse ce1 ce2 ce3, ctx3), [Constraint t2 t3, Constraint t1 Bool])
+       then writer ((t3, IfThenElse ce1 ce2 ce3), [Constraint t2 t3, Constraint t1 Bool])
        else empty
 
-typeconstraint ctx (SumValue mts (t, e)) = do
+typeconstraint (SumValue mts (t, e)) = do
     types <- mapM (\(s, mt) -> do
         vari <- lift $ lift get
         lift $ lift $ put $ vari + 1
         let t' = fromMaybe (TypeVar vari) mt
         return (s, t')) mts
-    (t2, ce, ctx2) <- typeconstraint ctx e
-    return (Sum ((t, t2):types), SumValue (map (second Just) types) (t, ce), ctx2)
+    (t2, ce) <- typeconstraint e
+    return (Sum ((t, t2):types), SumValue (map (second Just) types) (t, ce))
 
-typeconstraint ctx (CaseOfSum e exps) = do
-    (st, ce, (bctx', fctx')) <- typeconstraint ctx e
+typeconstraint (CaseOfSum e exps) = do
+    (st, ce) <- typeconstraint e
+    (bctx, fctx) <- get
     inferredexps <- mapM (\(s, ex) -> do
         vari <- lift $ lift get
         let tv = TypeVar vari
         lift $ lift $ put $ vari + 1
-        (t', ce, ctx') <- typeconstraint (Just tv:bctx', fctx') ex
+        put (Just tv:bctx, fctx)
+        (t', ce) <- typeconstraint ex
+        ctx' <- get
         return (t', s, ce, ctx')
         ) exps
     -- TODO: Probably doable in a more idiomatic way, like making an inference monad instead of all these function parameters
     let (t1', s1, ce1, ctx1') = head inferredexps
     if all ((== ctx1') . (\(_,_,_,c) -> c)) (tail inferredexps)
-       then writer ((t1', CaseOfSum ce (map (\(_,s,c,_) -> (s,c)) inferredexps), ctx1'), Constraint st (Sum (map (\(t,s,_,_) -> (s, t)) inferredexps)):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps))
+       then writer ((t1', CaseOfSum ce (map (\(_,s,c,_) -> (s,c)) inferredexps)), Constraint st (Sum (map (\(t,s,_,_) -> (s, t)) inferredexps)):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps))
        else empty
 
 --- end typeconstraint ----------
@@ -332,7 +362,7 @@ solveconstraints subs constr =
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst)
 typeinfer fc e = do
-    ((ctype, cexp, _), constraints) <- evalStateT (evalStateT (runWriterT $ typeconstraint ([], fc) e) ([], fc)) (length fc)
+    ((ctype, cexp), constraints) <- evalStateT (evalStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
     return (ctype', cexp', s)
