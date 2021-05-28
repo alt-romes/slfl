@@ -69,9 +69,9 @@ eval ctxt@(bctxt, fctxt) (App e1 e2) =
 
 --  *I
 --
-eval ctxt (TensorValue e1 e2) =
-    let e1' = eval ctxt e1 in
-    let e2' = eval ctxt e2 in
+eval c (TensorValue e1 e2) =
+    let e1' = eval c e1 in
+    let e2' = eval c e2 in
     TensorValue e1' e2'
 
 --  *E
@@ -162,24 +162,14 @@ eval ctxt (IfThenElse e1 e2 e3) =
 
 --- Sum Type ---------------
 
---  +I
-eval ctxt (InjL t e) =
+eval ctxt (SumValue mts (tag, e)) =
     let e' = eval ctxt e in
-    InjL t e'
+    SumValue mts (tag, e')
 
---  +I
-eval ctxt (InjR t e) =
-    let e' = eval ctxt e in
-    InjR t e'
-
---  +E
-eval ctxt (CaseOfPlus e1 e2 e3) =
-    let e1' = eval ctxt e1 in
-    let (bctxt, fctxt) = ctxt in
-    case e1' of
-        (InjL t e) -> eval (e1':bctxt, fctxt) e2
-        (InjR t e) -> eval (e1':bctxt, fctxt) e3
-
+eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) =
+    let SumValue mts (tag, e) = eval ctxt e1 in
+        let expbranch = fromJust $ lookup tag exps in -- If it's well typed we can assume the lookup to work
+            eval (e:bctxt, fctxt) expbranch
 
 -- end eval ------------
 

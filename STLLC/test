@@ -1,4 +1,4 @@
-let x = (union {red: Bool; green true;});
+let x = (union {red: Bool; green false;});
 let main = case x of
 red b =>
         if b
@@ -6,5 +6,5 @@ red b =>
             else true
     | green c =>
         if c
-            then true
-            else true
+            then false
+            else false
