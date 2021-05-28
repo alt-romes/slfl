@@ -46,6 +46,9 @@ synth :: Ctxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 
 ---- Right asynchronous rules -----------------
 
+---- forall a . T (async)  =>   instantiate T   (a' ...)
+        
+
 ---- -oR
 synth (г, d, o) (Fun a b) = do
     vari <- get
@@ -133,6 +136,7 @@ synth (g, d, p:o) t = synth (g, p:d, o) t
 synth (g, d, []) t = do
     focus (g, d) t
 
+
 focus :: FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 -- because of laziness it'll only run until the first succeeds (bc of observe)
 focus c goal =
@@ -192,6 +196,17 @@ focus c goal =
 
 
         ---- Left synchronous rules -------------------
+
+        focusScheme (Just (n, Forall [] t)) c@(g,d) goal = 
+            focus' (Just (n,t)) c@(g,d) goal 
+
+        focusScheme (Just (n, Forall ids t)) c@(g,d) goal = 
+            -- 1o "instanciar" ids em t com vars existenciais
+            -- focar no t instanciado (saiem constraints tambem)
+            -- tentar resolver constraints 
+            -- Se all good ... :)
+            -- Se nao ... :(
+
 
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
