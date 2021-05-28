@@ -30,7 +30,7 @@ while IFS='' read -r line; do tests+=("$line"); done < <(find tests -maxdepth 1 
 # Define command to run tests here
 run_command() {
     test_name=$1
-    ghci Main.hs < tests/"$test_name".test | grep '\*Main' | sed 's/\*Main> //'
+    bash tests/"$test_name".test
 }
 
 if [ "$1" ]

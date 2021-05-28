@@ -1,0 +1,31 @@
+(λa : (A -o (B -o C)) -o 
+    (λb : (A * B) -o 
+        let c*d = b in a c d))
+(λa : ((A * B) -o C) -o 
+    (λb : A -o 
+        (λc : B -o a < b * c >)))
+(λa : (A -o (B & C)) -o < 
+    (λb : A -o fst (a b)) & 
+    (λe : A -o snd (a e)) >)
+(λa : ((A -o B) & (A -o C)) -o 
+    (λb : A -o < fst a b & snd a b >))
+(λa : ((A + B) -o C) -o < 
+    (λb : A -o a inl b : Just B) & 
+    (λd : B -o a inr Just A : d) >)
+(λa : ((A -o C) & (B -o C)) -o 
+    (λb : (A + B) -o 
+        case b of 
+              inl c => fst a c
+            | inr d => snd a d))
+(λa : (! (A & B)) -o 
+    let !b = a in < ! fst b * ! snd b >)
+(λa : ((! A) * (! B)) -o 
+    let b*c = a in 
+        let !d = c in 
+            let !e = b in ! < e & d >)
+(λa : (A * 1) -o 
+    let b*c = a in 
+        let _ = c in b)
+(λa : A -o < a * <> >)
+(λa : (A & A) -o fst a)
+(λa : A -o < a & a >)

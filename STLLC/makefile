@@ -5,3 +5,6 @@ build:
 run:
 	# cabal run --opts mymodules/1.ll -- não consigo passar args
 	STLLC mymodules/5.ll
+
+test:
+	cabal test
