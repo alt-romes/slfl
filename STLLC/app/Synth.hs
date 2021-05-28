@@ -9,7 +9,7 @@ import Data.Maybe
 
 import Debug.Trace
 
-import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar))
+import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, Sum))
 import Syntax
 import Util
 
@@ -93,6 +93,14 @@ synth (g, d, (n, Plus a b):o) t = do
     guard (d' == d'')
     guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
     return (CaseOfPlus (Var n) n1 expa n2 expb, d')
+
+-- | SumValue [(String, Maybe Type)] (String, Expr)
+-- | CaseOfSum Expr [(String, String, Expr)]
+-- synth (g, d, (n, Sum tys):o) t = do
+--     l <- mapM (\(n, t) -> do
+--         return t
+--         ) tys
+--     return (CaseOfSum (Var n) )
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
