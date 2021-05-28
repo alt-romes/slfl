@@ -8,12 +8,14 @@ import Control.Monad.Writer (WriterT, writer, runWriterT)
 import Data.Bifunctor
 import qualified Data.Map as Map
 import Debug.Trace
+import Data.Set 
 
 import CoreSyntax
 
 data TypeBinding = TypeBinding String Type
 instance (Show TypeBinding) where
     show (TypeBinding s e) = s ++ ":\n    " ++ show e ++ "\n"
+
 
 type BoundCtxt = [Maybe Type]
 type FreeCtxt = [(String, Type)]
@@ -30,15 +32,50 @@ type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
 typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
+-- a -o a  ===> forall a . a -o a
+-- forall a . a -o a ===> a' -o a'
+
+--  foco : ?b |-    a'     (?b := a') [OK]
+--  foco : a' |-    ?b     (?b := a') [OK]
+--  foco : ?b |-    ?c     [NOK] (*)   ?b = ?c    ?c = a'
+--                                     ?b -o ?c [b := c,c := a]  => ?c -o ?c [NOK]
+--  foco : a' |-    b'    [NOK!]
+
+
+--  x: ?b -o ?b     , y:a' |-   b'     Existencial |-> Universal    Universal |-/-> Existencial
+-- ....
+
+
+
+-- x: (forall b c . b -o c)  , y:a'|-       b'
+-- x: (forall b . b -o b)  |-       a' -o a'
+-- x: (forall b . b -o b)  |-       : forall a . a -o a
+
+-- data Bool = True | False 
+
+-- (x:Bool) -o {y:Bool :  x=y}  ~ \x:Bool . case x of  True  ->  x=True     
+                                                  -- | False ->  x=False 
+
+--- |- forall a b . a -o b 
+
+{- 
+    let id x = x     
+        in
+        (id true, id 0)
+ -}
+
+
+
 --- hyp --------------------
 
 typeconstraint ce@(BLVar x) = do
     ctx <- get
-    let (pre, maybet:end) = splitAt x $ fst ctx
-    t <- lift $ lift $ lift maybet
+    let (pre, maybesch:end) = splitAt x $ fst ctx
+    sch <- lift $ lift $ lift maybesch
     put (pre ++ Nothing:end, snd ctx)
-    return (t, ce)
+    return (instantiate sch, ce)
 
+-- TODO: Instantiate schemes in var cases 
 typeconstraint ce@(FLVar x) = do
     (bctx, fctx) <- get
     let (maybet, fctx') = findDelete x fctx []
@@ -60,19 +97,16 @@ typeconstraint ce@(FUVar x) = do
 
 --  -oI
 typeconstraint (Abs t1 e) = do
-    vari <- lift $ lift get
-    lift $ lift $ put $ vari + 1
-    let t1' = fromMaybe (TypeVar vari) t1
+    tv <- fresh 
+    let t1' = fromMaybe tv t1 
     (bctx, fctx) <- get
-    put (Just t1':bctx, fctx)
+    put (Just (trivialScheme t1'):bctx, fctx)
     (t2, ce) <- typeconstraint e
     return (Fun t1' t2, Abs (Just t1') ce)
 
 --  -oE
 typeconstraint (App e1 e2) = do
-    vari <- lift $ lift get
-    lift $ lift $ put (vari+1)
-    let tv = TypeVar vari
+    tv <- fresh 
     (t1, ce1) <- typeconstraint e1
     (t2, ce2) <- typeconstraint e2
     writer ((tv, App ce1 ce2), [Constraint t1 (Fun t2 tv)])
@@ -198,10 +232,21 @@ typeconstraint (LetBang e1 e2) = do
 
 --- LetIn ------------------
 
+
+{-- 
+    \x:a -> ...
+    let f = 
+        \y ->  ... x ...  b -o a    forall b . b -o a
+     in
+         id : forall a. a -o a
+
+    forall b . (forall a . (forall a . a -o a) -o a) -o b  
+-}
 typeconstraint (LetIn e1 e2) = do
     (t1, ce1) <- typeconstraint e1
-    (bctx, fctx) <- get
-    put (Just t1:bctx, fctx)
+    (bctx, fctx) <- get 
+    let t1' = generalize (bctx, fctx) t1 
+    put (Just t1':bctx, fctx)
     (t2, ce2) <- typeconstraint e2
     return (t2, LetIn ce1 ce2)
 
@@ -260,10 +305,62 @@ typeconstraint (CaseOfSum e exps) = do
 
 --- end typeconstraint ----------
 
+---------------------------------
+-- type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
+
+
+
+fresh :: Infer Type 
+fresh = do 
+    n <- lift $ lift $ get 
+    lift $ lift $ put (n+1)
+    return $ TypeVar n 
+
+instantiate :: Scheme -> Infer Type 
+instantiate (Forall ns t) = do
+    fs <- mapM (const fresh) ns 
+    let s = Map.fromList $ zip ns fs 
+    return $ apply s t
+
+-- pre: No free tvars in t
+trivialScheme :: Type  
+trivialScheme t = Forall [] t 
+
+generalize :: Ctxt -> Type -> Scheme
+generalize ctxt t = Forall as t 
+    where as = Set.toList $ Set.difference (ftv [] t) (ftv ctxt)
+     
+
+
+
+
+
+
+
+
+
+
+
+---------------------------------
+
+
+
+
+
+
+
+
+
 type Subst = Map.Map Int Type
 
 class Substitutable a where
     apply :: Subst -> a -> a
+
+instance Substitutable Scheme where
+    apply s (Forall ns t) = Forall ns $ apply s' t 
+                            where s' = foldr Map.delete s ns 
+
+
 
 instance Substitutable Type where
     apply s (Fun t1 t2) = Fun (apply s t1) (apply s t2)
@@ -305,6 +402,8 @@ instance Substitutable a => Substitutable [a] where
 instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
     apply s (x, y) = (apply s x, apply s y)
 
+
+-- TODO: factorizar sem [] com where.
 ftv :: [Int] -> Type -> [Int]
 ftv acc (Fun t t') = ftv acc t ++ ftv acc t'
 ftv acc (Tensor t t') = ftv acc t ++ ftv acc t'
@@ -365,8 +464,11 @@ typeinfer fc e = do
     ((ctype, cexp), constraints) <- evalStateT (evalStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
+    -- TODO: Maybe factor into another function
+    let sch = generalize ([],[]) ctype'
     return (ctype', cexp', s)
         
+ -- typeinfer ........ Abs 0 ~~~~ Forall a . a -o a       
 
 --- util -------------------
 

@@ -73,8 +73,12 @@ data Type
     | Atom String
 
     | Sum [(String, Type)] -- TODO: Os Sum Type deviam ter as labels também ? 
+
     
     deriving (Eq)
+
+data Scheme = Forall [Int] Type 
+
 
 
 instance (Show Type) where 
