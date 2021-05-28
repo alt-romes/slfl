@@ -29,6 +29,9 @@ type Substitution = (Type, CoreExpr) -> (Type, CoreExpr) -- F to replace all typ
 
 type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 
+runinfer :: FreeCtxt -> CoreExpr -> Maybe ((Type, CoreExpr), [Constraint])
+runinfer fc e = evalStateT (evalStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
+
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
 typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
@@ -146,8 +149,10 @@ typeconstraint (LetUnit e1 e2) = do
 
 --  &I
 typeconstraint (WithValue e1 e2) = do
+    ctx1 <- get
     (t1, ce1) <- typeconstraint e1
     ctx2 <- get
+    put ctx1
     (t2, ce2) <- typeconstraint e2
     ctx3 <- get
     if equalCtxts ctx2 ctx3
@@ -156,10 +161,8 @@ typeconstraint (WithValue e1 e2) = do
 
 --  &E
 typeconstraint (Fst e) = do
-    vari <- lift $ lift get
-    let tv1 = TypeVar vari
-    let tv2 = TypeVar $ vari+1
-    lift $ lift $ put $ vari+2
+    tv1 <- fresh
+    tv2 <- fresh
     (t, ce) <- typeconstraint e
     writer ((tv1, Fst ce), [Constraint t (With tv1 tv2)])
 
@@ -189,14 +192,14 @@ typeconstraint (InjR t1 e) = do
 --  +E
 typeconstraint (CaseOfPlus e1 e2 e3) = do
     (pt, ce1) <- typeconstraint e1
+    (bctx, fctx) <- get
     tv1 <- fresh
     tv2 <- fresh
-    (bctx, fctx) <- get
     put (Just (trivialScheme tv1):bctx, fctx)
-    (t3, ce2) <- typeconstraint  e2
+    (t3, ce2) <- typeconstraint e2
     ctx3 <- get
     put (Just (trivialScheme tv2):bctx, fctx)
-    (t4, ce3) <- typeconstraint  e3
+    (t4, ce3) <- typeconstraint e3
     ctx4 <- get
     if equalCtxts ctx3 ctx4
        then writer ((t4, CaseOfPlus ce1 ce2 ce3), [Constraint t3 t4, Constraint pt (Plus tv1 tv2)])
@@ -216,8 +219,8 @@ typeconstraint (BangValue e) = do
 --  !E
 typeconstraint (LetBang e1 e2) = do
     (t1, ce1) <- typeconstraint e1
-    tv1 <- fresh
     (bctx, fctx) <- get
+    tv1 <- fresh
     put (Just (trivialScheme tv1):bctx, fctx)
     (t2, ce2) <- typeconstraint e2
     writer ((t2, LetBang ce1 ce2), [Constraint t1 (Bang tv1)])
@@ -424,10 +427,10 @@ solveconstraints subs constr =
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst)
 typeinfer fc e = do
-    ((ctype, cexp), constraints) <- evalStateT (evalStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
+    ((ctype, cexp), constraints) <- runinfer fc e
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
-    -- TODO: Maybe factor into another function? it's done in infer module?
+    -- TODO: Maybe factor into another function? i think i did it in the infer f?
     -- let sch = generalize ([],[]) ctype'
     return (ctype', cexp', s)
         

@@ -10,4 +10,3 @@ STLLC "(A * 1) -o A" # v 1
 STLLC "A -o (A * 1)" # v 2
 STLLC " ( A & A ) -o A " # viii 1
 STLLC " A -o ( A & A ) " # viii 2
-

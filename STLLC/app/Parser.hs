@@ -82,7 +82,7 @@ plus =
     <|> 
     do
     reserved "inr"
-    t1 <- option Nothing (do { t <- ty; reservedOp ":"; return $ Just t})
+    t1 <- option Nothing (try $ do { t <- ty; reservedOp ":"; return $ Just t})
     Syntax.InjR t1 <$> expr
 
 caseplus :: Parser Expr
@@ -348,4 +348,3 @@ parseType :: String -> Type
 parseType i = case runParser (contents ty) 0 "<stdin>" i of
                 Left x -> errorWithoutStackTrace $ "[Type Parse] Failed: " ++ show x
                 Right x -> x
-

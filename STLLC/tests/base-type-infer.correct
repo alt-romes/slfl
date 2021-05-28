@@ -1,0 +1,36 @@
+a:
+    forall c d e. ((c -o (d -o e)) -o ((c * d) -o e))
+
+b:
+    forall c d e. (((c * d) -o e) -o (c -o (d -o e)))
+
+c:
+    forall e f h. ((h -o (e & f)) -o ((h -o e) & (h -o f)))
+
+d:
+    forall e f i. (((e -o f) & (e -o i)) -o (e -o (f & i)))
+
+e:
+    forall g i k. (((k + i) -o g) -o ((k -o g) & (i -o g)))
+
+f:
+    forall h i j. (((h -o j) & (i -o j)) -o ((h + i) -o j))
+
+g:
+    forall k l. ((! (k & l)) -o ((! k) * (! l)))
+
+h:
+    forall k l. (((! l) * (! k)) -o (! (l & k)))
+
+i:
+    forall j. ((j * 1) -o j)
+
+j:
+    forall j. (j -o (j * 1))
+
+k:
+    forall l m. ((l & m) -o l)
+
+l:
+    forall l. (l -o (l & l))
+

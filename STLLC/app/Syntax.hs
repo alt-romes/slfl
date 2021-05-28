@@ -84,10 +84,12 @@ instance (Show Expr) where
             showexpr' d (WithValue e1 e2) = "< " ++ showexpr' d e1 ++ " & " ++ showexpr' d e2 ++ " >"
             showexpr' d (Fst a@(App _ _)) = "fst (" ++ showexpr' d a ++ ")"
             showexpr' d (Snd a@(App _ _)) = "snd (" ++ showexpr' d a ++ ")"
-            showexpr' d (Fst e) = "fst " ++ showexpr' d e
-            showexpr' d (Snd e) = "snd " ++ showexpr' d e
-            showexpr' d (InjL t e) = "inl " ++ showexpr' d e ++ " : " ++ show t
-            showexpr' d (InjR t e) = "inr " ++ show t ++ " : " ++ showexpr' d e
+            showexpr' d (Fst e) = "(fst " ++ showexpr' d e ++ ")"
+            showexpr' d (Snd e) = "(snd " ++ showexpr' d e ++ ")"
+            showexpr' d (InjL (Just t) e) = "inl " ++ showexpr' d e ++ " : " ++ show t
+            showexpr' d (InjL Nothing e) = "inl " ++ showexpr' d e 
+            showexpr' d (InjR (Just t) e) = "inr " ++ show t ++ " : " ++ showexpr' d e
+            showexpr' d (InjR Nothing e) = "inr " ++ showexpr' d e
             showexpr' d (CaseOfPlus e1 x e2 y e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
                                                         indent (d+1) ++ "  inl " ++ x ++ " => " ++ showexpr' (d+2) e2 ++
                                                         indent (d+1) ++ "| inr " ++ y ++ " => " ++ showexpr' (d+2) e3

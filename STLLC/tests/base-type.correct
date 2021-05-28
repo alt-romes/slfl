@@ -1,0 +1,36 @@
+a:
+    ((A -o (B -o C)) -o ((A * B) -o C))
+
+b:
+    (((A * B) -o C) -o (A -o (B -o C)))
+
+c:
+    ((A -o (B & C)) -o ((A -o B) & (A -o C)))
+
+d:
+    (((A -o B) & (A -o C)) -o (A -o (B & C)))
+
+e:
+    (((A + B) -o C) -o ((A -o C) & (B -o C)))
+
+f:
+    (((A -o C) & (B -o C)) -o ((A + B) -o C))
+
+g:
+    ((! (A & B)) -o ((! A) * (! B)))
+
+h:
+    (((! A) * (! B)) -o (! (A & B)))
+
+i:
+    ((A * 1) -o A)
+
+j:
+    (A -o (A * 1))
+
+k:
+    ((A & A) -o A)
+
+l:
+    (A -o (A & A))
+

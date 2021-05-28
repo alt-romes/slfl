@@ -1,1 +1,1 @@
-1) Neste momento a inferência de tipos vai gerar tipos polimórficos? como (Bool -o a). Como é que sintetiso ou instancio "a" ?
+1) Porque é que um trace no typeinfer faz print de 2 vezes da mesma coisa? Como se a função fosse chamada 2 vezes para o mesmo valor
