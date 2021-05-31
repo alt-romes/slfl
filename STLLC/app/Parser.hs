@@ -270,7 +270,8 @@ ty :: Parser Type
 ty = tylit <|> parens type'
 
 tylit :: Parser Type 
-tylit =     (reservedOp "1" >> return Unit)
+tylit =     sumty
+        <|> (reservedOp "1" >> return Unit)
         <|> (reservedOp "Bool" >> return Bool)
         <|> (reservedOp "A" >> return (Atom "A")) -- TODO: Melhor forma de fazer parse de atomos :)
         <|> (reservedOp "B" >> return (Atom "B"))
@@ -278,13 +279,28 @@ tylit =     (reservedOp "1" >> return Unit)
         <|> (reservedOp "D" >> return (Atom "D"))
         <|> (reservedOp "E" >> return (Atom "E"))
         <|> (reservedOp "F" >> return (Atom "F"))
-        <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: Melhor forma de fazer parse de type variables :)
-        <|> (reservedOp "b" >> return (TypeVar 1))
-        <|> (reservedOp "c" >> return (TypeVar 2))
-        <|> (reservedOp "d" >> return (TypeVar 3))
-        <|> (reservedOp "e" >> return (TypeVar 4))
-        <|> (reservedOp "f" >> return (TypeVar 5))
+        -- <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: fazer parse de type variables ?? :)
+        -- <|> (reservedOp "b" >> return (TypeVar 1))
+        -- <|> (reservedOp "c" >> return (TypeVar 2))
+        -- <|> (reservedOp "d" >> return (TypeVar 3))
+        -- <|> (reservedOp "e" >> return (TypeVar 4))
+        -- <|> (reservedOp "f" >> return (TypeVar 5))
         -- <|> (reservedOp "Nat"  >> return Nat )
+
+sumty :: Parser Type
+sumty = do
+    reservedOp "+"
+    reservedOp "{"
+    sts <- many1 (do
+                    tag <- identifier
+                    reservedOp ":"
+                    t <- ty
+                    reservedOp ";"
+                    return (tag, t)
+                 )
+    reservedOp "}"
+    return $ Sum sts
+
 
 -- ...---...
 type' :: Parser Type 

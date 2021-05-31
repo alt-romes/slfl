@@ -6,6 +6,7 @@ import Control.Applicative
 import Control.Monad.Logic
 import Control.Monad.State
 import Data.Maybe
+import Data.Bifunctor
 
 import Debug.Trace
 
@@ -29,6 +30,12 @@ letters = [1..] >>= flip replicateM ['a'..'z']
 getName :: Int -> String
 getName i = letters !! i
 
+fresh :: LogicT (State SynthState) String
+fresh = do 
+    n <- lift get 
+    lift $ put (n+1)
+    return $ getName n
+
 isAtomic :: Type -> Bool
 isAtomic t = case t of
                -- Bool -> True -- TODO: Como há regras para Bool, Bool já não é atómico?
@@ -47,13 +54,10 @@ synth :: Ctxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 ---- Right asynchronous rules -----------------
 
 ---- forall a . T (async)  =>   instantiate T   (a' ...)
-        
 
 ---- -oR
 synth (г, d, o) (Fun a b) = do
-    vari <- get
-    let name = getName vari
-    put $ vari + 1
+    name <- fresh
     (exp, d') <- synth (г, d, (name, a):o) b
     guard (name `notElem` map fst d')
     return (Abs name (Just a) exp, d')
@@ -72,10 +76,8 @@ synth c (With a b) = do
 
 ---- *L
 synth (g, d, (n, Tensor a b):o) t = do
-    vari <- get
-    let n1 = getName vari
-    let n2 = getName (vari+1)
-    put $ vari + 2
+    n1 <- fresh
+    n2 <- fresh
     (expt, d') <- synth (g, d, (n2, b):(n1, a):o) t
     guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
     return (LetTensor n1 n2 (Var n) expt, d')
@@ -87,29 +89,29 @@ synth (g, d, (n, Unit):o) t = do
 
 ---- +L
 synth (g, d, (n, Plus a b):o) t = do
-    vari <- get
-    let n1 = getName vari
-    let n2 = getName (vari+1)
-    put $ vari + 2
+    n1 <- fresh
+    n2 <- fresh
     (expa, d') <- synth (g, d, (n1, a):o) t
     (expb, d'')  <- synth (g, d, (n2, b):o) t
     guard (d' == d'')
     guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
     return (CaseOfPlus (Var n) n1 expa n2 expb, d')
 
--- | SumValue [(String, Maybe Type)] (String, Expr)
--- | CaseOfSum Expr [(String, String, Expr)]
--- synth (g, d, (n, Sum tys):o) t = do
---     l <- mapM (\(n, t) -> do
---         return t
---         ) tys
---     return (CaseOfSum (Var n) )
+---- sumL
+synth (g, d, (n, Sum tys):o) t = do
+    ls <- mapM (\(name, ct) -> do
+        varid <- fresh
+        (exp, d') <- synth (g, d, (varid, ct):o) t
+        return (name, varid, exp, d')
+        ) tys
+    let (n1, varid1, e1, d1') = head ls
+    guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
+    guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
+    return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
-    vari <- get
-    let nname = getName vari
-    put $ vari + 1
+    nname <- fresh
     (exp, d') <- synth ((nname, a):g, d, o) t
     guard (nname `notElem` map fst d')
     return (LetBang nname (Var n) exp, d')
@@ -181,6 +183,18 @@ focus c goal =
             (ir, d') <- focus' Nothing c b
             return (InjR (Just a) ir, d')
 
+        -- | SumValue [(String, Maybe Type)] (String, Expr)
+        -- | CaseOfSum Expr [(String, String, Expr)]
+        
+        ---- sumR
+        focus' Nothing c (Sum sts) =
+            foldr ((<|>) . (\(tag, goalt) ->
+                do {
+                   (e, d') <- focus' Nothing c goalt;
+                   let smts = map (second Just) $ delete (tag, goalt) sts in
+                   return (SumValue smts (tag, e), d')
+                })) empty sts
+
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
             (expa, d') <- synth (g, d, []) a
@@ -207,21 +221,16 @@ focus c goal =
             -- Se all good ... :)
             -- Se nao ... :(
 
-
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
-            vari <- lift get -- TODO: Parece que estes lifts não fazem nada :P Se tivesse só get acho q tmb funcionava
-            let nname = getName vari
-            lift $ put $ vari + 1
+            nname <- fresh
             (expb, d')  <- focus' (Just (nname, b)) c goal
             (expa, d'') <- synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal = do
-            vari <- lift get
-            let nname = getName vari
-            lift $ put $ vari + 1
+            nname <- fresh
             do
                 (lf, d') <- focus' (Just (nname, a)) c goal
                 return (substitute nname (Fst (Var n)) lf, d')

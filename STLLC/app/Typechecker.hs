@@ -280,9 +280,8 @@ typeconstraint (CaseOfSum e exps) = do
         ) exps
     -- TODO: Probably doable in a more idiomatic way
     let (t1', s1, ce1, ctx1') = head inferredexps
-    if all ((== ctx1') . (\(_,_,_,c) -> c)) (tail inferredexps)
-       then writer ((t1', CaseOfSum ce (map (\(_,s,c,_) -> (s,c)) inferredexps)), Constraint st (Sum (map (\(t,s,_,_) -> (s, t)) inferredexps)):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps))
-       else empty
+    guard $ all ((== ctx1') . (\(_,_,_,c) -> c)) (tail inferredexps)
+    writer ((t1', CaseOfSum ce (map (\(_,s,c,_) -> (s,c)) inferredexps)), Constraint st (Sum (map (\(t,s,_,_) -> (s, t)) inferredexps)):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps))
 
 --- end typeconstraint ----------
 
@@ -430,7 +429,8 @@ typeinfer fc e = do
     ((ctype, cexp), constraints) <- runinfer fc e
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
-    -- TODO: Maybe factor into another function? i think i did it in the infer f?
+    -- TODO: Maybe factor into another function?
+    -- TODO: Typeinfer should return a scheme?
     -- let sch = generalize ([],[]) ctype'
     return (ctype', cexp', s)
         

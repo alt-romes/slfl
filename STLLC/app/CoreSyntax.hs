@@ -66,7 +66,7 @@ data Type
     | Plus Type Type    -- A + B    -- additive disjunction
     | Bang Type         -- !A       -- exponential
 
-    | TypeVar Int       -- Type variable (uninterprted type) used for reconstruction
+    | TypeVar Int       -- Type variable (uninterpreted type) used for reconstruction
 
     | Bool
     
