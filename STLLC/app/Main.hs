@@ -42,7 +42,7 @@ mainparse = parseExpr
 maindesugar :: String -> CoreExpr
 maindesugar = desugarExpr . mainparse
 
-maintypecheck :: String -> Type
+maintypecheck :: String -> Scheme
 maintypecheck = typecheckExpr . maindesugar
 
 maineval :: String -> CoreExpr

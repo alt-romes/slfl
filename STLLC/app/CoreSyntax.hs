@@ -2,6 +2,7 @@ module CoreSyntax where
 
 import Prelude hiding (Bool)
 import Control.Monad
+import qualified Data.Map as Map
 
 data CoreBinding = CoreBinding String CoreExpr
 instance (Show CoreBinding) where
@@ -80,8 +81,6 @@ data Type
 data Scheme = Forall [Int] Type 
     deriving (Eq)
 
-
-
 instance (Show Type) where 
     show (Fun t1 t2) = "(" ++ show t1 ++ " -o " ++ show t2 ++ ")"
     show (Tensor t1 t2) = "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
@@ -93,6 +92,9 @@ instance (Show Type) where
     show (Atom x) = x
     show (TypeVar x) = letters !! x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
+
+instance (Show Scheme) where
+    show (Forall ns t) = (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ ". ") ++ show t
 
 instance (Show CoreExpr) where
     show e = showexpr' 0 e

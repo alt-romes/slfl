@@ -15,8 +15,7 @@ import Util (findDelete)
 
 data TypeBinding = TypeBinding String Scheme
 instance (Show TypeBinding) where
-    show (TypeBinding s (Forall ns t)) = s ++ ":\n    " ++ (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ ". ") ++ show t ++ "\n"
-
+    show (TypeBinding s sch) = s ++ ":\n    " ++ show sch ++ "\n"
 
 type BoundCtxt = [Maybe Scheme]
 type FreeCtxt = [(String, Scheme)]
@@ -152,7 +151,7 @@ typeconstraint (WithValue e1 e2) = do
     put ctx1
     (t2, ce2) <- typeconstraint e2
     ctx3 <- get
-    if equalCtxts ctx2 ctx3
+    if equalDeltas ctx2 ctx3
         then return (With t1 t2, WithValue ce1 ce2)
         else empty
 
@@ -198,7 +197,7 @@ typeconstraint (CaseOfPlus e1 e2 e3) = do
     put (Just (trivialScheme tv2):bctx, fctx)
     (t4, ce3) <- typeconstraint e3
     ctx4 <- get
-    if equalCtxts ctx3 ctx4
+    if equalDeltas ctx3 ctx4
        then writer ((t4, CaseOfPlus ce1 ce2 ce3), [Constraint t3 t4, Constraint pt (Plus tv1 tv2)])
        else empty
 
@@ -209,9 +208,8 @@ typeconstraint (BangValue e) = do
     ctx <- get
     (t2, ce) <- typeconstraint e
     ctx2 <- get
-    if equalCtxts ctx2 ctx
-        then return (Bang t2, BangValue ce)
-        else empty -- TODO: Assim (\x -o !x) não é sintetisado, mas se calhar o tipo inferido de x devia ser !a
+    guard $ equalDeltas ctx2 ctx
+    return (Bang t2, BangValue ce)
 
 --  !E
 typeconstraint (LetBang e1 e2) = do
@@ -225,9 +223,11 @@ typeconstraint (LetBang e1 e2) = do
 --- LetIn ------------------
 
 typeconstraint (LetIn e1 e2) = do
+    c <- get
     (t1, ce1) <- typeconstraint e1
-    c@(bctx, fctx) <- get 
-    let t1' = generalize c t1 
+    c'@(bctx, fctx) <- get 
+    guard $ equalDeltas c c' -- LetIn makes first variable unrestricted, so e1 should typecheck on an empty delta
+    let t1' = generalize c' t1 
     put (Just t1':bctx, fctx)
     (t2, ce2) <- typeconstraint e2
     return (t2, LetIn ce1 ce2)
@@ -253,9 +253,8 @@ typeconstraint (IfThenElse e1 e2 e3) = do
     put ctx1
     (t3, ce3) <- typeconstraint e3
     ctx3 <- get
-    if equalCtxts ctx2 ctx3
-       then writer ((t3, IfThenElse ce1 ce2 ce3), [Constraint t2 t3, Constraint t1 Bool])
-       else empty
+    guard $ equalDeltas ctx2 ctx3
+    writer ((t3, IfThenElse ce1 ce2 ce3), [Constraint t2 t3, Constraint t1 Bool])
 
 typeconstraint (SumValue mts (t, e)) = do
     types <- mapM (\(s, mt) -> do
@@ -326,8 +325,8 @@ typeinfer fc e = do
         
 --- util -------------------
 
-equalCtxts :: Ctxt -> Ctxt -> Bool
-equalCtxts (ba, fa) (bb, fb) = (catMaybes ba, fa) == (catMaybes bb, fb) || trace "[Typecheck] Failed resource management." False
+equalDeltas :: Ctxt -> Ctxt -> Bool
+equalDeltas (ba, _) (bb, _) = catMaybes ba == catMaybes bb || trace "[Typecheck] Failed resource management." False
 
 
 ---- TOP LEVEL ------------
@@ -349,8 +348,8 @@ typeinferModule cbs = let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.e
                              typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce
                  first (CoreBinding n bexpr :) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype):acc) subst'
 
-typecheckExpr :: CoreExpr -> Type
-typecheckExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e)
+typecheckExpr :: CoreExpr -> Scheme
+typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
 
 typecheckModule :: [CoreBinding] -> [TypeBinding]
 typecheckModule cbs = typecheckModule' cbs []

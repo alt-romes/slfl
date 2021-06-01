@@ -84,7 +84,7 @@ desugar (Syntax.LetBang id e1 e2) = do
 
 desugar (Syntax.LetIn id e1 e2) = do
     e1' <- desugar e1
-    e2' <- inEnv (id, linVar) (desugar e2)
+    e2' <- inEnv (id, unVar) (desugar e2)
     return $ CoreSyntax.LetIn e1' e2' -- se quisesse fazer desugar do let in para uma abstração tinha também de passar todo o contexto para o typechecker, porque sem passar mais informação ela é incompleta
 
 desugar (Syntax.Mark i t) = return $ CoreSyntax.Mark i t
