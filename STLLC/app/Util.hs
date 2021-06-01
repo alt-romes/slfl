@@ -6,6 +6,12 @@ import Syntax
 
 import qualified Data.Map as Map
 
+findDelete :: (Eq a) => a -> [(a, b)] -> [(a, b)] -> (Maybe b, [(a, b)])
+findDelete _ [] _ = (Nothing, [])
+findDelete x ((y,t):xs) acc =
+    if x==y then (Just t, reverse acc ++ xs)
+    else findDelete x xs ((y,t):acc)
+
 type MarksTypes = Map.Map Int (Maybe Type)
 
 -- copy marks types to the non-desugared expression from the desugared+inferred expression
@@ -42,7 +48,6 @@ copyMarksTypesModule = zipWith copyMarksTypes
 ---- Apply a function to edit certain expression constructors arbitrarily deep in the expression
 -- TODO : http://dev.stephendiehl.com/fun/007_path.html#traversals
 -- Nota: Não consegui o above ^^^
-
 editexp :: (Expr -> Bool) -> (Expr -> Expr) -> Expr -> Expr
 editexp c f e = if c e then f e else editexp' c f e
     where

@@ -1,0 +1,5 @@
+# let f = (\fc : (Bool -o Bool) -> (\x : Bool -o if x then true else fc true));
+
+# let fix = (λf -> (λx -> f (λy -> x x y)) (λx -> f (λy -> x x y)));
+
+let main = (\x : + {red: Bool;} -o x);

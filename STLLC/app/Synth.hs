@@ -10,7 +10,7 @@ import Data.Bifunctor
 
 import Debug.Trace
 
-import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, Sum))
+import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, Sum), Scheme (Forall))
 import Syntax
 import Util
 
@@ -38,7 +38,6 @@ fresh = do
 
 isAtomic :: Type -> Bool
 isAtomic t = case t of
-               -- Bool -> True -- TODO: Como há regras para Bool, Bool já não é atómico?
                Atom _ -> True
                _ -> False
 
@@ -183,9 +182,6 @@ focus c goal =
             (ir, d') <- focus' Nothing c b
             return (InjR (Just a) ir, d')
 
-        -- | SumValue [(String, Maybe Type)] (String, Expr)
-        -- | CaseOfSum Expr [(String, String, Expr)]
-        
         ---- sumR
         focus' Nothing c (Sum sts) =
             foldr ((<|>) . (\(tag, goalt) ->
@@ -200,7 +196,6 @@ focus c goal =
             (expa, d') <- synth (g, d, []) a
             guard (d == d')
             return (BangValue expa, d')
-           -- TODO: Podemos ver alguns exemplos disto? (context ter de ser vazio e quando não é para gerar Bangsetc)
 
         -- all right propositions focused on are synchronous; this pattern matching should be extensive
 
@@ -210,16 +205,6 @@ focus c goal =
 
 
         ---- Left synchronous rules -------------------
-
-        -- focusScheme (Just (n, Forall [] t)) c@(g,d) goal = 
-        --     focus' (Just (n,t)) c@(g,d) goal 
-
-        -- focusScheme (Just (n, Forall ids t)) c@(g,d) goal = 
-            -- 1o "instanciar" ids em t com vars existenciais
-            -- focar no t instanciado (saiem constraints tambem)
-            -- tentar resolver constraints 
-            -- Se all good ... :)
-            -- Se nao ... :(
 
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
@@ -239,6 +224,17 @@ focus c goal =
                 (rt, d') <- focus' (Just (nname, b)) c goal
                 return (substitute nname (Snd (Var n)) rt, d')
 
+        ---- VL
+
+        -- focusScheme (Just (n, Forall [] t)) c@(g,d) goal = 
+        --     focus' (Just (n,t)) c@(g,d) goal 
+
+        -- focusScheme (Just (n, Forall ids t)) c@(g,d) goal = 
+            -- 1o "instanciar" ids em t com vars existenciais
+            -- focar no t instanciado (saiem constraints tambem)
+            -- tentar resolver constraints 
+            -- Se all good ... :)
+            -- Se nao ... :(
 
         ---- Proposition no longer synchronous --------
 
@@ -265,6 +261,7 @@ focus c goal =
 
 ---- top level
 
+
 synthAllType :: Type -> [Expr]
 -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
 synthAllType t = let res = evalState (observeAllT $ synth ([], [], []) t) 0 in
@@ -273,7 +270,7 @@ synthAllType t = let res = evalState (observeAllT $ synth ([], [], []) t) 0 in
                      else map fst res
 
 synthType :: Type -> Expr
-synthType t = head $ synthAllType t
+synthType t = head $ synthAllType t -- TODO: instanciate $ generalize t?
 
 synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
 synthMarks = editexp (\case {Mark _ _ -> True; _ -> False}) (\(Mark _ t) -> synthType $ fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
