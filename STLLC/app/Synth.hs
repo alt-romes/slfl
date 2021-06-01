@@ -2,6 +2,7 @@
 module Synth where
 
 import Data.List
+import qualified Data.Set as Set
 import Control.Applicative
 import Control.Monad.Logic
 import Control.Monad.State
@@ -13,6 +14,7 @@ import Debug.Trace
 import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, Sum), Scheme (Forall))
 import Syntax
 import Util
+import Constraints
 
 type Gamma = [(String, Type)] -- Unrestricted hypothesis
 type Delta = [(String, Type)] -- Linear hypothesis (not left asynchronous)
@@ -257,10 +259,21 @@ focus c goal =
             return (e, d')
 
 
+---- util
+
+-- ftvctx :: FocusCtxt -> Set.Set Int
+-- ftvctx = ftvctx' Set.empty
+--     where
+--         ftvctx' :: Set.Set Int -> FocusCtxt -> Set.Set Int
+--         ftvctx' acc (gc, dc) = Set.unions (map (ftvsch . snd) gc) `Set.union` Set.unions (map (ftvsch . snd) dc)
+--         ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
+
+-- generalize :: FocusCtxt -> Type -> Scheme
+-- generalize ctxt t = Forall as t 
+--     where as = Set.toList $ Set.difference (ftv t) (ftvctx ctxt)
 
 
 ---- top level
-
 
 synthAllType :: Type -> [Expr]
 -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
@@ -269,11 +282,12 @@ synthAllType t = let res = evalState (observeAllT $ synth ([], [], []) t) 0 in
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res
 
+-- TODO: i'm assuming this type might contain type variables, and those will be used in the synth process as universal
 synthType :: Type -> Expr
 synthType t = head $ synthAllType t -- TODO: instanciate $ generalize t?
 
 synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks = editexp (\case {Mark _ _ -> True; _ -> False}) (\(Mark _ t) -> synthType $ fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
+synthMarks = editexp (\case {Mark _ _ -> True; _ -> False}) (\(Mark _ t) -> synthType $ fromMaybe (error "[Synth] Failed: Marks can'Ct be synthetized without a type.") t)
 
 synthMarksModule :: [Binding] -> [Binding]
 synthMarksModule = map (\(Binding n e) -> Binding n $ synthMarks e)

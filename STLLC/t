@@ -2,4 +2,6 @@
 
 # let fix = (λf -> (λx -> f (λy -> x x y)) (λx -> f (λy -> x x y)));
 
-let main = (\x : + {red: Bool;} -o x);
+# let main = (\x : + {red: Bool;} -o x);
+
+let main = let ! id = ! (\x -o x) in id id

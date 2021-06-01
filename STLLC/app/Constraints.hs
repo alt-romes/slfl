@@ -9,8 +9,6 @@ import Control.Monad
 
 import CoreSyntax
 
-type Ctxt = ([Maybe Scheme], [(String, Scheme)])
-
 data Constraint = Constraint Type Type -- e.g. [X => Y]
 instance Show Constraint where
     show (Constraint t t') = "[" ++ show t ++ " => " ++ show t' ++ "]"
@@ -78,13 +76,6 @@ ftv = ftv' Set.empty
         ftv' acc (Sum []) = acc
         ftv' acc (Sum ((i, t):ts)) = ftv' acc t `mappend` ftv' acc (Sum ts)
         ftv' acc t = acc
-
-ftvctx :: Ctxt -> Set.Set Int
-ftvctx = ftvctx' Set.empty
-    where
-        ftvctx' :: Set.Set Int -> Ctxt -> Set.Set Int
-        ftvctx' acc (bc, fc) = Set.unions (map ftvsch (catMaybes bc)) `Set.union` Set.unions (map (ftvsch . snd) fc)
-        ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
 
 unify :: Type -> Type -> Maybe Subst 
 unify Bool Bool = Just Map.empty

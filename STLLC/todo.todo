@@ -1,1 +1,2 @@
 1) Porque é que um trace no typeinfer faz print de 2 vezes da mesma coisa? Como se a função fosse chamada 2 vezes para o mesmo valor
+2) Typechecking is wrong : let !id = !(\x -o x) in id id"
