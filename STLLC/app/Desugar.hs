@@ -32,7 +32,7 @@ lookupVar x = do
             case mult of
                 Linear -> return $ BLVar $ fromJust $ elemIndex (x, Desugar.Var mult) env
                 Unr -> return $ BUVar $ fromJust $ elemIndex (x, Desugar.Var mult) env
-        Nothing -> return $ FLVar x
+        Nothing -> return $ FUVar x
 
 
 desugar :: Expr -> Desugar CoreExpr

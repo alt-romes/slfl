@@ -126,8 +126,8 @@ typeconstraint (LetTensor e1 e2) = do
     tv1 <- fresh
     tv2 <- fresh
     (t, ce1) <- typeconstraint e1
-    c@(bctx, fctx) <- get
-    put (Just (generalize c tv2):Just (generalize c tv1):bctx, fctx)
+    (bctx, fctx) <- get
+    put (Just (trivialScheme tv2):Just (trivialScheme tv1):bctx, fctx)
     (t3, ce2) <- typeconstraint e2
     writer ((t3, LetTensor ce1 ce2), [Constraint t (Tensor tv1 tv2)])
 
@@ -216,9 +216,9 @@ typeconstraint (BangValue e) = do
 --  !E
 typeconstraint (LetBang e1 e2) = do
     (t1, ce1) <- typeconstraint e1
-    c@(bctx, fctx) <- get
+    (bctx, fctx) <- get
     tv1 <- fresh
-    put (Just (generalize c tv1):bctx, fctx)
+    put (Just (trivialScheme tv1):bctx, fctx)
     (t2, ce2) <- typeconstraint e2
     writer ((t2, LetBang ce1 ce2), [Constraint t1 (Bang tv1)])
 
@@ -227,7 +227,8 @@ typeconstraint (LetBang e1 e2) = do
 typeconstraint (LetIn e1 e2) = do
     (t1, ce1) <- typeconstraint e1
     c@(bctx, fctx) <- get 
-    put (Just (generalize c t1):bctx, fctx)
+    let t1' = generalize c t1 
+    put (Just t1':bctx, fctx)
     (t2, ce2) <- typeconstraint e2
     return (t2, LetIn ce1 ce2)
 

@@ -4,4 +4,5 @@
 
 # let main = (\x : + {red: Bool;} -o x);
 
-let main = let ! id = ! (\x -o x) in id id
+let id = (\x -o x);
+let main = id id
