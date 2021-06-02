@@ -45,7 +45,7 @@ data CoreExpr
 
     | LetIn CoreExpr CoreExpr
 
-    | Mark Int (Maybe Type)
+    | Mark Int [(String, Scheme)] (Maybe Type)
 
     -- Bool
     | Tru
@@ -123,7 +123,7 @@ showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " o
 showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
 showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-showexpr' d (Mark _ t) = "{{ " ++ show t ++ " }}"
+showexpr' d (Mark _ _ t) = "{{ " ++ show t ++ " }}"
 showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++ 
                                         indent (d+1) ++ "then " ++ showexpr' (d+1) e2 ++
                                         indent (d+1) ++ "else " ++ showexpr' (d+1) e3

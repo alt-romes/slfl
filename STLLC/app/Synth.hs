@@ -16,7 +16,7 @@ import Syntax
 import Util
 import Constraints
 
-type Gamma = [(String, Type)] -- Unrestricted hypothesis
+type Gamma = [(String, Either Scheme Type)] -- Unrestricted hypothesis
 type Delta = [(String, Type)] -- Linear hypothesis (not left asynchronous)
 type Omega = [(String, Type)] -- Ordered (linear?) hypothesis
 type Ctxt = (Gamma, Delta, Omega)   -- Delta out is a return value
@@ -54,7 +54,7 @@ synth :: Ctxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 
 ---- Right asynchronous rules -----------------
 
----- forall a . T (async)  =>   instantiate T   (a' ...)
+---- forall a . T (async)  =>   instantiate T   (a' ...) -- TODO: Estou a assumir que se houverem type variables no tipo é como se já tivessem sido "instanciadas", e então começo a síntese sempre com um tipo simples, por isso este passo já não existe correto?
 
 ---- -oR
 synth (г, d, o) (Fun a b) = do
@@ -113,7 +113,7 @@ synth (g, d, (n, Sum tys):o) t = do
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
     nname <- fresh
-    (exp, d') <- synth ((nname, a):g, d, o) t
+    (exp, d') <- synth ((nname, Right a):g, d, o) t
     guard (nname `notElem` map fst d')
     return (LetBang nname (Var n) exp, d')
 
@@ -128,17 +128,13 @@ synth (g, d, (n, Bool):o) t = do
 
 ---- Synchronous left propositions to Delta ----
 
-synth (g, d, p:o) t = synth (g, p:d, o) t
-
--- eventually the ordered context will be empty, then start focusing
-
+synth (g, d, p:o) t =
+    synth (g, p:d, o) t
 
 ---- Synchronous rules -------------------------
 
 -- no more asynchronous propositions, focus
-synth (g, d, []) t = do
-    focus (g, d) t
-
+synth (g, d, []) t = focus (g, d) t
 
 focus :: FocusCtxt -> Type -> LogicT (State SynthState) (Expr, Delta)
 -- because of laziness it'll only run until the first succeeds (bc of observe)
@@ -261,33 +257,42 @@ focus c goal =
 
 ---- util
 
--- ftvctx :: FocusCtxt -> Set.Set Int
--- ftvctx = ftvctx' Set.empty
---     where
---         ftvctx' :: Set.Set Int -> FocusCtxt -> Set.Set Int
---         ftvctx' acc (gc, dc) = Set.unions (map (ftvsch . snd) gc) `Set.union` Set.unions (map (ftvsch . snd) dc)
---         ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
+ftvctx :: FocusCtxt -> Set.Set Int
+ftvctx = ftvctx' Set.empty
+    where
+        ftvctx' :: Set.Set Int -> FocusCtxt -> Set.Set Int
+        ftvctx' acc (gc, dc) = Set.unions (map (ftvctx'' . snd) gc) `Set.union` Set.unions (map (ftv . snd) dc)
+        ftvctx'' = \case {Right t -> ftv t; Left sch -> ftvsch sch}
+        ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
 
--- generalize :: FocusCtxt -> Type -> Scheme
--- generalize ctxt t = Forall as t 
---     where as = Set.toList $ Set.difference (ftv t) (ftvctx ctxt)
-
+generalize :: FocusCtxt -> Type -> Scheme
+generalize ctxt t = Forall ns t 
+    where ns = Set.toList $ Set.difference (ftv t) (ftvctx ctxt)
 
 ---- top level
 
-synthAllType :: Type -> [Expr]
+synthCtxAllType :: (Gamma, Delta) -> Type -> [Expr]
 -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
-synthAllType t = let res = evalState (observeAllT $ synth ([], [], []) t) 0 in
+synthCtxAllType (g, d) t = let res = evalState (observeAllT $ synth (g, d, []) t) 0 in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res
+
+synthCtxType :: (Gamma, Delta) -> Type -> Expr
+synthCtxType c t = head $ synthCtxAllType c t
+
+synthAllType :: Type -> [Expr]
+synthAllType = synthCtxAllType ([], [])
 
 -- TODO: i'm assuming this type might contain type variables, and those will be used in the synth process as universal
 synthType :: Type -> Expr
 synthType t = head $ synthAllType t -- TODO: instanciate $ generalize t?
 
 synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks = editexp (\case {Mark _ _ -> True; _ -> False}) (\(Mark _ t) -> synthType $ fromMaybe (error "[Synth] Failed: Marks can'Ct be synthetized without a type.") t)
+synthMarks = editexp
+                (\case {Mark {} -> True; _ -> False})
+                    (\(Mark _ c t) ->
+                        synthCtxType (map (second Left) c, []) (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t))
 
 synthMarksModule :: [Binding] -> [Binding]
 synthMarksModule = map (\(Binding n e) -> Binding n $ synthMarks e)

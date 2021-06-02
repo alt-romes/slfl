@@ -87,7 +87,7 @@ desugar (Syntax.LetIn id e1 e2) = do
     e2' <- inEnv (id, unVar) (desugar e2)
     return $ CoreSyntax.LetIn e1' e2' -- se quisesse fazer desugar do let in para uma abstração tinha também de passar todo o contexto para o typechecker, porque sem passar mais informação ela é incompleta
 
-desugar (Syntax.Mark i t) = return $ CoreSyntax.Mark i t
+desugar (Syntax.Mark i c t) = return $ CoreSyntax.Mark i c t
 
 desugar (Syntax.IfThenElse e1 e2 e3) = do
     e1' <- desugar e1

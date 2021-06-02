@@ -12,14 +12,14 @@ findDelete x ((y,t):xs) acc =
     if x==y then (Just t, reverse acc ++ xs)
     else findDelete x xs ((y,t):acc)
 
-type MarksTypes = Map.Map Int (Maybe Type)
+type MarksTypes = Map.Map Int ([(String, Scheme)], Maybe Type)
 
 -- copy marks types to the non-desugared expression from the desugared+inferred expression
 copyMarksTypes :: Binding -> CoreBinding -> Binding
 copyMarksTypes (Binding n e) (CoreBinding _ ce) = Binding n $ copyMarksTypes' (getMarksTypes Map.empty ce) e
     where
         getMarksTypes :: MarksTypes -> CoreExpr -> MarksTypes
-        getMarksTypes m (CoreSyntax.Mark i t) = Map.insert i t m
+        getMarksTypes m (CoreSyntax.Mark i c t) = Map.insert i (c,t) m
         getMarksTypes m (CoreSyntax.Abs _ e) = getMarksTypes m e
         getMarksTypes m (CoreSyntax.App e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
         getMarksTypes m (CoreSyntax.TensorValue e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
@@ -37,7 +37,13 @@ copyMarksTypes (Binding n e) (CoreBinding _ ce) = Binding n $ copyMarksTypes' (g
         getMarksTypes m a = m
 
         copyMarksTypes' :: MarksTypes -> Expr -> Expr
-        copyMarksTypes' m t = editexp (\case {Syntax.Mark _ _ -> True; _ -> False}) (\(Syntax.Mark i t) -> Syntax.Mark i $ Map.findWithDefault (error "[Copy Marks Types] Failed to find mark index in map, make sure to use the same expression desugared and non-desugared when copying marks types.") i m) t 
+        copyMarksTypes' m e =
+            editexp
+                (\case {Syntax.Mark {} -> True; _ -> False})
+                    (\(Syntax.Mark i _ t) ->
+                        let (c, t) = Map.findWithDefault (error "[Copy Marks Types] Failed to find mark index in map, make sure to use the same expression desugared and non-desugared when copying marks types.") i m in
+                            Syntax.Mark i c t)
+                                e
 
 
 copyMarksTypesModule :: [Binding] -> [CoreBinding] -> [Binding]

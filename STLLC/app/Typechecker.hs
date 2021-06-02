@@ -151,9 +151,8 @@ typeconstraint (WithValue e1 e2) = do
     put ctx1
     (t2, ce2) <- typeconstraint e2
     ctx3 <- get
-    if equalDeltas ctx2 ctx3
-        then return (With t1 t2, WithValue ce1 ce2)
-        else empty
+    guard $ equalDeltas ctx2 ctx3
+    return (With t1 t2, WithValue ce1 ce2)
 
 --  &E
 typeconstraint (Fst e) = do
@@ -197,9 +196,8 @@ typeconstraint (CaseOfPlus e1 e2 e3) = do
     put (Just (trivialScheme tv2):bctx, fctx)
     (t4, ce3) <- typeconstraint e3
     ctx4 <- get
-    if equalDeltas ctx3 ctx4
-       then writer ((t4, CaseOfPlus ce1 ce2 ce3), [Constraint t3 t4, Constraint pt (Plus tv1 tv2)])
-       else empty
+    guard $ equalDeltas ctx3 ctx4
+    writer ((t4, CaseOfPlus ce1 ce2 ce3), [Constraint t3 t4, Constraint pt (Plus tv1 tv2)])
 
 --- ! ----------------------
 
@@ -234,10 +232,17 @@ typeconstraint (LetIn e1 e2) = do
 
 --- Synth marker ---
 
-typeconstraint (Mark i t) = do
+typeconstraint (Mark i _ t) = do
     tv <- fresh
+    (bc, fc) <- get
     let t' = fromMaybe tv t
-    return (t', Mark i (Just t'))
+    return (t', Mark i (nontrivialschemes fc []) (Just t')) -- TODO: Apenas contexto quantificado universalmente no free context vai poder ser utilizado na mark porque tenho a certeza que é unrestricted e porque não tenho de inventar um nome novo que não pensei ainda como fazer, se quisessemos utilizar coisas do contexto linear tenho de modificar as variáveis para elas terem informação sobre se são lineares ou não para poder guardar na Mark o contexto linear e o unrestricted para o saber passar para o sintetisador
+        where
+            nontrivialschemes [] acc = acc
+            nontrivialschemes ((n, Forall ns t):xs) acc =
+                if null ns
+                   then nontrivialschemes xs acc
+                   else nontrivialschemes xs ((n, Forall ns t):acc)
 
 --- Bool -------------------
 

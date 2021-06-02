@@ -254,14 +254,14 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i (Just plhty)
+            return $ Syntax.Mark i [] (Just plhty)
 
         emptymark = do
             reservedOp "..."
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i Nothing
+            return $ Syntax.Mark i [] Nothing
 
 
 -- Parsing Types 
@@ -279,12 +279,12 @@ tylit =     sumty
         <|> (reservedOp "D" >> return (Atom "D"))
         <|> (reservedOp "E" >> return (Atom "E"))
         <|> (reservedOp "F" >> return (Atom "F"))
-        -- <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: fazer parse de type variables ?? :)
-        -- <|> (reservedOp "b" >> return (TypeVar 1))
-        -- <|> (reservedOp "c" >> return (TypeVar 2))
-        -- <|> (reservedOp "d" >> return (TypeVar 3))
-        -- <|> (reservedOp "e" >> return (TypeVar 4))
-        -- <|> (reservedOp "f" >> return (TypeVar 5))
+        <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: fazer parse de type variables ?? :)
+        <|> (reservedOp "b" >> return (TypeVar 1))
+        <|> (reservedOp "c" >> return (TypeVar 2))
+        <|> (reservedOp "d" >> return (TypeVar 3))
+        <|> (reservedOp "e" >> return (TypeVar 4))
+        <|> (reservedOp "f" >> return (TypeVar 5))
         -- <|> (reservedOp "Nat"  >> return Nat )
 
 sumty :: Parser Type
