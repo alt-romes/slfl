@@ -16,10 +16,12 @@ data ADT = ADT Name [(Name, Type)]    -- Algebric Data Type
 
 
 instance Show Program where
-    show (Program adts bs) = show adts ++ show bs
+    show (Program adts bs) = unlines (map show adts) ++ unlines (map show bs)
 
 instance Show CoreProgram where
-    show (CoreProgram adts bs) = show adts ++ show bs
+    show (CoreProgram adts bs) = unlines (map show adts) ++ unlines (map show bs)
 
 instance Show ADT where
-    show (ADT n ((c, t):cs)) = "data " ++ n ++ " = " ++ show c ++ " " ++ show t ++ foldl (\p (c', t') -> p ++ " | " ++ show c' ++ " " ++ show t') "" cs
+    show (ADT n ((c, t):cs)) = "data " ++ n ++ " = " ++ c ++ showType t ++ foldl (\p (c', t') -> p ++ " | " ++ c' ++ showType t') "" cs
+        where
+            showType t = if t == Unit then "" else " " ++ show t

@@ -335,18 +335,36 @@ letdecl = do
   body <- expr
   return $ Binding name $ foldr (uncurry Syntax.Abs) body args
 
+datacon :: Parser (Name, Type)
+datacon = do
+    name <- identifier
+    t <- option Unit ty
+    return (name, t)
+
+datatype :: Parser ADT
+datatype = do
+    reserved "data"
+    name <- identifier
+    reservedOp "="
+    con <- datacon
+    cons <- many (do {reservedOp "|"; datacon})
+    optional (reservedOp ";")
+    return $ ADT name (con:cons)
+
 val :: Parser Binding
 val = Binding "main" <$> expr
 
 top :: Parser Binding
 top = do
   x <- letdecl <|> val
-  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!
+  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!, é tudo menos optional :P
   return x
 
-modl :: Parser [Binding]
-modl = many top
-
+modl :: Parser Program
+modl = do
+    adts <- many datatype
+    bs <- many top
+    return $ Program adts bs
 
 
 ---- TOP LEVEL ------------
@@ -359,7 +377,7 @@ parseExpr i = case runParser (contents expr) 0 "<stdin>" i of
 parseModule :: FilePath -> String -> Program
 parseModule f i = case runParser (contents modl) 0 f i of
                     Left x -> errorWithoutStackTrace $ "[Module Parse] Failed: " ++ show x
-                    Right x -> Program [] x
+                    Right x -> x
 
 parseType :: String -> Type
 parseType i = case runParser (contents ty) 0 "<stdin>" i of
