@@ -4,7 +4,10 @@ import Prelude hiding (Bool)
 import Control.Monad
 import qualified Data.Map as Map
 
-data CoreBinding = CoreBinding String CoreExpr
+type Name = String
+
+
+data CoreBinding = CoreBinding Name CoreExpr
 instance (Show CoreBinding) where
     show (CoreBinding s e) = s ++ ":\n" ++ show e ++ "\n"
 

@@ -14,6 +14,7 @@ import Debug.Trace
 
 import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, ExistentialTypeVar, Sum), Scheme (Forall))
 import Syntax
+import Program
 import Util
 import Constraints
 
@@ -341,5 +342,5 @@ synthMarks = editexp
                     (\(Mark _ c t) ->
                         trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t))
 
-synthMarksModule :: [Binding] -> [Binding]
-synthMarksModule = map (\(Binding n e) -> Binding n $ synthMarks e)
+synthMarksModule :: Program -> Program
+synthMarksModule (Program adts bs) = Program adts $ map (\(Binding n e) -> Binding n $ synthMarks e) bs

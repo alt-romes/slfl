@@ -5,6 +5,7 @@ import Prelude hiding (Bool, sum)
 import Lexer
 import CoreSyntax
 import Syntax
+import Program
 
 import Text.Parsec
 import qualified Text.Parsec.Expr as Ex 
@@ -355,10 +356,10 @@ parseExpr i = case runParser (contents expr) 0 "<stdin>" i of
                 Left x -> errorWithoutStackTrace $ "[Expr Parse] Failed: " ++ show x
                 Right x -> x
 
-parseModule :: FilePath -> String -> [Binding]
+parseModule :: FilePath -> String -> Program
 parseModule f i = case runParser (contents modl) 0 f i of
                     Left x -> errorWithoutStackTrace $ "[Module Parse] Failed: " ++ show x
-                    Right x -> x
+                    Right x -> Program [] x
 
 parseType :: String -> Type
 parseType i = case runParser (contents ty) 0 "<stdin>" i of

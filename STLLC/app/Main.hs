@@ -2,6 +2,7 @@ module Main where
 
 import CoreSyntax
 import Syntax
+import Program
 import Parser
 import Desugar
 import Typechecker
@@ -63,12 +64,12 @@ mainsynthAll t =
 
 ---- Modules
 
-mainparseModule :: String -> IO [Binding]
+mainparseModule :: String -> IO Program
 mainparseModule fname = do
     input <- readFile fname
     return $ parseModule fname input
 
-maindesugarModule :: String -> IO [CoreBinding]
+maindesugarModule :: String -> IO CoreProgram
 maindesugarModule fname = do
    bindings <- mainparseModule fname
    let cbindings = desugarModule bindings -- Desugaring is automatically followed by typechecking+inference
@@ -86,7 +87,7 @@ mainevalModule fname = do
     cbindings <- maindesugarModule fname
     return $ evalModule cbindings
 
-mainsynthMarksModule :: String -> IO [Binding]
+mainsynthMarksModule :: String -> IO Program
 mainsynthMarksModule fname = do
     bindings <- mainparseModule fname
     ctbindings <- maindesugarModule fname -- TODO: por causa tb de memoization aqui não faz mal chamar tudo de novo em vez de aproveitar os resultados do primeiro parse right
@@ -109,9 +110,9 @@ main = do
     case action of
       "synth" -> print $ mainsynth arg
       "all" -> print $ mainsynthAll arg
-      "complete" -> mainsynthMarksModule arg >>= mapM_ print 
+      "complete" -> mainsynthMarksModule arg >>= print 
       "fdesugar" -> print $ maindesugar arg
-      "desugar" -> maindesugarModule arg >>= mapM_ print
+      "desugar" -> maindesugarModule arg >>= print
       "ftype" -> print $ maintypecheck arg
       "type" -> maintypecheckModule arg >>= mapM_ print
       "feval" -> print $ maineval arg

@@ -3,6 +3,7 @@ module Util where
     
 import CoreSyntax
 import Syntax
+import Program
 
 import qualified Data.Map as Map
 
@@ -42,13 +43,10 @@ copyMarksTypes (Binding n e) (CoreBinding _ ce) = Binding n $ copyMarksTypes' (g
                 (\case {Syntax.Mark {} -> True; _ -> False})
                     (\(Syntax.Mark i _ t) ->
                         let (c, t) = Map.findWithDefault (error "[Copy Marks Types] Failed to find mark index in map, make sure to use the same expression desugared and non-desugared when copying marks types.") i m in
-                            Syntax.Mark i c t)
-                                e
+                            Syntax.Mark i c t) e
 
-
-copyMarksTypesModule :: [Binding] -> [CoreBinding] -> [Binding]
-copyMarksTypesModule = zipWith copyMarksTypes
-
+copyMarksTypesModule :: Program -> CoreProgram -> Program
+copyMarksTypesModule (Program adts bs) (CoreProgram _ cbs) = Program adts $ zipWith copyMarksTypes bs cbs
 
 
 ---- Apply a function to edit certain expression constructors arbitrarily deep in the expression

@@ -10,6 +10,7 @@ import Control.Monad.State
 import Control.Monad.Writer (WriterT, writer, runWriterT) 
 
 import CoreSyntax
+import Program
 import Constraints
 import Util (findDelete)
 
@@ -340,9 +341,10 @@ equalDeltas (ba, _) (bb, _) = catMaybes ba == catMaybes bb || trace "[Typecheck]
 typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _) -> ce) (typeinfer [] e)
 
-typeinferModule :: [CoreBinding] -> [CoreBinding] -- typecheck and use inferred types
-typeinferModule cbs = let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
-                          apply finalsubst finalcbs
+typeinferModule :: CoreProgram -> CoreProgram -- typecheck and use inferred types
+typeinferModule (CoreProgram adts cbs) =
+    let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+        CoreProgram adts $ apply finalsubst finalcbs
     where
         typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Subst -> ([CoreBinding], Subst)
         typeinferModule' corebindings acc subst =
@@ -357,8 +359,8 @@ typeinferModule cbs = let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.e
 typecheckExpr :: CoreExpr -> Scheme
 typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
 
-typecheckModule :: [CoreBinding] -> [TypeBinding]
-typecheckModule cbs = typecheckModule' cbs []
+typecheckModule :: CoreProgram -> [TypeBinding]
+typecheckModule (CoreProgram _ cbs) = typecheckModule' cbs []
     where typecheckModule' cbs acc = 
             if null cbs then []
             else let b@(CoreBinding n ce):xs = cbs in

@@ -2,14 +2,13 @@ module Desugar where
 
 import CoreSyntax
 import Syntax
+import Program
 
 import Control.Monad.Reader
 import Data.List
 import Data.Maybe
 
 import Debug.Trace
-
-type Name = String
 
 data Mult = Linear | Unr | Unknown deriving (Eq, Show)
 newtype Var a = Var Mult deriving (Eq, Show)
@@ -118,7 +117,7 @@ desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Sy
 desugarExpr :: Expr -> CoreExpr
 desugarExpr exp = runReader (desugar exp) []
 
-desugarModule :: [Binding] -> [CoreBinding]
-desugarModule = map desugarModule'
+desugarModule :: Program -> CoreProgram
+desugarModule (Program adts bindings) = CoreProgram adts $ map desugarModule' bindings
     where desugarModule' (Binding name exp) = CoreBinding name $ runReader (desugar exp) [] 
 

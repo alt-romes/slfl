@@ -3,9 +3,9 @@ module Syntax where
 import Data.Maybe
 
 import Prelude hiding (Bool)
-import CoreSyntax (Type, Scheme)
+import CoreSyntax (Type, Scheme, Name)
 
-data Binding = Binding String Expr
+data Binding = Binding Name Expr
 instance (Show Binding) where
     show (Binding s e) = "let " ++ s ++ " =\n" ++ show e ++ ";\n"
 

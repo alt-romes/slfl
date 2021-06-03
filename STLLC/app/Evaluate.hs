@@ -5,6 +5,7 @@ import Data.List
 import Data.Maybe
 
 import CoreSyntax
+import Program
 import Util
 
 import Debug.Trace
@@ -180,8 +181,8 @@ eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) =
 evalExpr :: CoreExpr -> CoreExpr
 evalExpr = eval ([], [])
 
-evalModule :: [CoreBinding] -> CoreExpr
-evalModule cbs =
+evalModule :: CoreProgram -> CoreExpr
+evalModule (CoreProgram adts cbs) =
     case find (\(CoreBinding n _) -> n == "main") cbs of
       Nothing -> errorWithoutStackTrace "[Eval] No main function defined."
       Just (CoreBinding _ exp) -> eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp

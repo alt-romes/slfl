@@ -55,5 +55,6 @@ executable STLLC
         Synth,
         Typechecker,
         Util,
-        Constraints
+        Constraints,
+        Program
 
