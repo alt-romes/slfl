@@ -1,3 +1,4 @@
 1) Porque é que um trace no typeinfer faz print de 2 vezes da mesma coisa? Como se a função fosse chamada 2 vezes para o mesmo valor
-2) LetIn should be unrestricted instead of linear
 3) let x*y = < true * false > in x é suposto funcionar ou dizer que o resource management falhou porque y não foi usado?
+4) (\x -o true) devia falhar o typecheck por má utilização de recursos certo...
+5) escrever bons testes com polimorfismo

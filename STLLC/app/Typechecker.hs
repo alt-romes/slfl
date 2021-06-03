@@ -25,8 +25,8 @@ type Substitution = (Type, CoreExpr) -> (Type, CoreExpr) -- F to replace all typ
 
 type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 
-runinfer :: FreeCtxt -> CoreExpr -> Maybe ((Type, CoreExpr), [Constraint])
-runinfer fc e = evalStateT (evalStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
+runinfer :: FreeCtxt -> CoreExpr -> Maybe (((Type, CoreExpr), [Constraint]), Ctxt)
+runinfer fc e = evalStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
 
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
 typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
@@ -319,7 +319,8 @@ ftvctx = ftvctx' Set.empty
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst)
 typeinfer fc e = do
-    ((ctype, cexp), constraints) <- runinfer fc e
+    (((ctype, cexp), constraints), (bc, _)) <- runinfer fc e
+    -- guard (null $ catMaybes bc) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
     -- TODO: Maybe factor into another function?

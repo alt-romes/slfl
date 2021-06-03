@@ -68,6 +68,7 @@ data Type
     | Bang Type         -- !A       -- exponential
 
     | TypeVar Int       -- Type variable (uninterpreted type) used for reconstruction
+    | ExistentialTypeVar Int
 
     | Bool
     
@@ -91,6 +92,7 @@ instance (Show Type) where
     show Bool = "Bool"
     show (Atom x) = x
     show (TypeVar x) = letters !! x
+    show (ExistentialTypeVar x) = "?" ++ letters !! x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
 
 instance (Show Scheme) where

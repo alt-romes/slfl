@@ -29,6 +29,7 @@ instance Substitutable Type where
     apply s (Plus t1 t2) = Plus (apply s t1) (apply s t2)
     apply s (Bang t) = Bang (apply s t)
     apply s t@(TypeVar i) = Map.findWithDefault t i s
+    apply s t@(ExistentialTypeVar i) = Map.findWithDefault t i s
     apply s (Sum tl) = Sum $ map (second $ apply s) tl
     apply s t = t
 
@@ -76,6 +77,7 @@ ftv = ftv' Set.empty
         ftv' acc (Plus t t') = ftv' acc t `mappend` ftv' acc t'
         ftv' acc (Bang t) = ftv' acc t
         ftv' acc (TypeVar x) = Set.insert x acc
+        ftv' acc (ExistentialTypeVar x) = Set.insert x acc
         ftv' acc (Sum []) = acc
         ftv' acc (Sum ((i, t):ts)) = ftv' acc t `mappend` ftv' acc (Sum ts)
         ftv' acc t = acc
@@ -84,6 +86,11 @@ unify :: Type -> Type -> Maybe Subst
 unify Bool Bool = Just Map.empty
 unify (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unify Unit Unit = Just Map.empty
+unify (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
+unify (TypeVar x) (ExistentialTypeVar y) = Just $ Map.singleton y (TypeVar x)
+unify (ExistentialTypeVar x) (TypeVar y) = Just $ Map.singleton x (TypeVar y)
+unify (ExistentialTypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
+unify x (ExistentialTypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
 unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (TypeVar y)
 unify (TypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
 unify x (TypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
@@ -111,6 +118,38 @@ unify (Sum xtl) (Sum ytl) = do
     foldM (\p n -> compose p <$> n) Map.empty maybesubs
 unify _ _ = Nothing
 
+unifyExistential :: Type -> Type -> Maybe Subst 
+unifyExistential Bool Bool = Just Map.empty
+unifyExistential (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
+unifyExistential Unit Unit = Just Map.empty
+unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
+unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
+unifyExistential (ExistentialTypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
+unifyExistential x (ExistentialTypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
+unifyExistential (Fun t1 t2) (Fun t1' t2') = do
+    s  <- unifyExistential t1 t1'
+    s' <- unifyExistential (apply s t2) (apply s t2')
+    return $ compose s' s
+unifyExistential (Tensor t1 t2) (Tensor t1' t2') = do
+    s  <- unifyExistential t1 t1'
+    s' <- unifyExistential (apply s t2) (apply s t2')
+    return $ compose s' s
+unifyExistential (With t1 t2) (With t1' t2') = do
+    s  <- unifyExistential t1 t1'
+    s' <- unifyExistential (apply s t2) (apply s t2')
+    return $ compose s' s
+unifyExistential (Plus t1 t2) (Plus t1' t2') = do
+    s  <- unifyExistential t1 t1'
+    s' <- unifyExistential (apply s t2) (apply s t2')
+    return $ compose s' s
+unifyExistential (Bang x) (Bang y) = unifyExistential x y
+unifyExistential (Sum xtl) (Sum ytl) = do
+    let xtl' = sortBy (\(a,_) (b,_) -> compare a b) xtl
+    let ytl' = sortBy (\(a,_) (b,_) -> compare a b) ytl
+    let maybesubs = zipWith (\x y -> snd x `unifyExistential` snd y) xtl' ytl'
+    foldM (\p n -> compose p <$> n) Map.empty maybesubs
+unifyExistential _ _ = Nothing
+
 compose :: Subst -> Subst -> Subst
 s' `compose` s = Map.map (apply s') s `Map.union` s'
 
@@ -121,3 +160,13 @@ solveconstraints subs constr =
       Constraint t1 t2:cs -> do
           s <- unify t1 t2
           solveconstraints (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
+
+
+-- TODO: Preciso deste solve existential especial porque as TypeVars não devem ser substituidas, porque [?a => 1, ?a => c] é satisfazível no unify normal certo? não é suposto conseguir unificar isto acho
+solveconstraintsExistential :: Subst -> [Constraint] -> Maybe Subst -- w/ substitution accumulator and list of constraints generate a substitution
+solveconstraintsExistential subs constr =
+    case constr of
+      [] -> return subs
+      Constraint t1 t2:cs -> do
+          s <- unifyExistential t1 t2
+          solveconstraintsExistential (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
