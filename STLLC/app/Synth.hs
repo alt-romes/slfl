@@ -151,17 +151,17 @@ focus c goal =
         decideRight c goal =
             if isAtomic goal            -- to decide right, goal cannot be atomic
                 then empty
-                else trace ("DECIDE RIGHT FOR GOAL " ++ show goal) $ focus' Nothing c goal
+                else focus' Nothing c goal
 
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> trace ("DECIDE LEFT FOR GOAL " ++ show goal) $ foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
 
         decideLeftBang (g, din) goal = do
             case g of
               []   -> empty
-              _ -> trace ("DECIDE LEFT BANG FOR GOAL " ++ show goal) $ foldr ((<|>) . (\case {
+              _ -> foldr ((<|>) . (\case {
                                         (n, Right x) -> focus' (Just (n, x)) (g, din) goal;
                                         (n, Left sch) -> focusSch (n, sch) (g, din) goal})) empty g
         
@@ -185,7 +185,7 @@ focus c goal =
             constrs <- lift get
             let unify = solveconstraintsExistential Map.empty constrs                                      -- resolve ou falha -- por conflito ou falta informação
             guard (isJust unify)                                                                -- por conflicto
-            trace ("unify " ++ show unify ++ " constrs: " ++ show constrs) $ guard (Set.disjoint (Set.fromList ns) (ftv $ apply (fromJust unify) et))            -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
+            guard (Set.disjoint (Set.fromList ns) (ftv $ apply (fromJust unify) et))            -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
             return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
                 where                                                                           -- TODO: É isto certo?
                     existencialInstantiate (Forall ns t) =
@@ -255,7 +255,7 @@ focus c goal =
             (expb, d')  <- focus' (Just (nname, b)) c goal
             (expa, d'') <- synth (g, d', []) a
             css <- lift get
-            trace ("Exit function with term: " ++ show (substitute nname (App (Var n) expa) expb) ++ " and constraints: " ++ show css) $ return (substitute nname (App (Var n) expa) expb, d'')
+            return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal =
