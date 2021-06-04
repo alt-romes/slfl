@@ -79,6 +79,7 @@ data Type
 
     | Sum [(String, Type)] -- TODO: Os Sum Type deviam ter as labels também ? 
 
+    | ADT String
     
     deriving (Eq)
 

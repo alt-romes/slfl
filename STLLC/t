@@ -1,4 +1,5 @@
 data Sem = Red | Green | Yellow Bool;
 data Bool = True | False;
-data Test = Test (A * B * C)
-# data List = Nil | Cons (Bool * List)
+data Test = Test (A * B * C);
+
+let main = Yellow;

@@ -86,11 +86,11 @@ unify :: Type -> Type -> Maybe Subst
 unify Bool Bool = Just Map.empty
 unify (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unify Unit Unit = Just Map.empty
-unify (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
-unify (TypeVar x) (ExistentialTypeVar y) = Just $ Map.singleton y (TypeVar x)
-unify (ExistentialTypeVar x) (TypeVar y) = Just $ Map.singleton x (TypeVar y)
-unify (ExistentialTypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
-unify x (ExistentialTypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
+-- unify (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
+-- unify (TypeVar x) (ExistentialTypeVar y) = Just $ Map.singleton y (TypeVar x)
+-- unify (ExistentialTypeVar x) (TypeVar y) = Just $ Map.singleton x (TypeVar y)
+-- unify (ExistentialTypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
+-- unify x (ExistentialTypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
 unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (TypeVar y)
 unify (TypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
 unify x (TypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
@@ -123,7 +123,7 @@ unifyExistential Bool Bool = Just Map.empty
 unifyExistential (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
-unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
+unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ExistentialTypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
 unifyExistential x (ExistentialTypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
 unifyExistential (Fun t1 t2) (Fun t1' t2') = do

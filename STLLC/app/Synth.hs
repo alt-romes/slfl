@@ -45,6 +45,7 @@ isAtomic :: Type -> Bool
 isAtomic t = case t of
                Bool -> True
                TypeVar _ -> True
+               ExistentialTypeVar _ -> True
                Atom _ -> True
                _ -> False
 
@@ -172,16 +173,14 @@ focus c goal =
 
         ---- VL
         focusSch (n, sch@(Forall ns t)) ctxt goal = do
+
             -- can only try scheme if current constraints are still safe
             -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
             -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
             -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
             -- TODO: Do i need this verification everytime I add a constraint? Kind of makes sense, to detect issues right away
             -- TODO: Será que posso ter em vez disto uma substituição "solved" à qual sempre que quero adicionar uma constraint a resolve logo com as outras, falhando logo em vez de capturar constraints e juntar depois?
-            constrs <- lift get
-            let unify = solveconstraintsExistential Map.empty constrs                                      -- resolve ou falha -- por conflito ou falta informação
-            guard (isJust unify)                                                                -- por conflicto
-            let et = existencialInstantiate sch                                                 -- tipo com existenciais
+            let et = existencialInstantiate sch -- TODO: ALWAYS FRESH                                 -- tipo com existenciais
             (se, d') <- focus' (Just (n, et)) ctxt goal   -- fail ou success c restrições
             constrs <- lift get
             let unify = solveconstraintsExistential Map.empty constrs                                      -- resolve ou falha -- por conflito ou falta informação
@@ -235,18 +234,7 @@ focus c goal =
         ----- Non-canonical right sync rules ---------
 
         -- focus' Nothing (g, d) Bool = return (Tru, d) <|> return (Fls, d)
-
-        focus' Nothing (g, d) (ExistentialTypeVar x) =  -- TODO: Factor (Bool, Unit, etc) into "Literal?"
-            -- (do
-            -- (e, d') <- focus (g, d) Bool                -- focus will try all decides
-            -- lift $ Writer.tell [Constraint (ExistentialTypeVar x) Bool]
-            -- return (e, d'))
-            -- <|>
-            do
-            lift $ modify (Constraint (ExistentialTypeVar x) Unit :)
-            (e, d') <- focus (g, d) Unit
-            return (e, d')
-            -- TODO: Não é possível gerar type constraints de ?a => a' a focando-nos à direita certo? aqui apenas posso tentar instanciar literais, e falhar, para nos podermos focar no contexto e eventualmente instanciar de TypeVar para ExistencialVar e gerar o tal constraint ?a => a'
+        ---- TODO: Factor (Bool, Unit, etc) into "Literal?"
 
         ---- Left synchronous rules -------------------
 
@@ -340,7 +328,7 @@ synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a s
 synthMarks = editexp
                 (\case {Mark {} -> True; _ -> False})
                     (\(Mark _ c t) ->
-                        trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t))
+                        trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (("ok", Left $ Forall [0, 1] (Fun (TypeVar 0) (TypeVar 1))):map (second Left) c, []) (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t))
 
 synthMarksModule :: Program -> Program
 synthMarksModule (Program adts bs) = Program adts $ map (\(Binding n e) -> Binding n $ synthMarks e) bs

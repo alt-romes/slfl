@@ -360,9 +360,16 @@ typecheckExpr :: CoreExpr -> Scheme
 typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
 
 typecheckModule :: CoreProgram -> [TypeBinding]
-typecheckModule (CoreProgram _ cbs) = typecheckModule' cbs []
-    where typecheckModule' cbs acc = 
+typecheckModule (CoreProgram adts cbs) = trace ("Generated TypeBindings from ADTD: " ++ show (concatMap processadt adts)) $ typecheckModule' cbs $ concatMap processadt adts
+    where
+        typecheckModule' cbs acc = 
             if null cbs then []
             else let b@(CoreBinding n ce):xs = cbs in
                  let tb = TypeBinding n $ generalize ([],[]) $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) (\(t, _, _) -> t) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
                      tb:typecheckModule' xs (tb:acc)
+
+        processadt :: ADTD -> [TypeBinding]
+        processadt (ADTD tn cns) = map processcns cns
+            where
+                processcns (cn, Unit) = TypeBinding cn (trivialScheme (ADT tn))
+                processcns (cn, ty) = TypeBinding cn (trivialScheme (Fun ty (ADT tn)))

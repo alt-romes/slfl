@@ -341,7 +341,7 @@ datacon = do
     t <- option Unit ty
     return (name, t)
 
-datatype :: Parser ADT
+datatype :: Parser ADTD
 datatype = do
     reserved "data"
     name <- identifier
@@ -349,7 +349,7 @@ datatype = do
     con <- datacon
     cons <- many (do {reservedOp "|"; datacon})
     optional (reservedOp ";")
-    return $ ADT name (con:cons)
+    return $ ADTD name (con:cons)
 
 val :: Parser Binding
 val = Binding "main" <$> expr
@@ -357,7 +357,7 @@ val = Binding "main" <$> expr
 top :: Parser Binding
 top = do
   x <- letdecl <|> val
-  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!, é tudo menos optional :P
+  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!, é tudo menos optional, menos na ultima linha :P
   return x
 
 modl :: Parser Program
