@@ -340,7 +340,7 @@ synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a s
 synthMarks = editexp
                 (\case {Mark {} -> True; _ -> False})
                     (\(Mark _ c t) ->
-                        trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (("ok", Left $ Forall [0, 1] (Fun (TypeVar 0) (TypeVar 1))):map (second Left) c, []) (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t))
+                        trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t))
 
 synthMarksModule :: Program -> Program
 synthMarksModule (Program adts bs) = Program adts $ map (\(Binding n e) -> Binding n $ synthMarks e) bs
