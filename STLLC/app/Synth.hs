@@ -41,6 +41,12 @@ fresh = do
     lift $ lift $ put (n+1)
     return $ getName n
 
+freshIndex :: Synth Int
+freshIndex = do 
+    n <- lift $ lift get 
+    lift $ lift $ put (n+1)
+    return n
+
 isAtomic :: Type -> Bool
 isAtomic t = case t of
                Bool -> True
@@ -180,16 +186,17 @@ focus c goal =
             -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
             -- TODO: Do i need this verification everytime I add a constraint? Kind of makes sense, to detect issues right away
             -- TODO: Será que posso ter em vez disto uma substituição "solved" à qual sempre que quero adicionar uma constraint a resolve logo com as outras, falhando logo em vez de capturar constraints e juntar depois?
-            let et = existencialInstantiate sch -- TODO: ALWAYS FRESH                                 -- tipo com existenciais
+            et <- existencialInstantiate sch                                     -- tipo com existenciais
             (se, d') <- focus' (Just (n, et)) ctxt goal   -- fail ou success c restrições
             constrs <- lift get
             let unify = solveconstraintsExistential Map.empty constrs                                      -- resolve ou falha -- por conflito ou falta informação
             guard (isJust unify)                                                                -- por conflicto
-            guard (Set.disjoint (Set.fromList ns) (ftv $ apply (fromJust unify) et))            -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
+            -- !TODO: EXEMPLO PARA TESTAR ISTO: guard (Set.disjoint (Set.fromList ns) (ftv $ apply (fromJust unify) et))            -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
             return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
                 where                                                                           -- TODO: É isto certo?
-                    existencialInstantiate (Forall ns t) =
-                        apply (Map.fromList $ zip ns (map ExistentialTypeVar ns)) t
+                    existencialInstantiate (Forall ns t) = do
+                        nevs <- mapM (const $ ExistentialTypeVar <$> freshIndex) ns
+                        return $ apply (Map.fromList $ zip ns nevs) t
 
 
         focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)
@@ -258,9 +265,14 @@ focus c goal =
                 (rt, d') <- focus' (Just (nname, b)) c goal
                 return (substitute nname (Snd (Var n)) rt, d')
 
-        focus' (Just (n, ExistentialTypeVar x)) (g, d) goal = do -- TODO: Refactor
-                lift $ modify (Constraint (ExistentialTypeVar x) goal :) -- TODO: Correct
-                return (Var n, d)
+        focus' (Just (n, ExistentialTypeVar x)) (g, d) goal =
+            case goal of
+              (ExistentialTypeVar y) ->
+                  if x == y then return (Var n, d)          -- ?a |- ?a succeeds
+                            else empty                      -- ?a |- ?b fails
+              _ -> do                                       -- ?a |-  t succeeds with constraint
+                  lift $ modify (Constraint (ExistentialTypeVar x) goal :)
+                  return (Var n, d)
 
         ---- Proposition no longer synchronous --------
 

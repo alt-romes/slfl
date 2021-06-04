@@ -29,7 +29,7 @@ instance Substitutable Type where
     apply s (Plus t1 t2) = Plus (apply s t1) (apply s t2)
     apply s (Bang t) = Bang (apply s t)
     apply s t@(TypeVar i) = Map.findWithDefault t i s
-    apply s t@(ExistentialTypeVar i) = Map.findWithDefault t i s
+    apply s t@(ExistentialTypeVar i) = Map.findWithDefault t (-i) s
     apply s (Sum tl) = Sum $ map (second $ apply s) tl
     apply s t = t
 
@@ -124,8 +124,8 @@ unifyExistential (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Nothing
-unifyExistential (ExistentialTypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
-unifyExistential x (ExistentialTypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
+unifyExistential (ExistentialTypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton (-x) y else Nothing
+unifyExistential x (ExistentialTypeVar y) = if y `notElem` ftv x then Just $ Map.singleton (-y) x else Nothing
 unifyExistential (Fun t1 t2) (Fun t1' t2') = do
     s  <- unifyExistential t1 t1'
     s' <- unifyExistential (apply s t2) (apply s t2')
