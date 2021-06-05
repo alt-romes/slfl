@@ -98,6 +98,7 @@ instance (Show Type) where
     show (TypeVar x) = letters !! x
     show (ExistentialTypeVar x) = "?" ++ letters !! x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
+    show (ADT t) = t
 
 instance (Show Scheme) where
     show (Forall ns t) = (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ ". ") ++ show t

@@ -343,7 +343,7 @@ typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, 
 
 typeinferModule :: CoreProgram -> CoreProgram -- typecheck and use inferred types
 typeinferModule (CoreProgram adts cbs) =
-    let (finalcbs, finalsubst) = typeinferModule' cbs [] Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+    let (finalcbs, finalsubst) = typeinferModule' cbs (processadts adts) Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
         CoreProgram adts $ apply finalsubst finalcbs
     where
         typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Subst -> ([CoreBinding], Subst)
@@ -360,7 +360,7 @@ typecheckExpr :: CoreExpr -> Scheme
 typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
 
 typecheckModule :: CoreProgram -> [TypeBinding]
-typecheckModule (CoreProgram adts cbs) = trace ("Generated TypeBindings from ADTD: " ++ show (concatMap processadt adts)) $ typecheckModule' cbs $ concatMap processadt adts
+typecheckModule (CoreProgram adts cbs) = typecheckModule' cbs $ processadts adts
     where
         typecheckModule' cbs acc = 
             if null cbs then []
@@ -368,6 +368,9 @@ typecheckModule (CoreProgram adts cbs) = trace ("Generated TypeBindings from ADT
                  let tb = TypeBinding n $ generalize ([],[]) $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) (\(t, _, _) -> t) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
                      tb:typecheckModule' xs (tb:acc)
 
+processadts :: [ADTD] -> [TypeBinding]
+processadts = concatMap processadt
+    where
         processadt :: ADTD -> [TypeBinding]
         processadt (ADTD tn cns) = map processcns cns
             where
