@@ -174,7 +174,7 @@ sum = do
 casebranch :: Parser (String, String, Expr)
 casebranch = do
     tag <- identifier
-    id <- identifier
+    id <- option "" identifier -- TODO: shouldn't be possible for sum types, but sum types should be generalized to adts?
     reservedOp "=>"
     e <- expr
     return (tag, id, e)
@@ -182,16 +182,27 @@ casebranch = do
 casesum :: Parser Expr
 casesum = do 
     reserved "case"
+    reserved "sum"
     e1 <- expr
     reserved "of"
     c1 <- casebranch
     cls <- many (do {reservedOp "|"; casebranch})
     return $ Syntax.CaseOfSum e1 (c1:cls)
 
+caseadt :: Parser Expr
+caseadt = do
+    reserved "case"
+    e1 <- expr
+    reserved "of"
+    c1 <- casebranch
+    cls <- many (do {reservedOp "|"; casebranch})
+    return $ Syntax.CaseOf e1 (c1:cls)
+
 
 caseof :: Parser Expr
-caseof = try caseplus
-      <|> casesum
+caseof = try casesum
+      <|> try caseplus
+      <|> caseadt
 
 
 -- num :: Parser Expr 

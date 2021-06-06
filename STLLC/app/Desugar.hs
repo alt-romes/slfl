@@ -108,6 +108,19 @@ desugar (Syntax.CaseOfSum e exps) = do
     exps' <- mapM (\(t, i, ex) -> do {ex' <- inEnv (i, linVar) (desugar ex); return (t, ex')}) exps
     return $ CoreSyntax.CaseOfSum e' exps'
 
+desugar (Syntax.CaseOf e exps) = do
+    e' <- desugar e
+    exps' <- mapM (\(t, i, ex) ->
+        if i == ""
+           then do
+               ex' <- desugar ex
+               return (t, ex')
+           else do
+               ex' <- inEnv (i, linVar) (desugar ex)
+               return (t, ex')
+       ) exps
+    return $ CoreSyntax.CaseOf e' exps'
+
 desugar (Syntax.UnrestrictedAbs i (Just t) e) = desugar (Syntax.Abs i (Just $ Bang t) (Syntax.LetBang i (Syntax.Var i) e))
 desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Syntax.LetBang i (Syntax.Var i) e))
 

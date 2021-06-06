@@ -1,8 +1,9 @@
 data Sem = Red | Green | Yellow Bool;
-data Bool = True | False;
 data Test = Test (A * B * C);
 
-let f = Red;
-let z = Green;
-let y = Yellow true;
-let main = Yellow;
+let z = Red;
+
+let main = case z of
+             Green => true
+           | Red => false
+           | Yellow x => x;

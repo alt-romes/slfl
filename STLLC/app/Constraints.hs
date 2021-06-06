@@ -48,6 +48,7 @@ instance Substitutable CoreExpr where
     apply s (Mark i ctx (Just t)) = Mark i (apply s ctx) (return $ apply s t)
     apply s (SumValue tl (i, e)) = SumValue (map (second $ apply s) tl) (i, apply s e)
     apply s (CaseOfSum e el) = CaseOfSum (apply s e) (map (second $ apply s) el)
+    apply s (CaseOf e el) = CaseOf (apply s e) (map (second $ apply s) el)
     apply s e = e
 
 instance Substitutable CoreBinding where
@@ -86,6 +87,7 @@ unify :: Type -> Type -> Maybe Subst
 unify Bool Bool = Just Map.empty
 unify (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unify Unit Unit = Just Map.empty
+unify (ADT x) (ADT y) = if x == y then Just Map.empty else Nothing
 -- unify (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
 -- unify (TypeVar x) (ExistentialTypeVar y) = Just $ Map.singleton y (TypeVar x)
 -- unify (ExistentialTypeVar x) (TypeVar y) = Just $ Map.singleton x (TypeVar y)
@@ -121,6 +123,7 @@ unify _ _ = Nothing
 unifyExistential :: Type -> Type -> Maybe Subst 
 unifyExistential Bool Bool = Just Map.empty
 unifyExistential (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
+unifyExistential (ADT x) (ADT y) = if x == y then Just Map.empty else Nothing
 unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Nothing

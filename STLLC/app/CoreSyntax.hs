@@ -58,6 +58,8 @@ data CoreExpr
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, CoreExpr)
     | CaseOfSum CoreExpr [(String, CoreExpr)]
+  
+    | CaseOf CoreExpr [(String, CoreExpr)]
 
     deriving (Eq)
 
@@ -141,6 +143,11 @@ showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
     ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
     ++ indent (d+1) ++ "}"
 showexpr' d (CaseOfSum e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+    indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " => " ++ showexpr' (d+2) e1 ++
+        foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
+            "| " ++ t ++ " " ++ "?" ++ " => " ++
+                showexpr' (d+2) ex) "" exps
+showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
     indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " => " ++ showexpr' (d+2) e1 ++
         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
             "| " ++ t ++ " " ++ "?" ++ " => " ++

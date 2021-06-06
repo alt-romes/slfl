@@ -55,6 +55,8 @@ data Expr
     | SumValue [(String, Maybe Type)] (String, Expr)
     | CaseOfSum Expr [(String, String, Expr)]
 
+    | CaseOf Expr [(String, String, Expr)]
+
     -- Added sugar :)
 
     | UnrestrictedAbs String (Maybe Type) Expr
@@ -108,6 +110,12 @@ instance (Show Expr) where
                 ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
                 ++ indent (d+1) ++ "}"
             showexpr' d (CaseOfSum e ((tag, id, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+                                                        indent (d+1) ++ "  " ++ tag ++ " " ++ id ++ " => " ++ showexpr' (d+2) e1 ++
+                                                        foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
+                                                            "| " ++ t ++ " " ++ i ++ " => " ++
+                                                                showexpr' (d+2) ex) "" exps
+
+            showexpr' d (CaseOf e ((tag, id, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
                                                         indent (d+1) ++ "  " ++ tag ++ " " ++ id ++ " => " ++ showexpr' (d+2) e1 ++
                                                         foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
                                                             "| " ++ t ++ " " ++ i ++ " => " ++

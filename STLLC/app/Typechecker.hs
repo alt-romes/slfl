@@ -35,36 +35,6 @@ typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 -- a -o a  ===> forall a . a -o a
 -- forall a . a -o a ===> a' -o a'
 
---  foco : ?b |-    a'     (?b := a') [OK]
---  foco : a' |-    ?b     (?b := a') [OK]
---  foco : ?b |-    ?c     [NOK] (*)   ?b = ?c    ?c = a'
---                                     ?b -o ?c [b := c,c := a]  => ?c -o ?c [NOK]
---  foco : a' |-    b'    [NOK!]
-
-
---  x: ?b -o ?b     , y:a' |-   b'     Existencial |-> Universal    Universal |-/-> Existencial
--- ....
-
-
-
--- x: (forall b c . b -o c)  , y:a'|-       b'
--- x: (forall b . b -o b)  |-       a' -o a'
--- x: (forall b . b -o b)  |-       : forall a . a -o a
-
--- data Bool = True | False 
-
--- (x:Bool) -o {y:Bool :  x=y}  ~ \x:Bool . case x of  True  ->  x=True | False ->  x=False 
-
---- |- forall a b . a -o b 
-
-{- 
-    let id x = x     
-        in
-        (id true, id 0)
- -}
-
-
-
 --- hyp --------------------
 
 typeconstraint ce@(BLVar x) = do
@@ -285,6 +255,33 @@ typeconstraint (CaseOfSum e exps) = do
     guard $ all ((== ctx1') . (\(_,_,_,c) -> c)) (tail inferredexps)
     writer ((t1', CaseOfSum ce (map (\(_,s,c,_) -> (s,c)) inferredexps)), Constraint st (Sum (map (\(t,s,_,_) -> (s, t)) inferredexps)):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps))
 
+-- TODO: Refactor whole function
+typeconstraint (CaseOf e exps) = do
+    (st, ce) <- typeconstraint e
+    (bctx, fctx) <- get
+    inferredexps <- mapM (\(s, ex) -> do
+        case lookup s fctx of
+            Just (Forall [] (Fun argtype (ADT _))) -> do -- Constructor takes an argument
+                tv <- fresh
+                put (Just (trivialScheme argtype):bctx, fctx)
+            Just (Forall [] (ADT _)) -> do -- Constructor does not take an argument
+                tv <- fresh
+                put (bctx, fctx)
+        (t', ce) <- typeconstraint ex
+        ctx' <- get
+        return (t', s, ce, ctx')
+        ) exps
+    -- TODO: Probably doable in a more idiomatic way
+    let (t1', s1, ce1, ctx1') = head inferredexps
+    guard $ all ((== first catMaybes ctx1') . (\(_,_,_,c) -> first catMaybes c)) (tail inferredexps)
+    let adtname = getadtname fctx s1
+    guard $ all ((== adtname) . (\(_,constr,_,_) -> getadtname fctx constr)) (tail inferredexps)
+    writer ((t1', CaseOf ce (map (\(_,s,c,_) -> (s,c)) inferredexps)), Constraint st (ADT adtname):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps))
+        where
+            getadtname fctx s = case lookup s fctx of
+                        Just (Forall [] (Fun _ (ADT adtname))) -> adtname -- Constructor takes an argument
+                        Just (Forall [] (ADT adtname)) -> adtname -- Constructor does not take an argument
+
 --- end typeconstraint ----------
 
 ---------------------------------
@@ -352,7 +349,7 @@ typeinferModule (CoreProgram adts cbs) =
               [] -> ([], subst)
               b@(CoreBinding n ce):corebindings' -> do
                  let (btype, bexpr, subst') =
-                         fromMaybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) $
+                         fromMaybe (errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) $
                              typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce
                  first (CoreBinding n bexpr :) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype):acc) subst'
 
@@ -365,7 +362,7 @@ typecheckModule (CoreProgram adts cbs) = typecheckModule' cbs $ processadts adts
         typecheckModule' cbs acc = 
             if null cbs then []
             else let b@(CoreBinding n ce):xs = cbs in
-                 let tb = TypeBinding n $ generalize ([],[]) $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b)) (\(t, _, _) -> t) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
+                 let tb = TypeBinding n $ generalize ([],[]) $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) (\(t, _, _) -> t) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
                      tb:typecheckModule' xs (tb:acc)
 
 processadts :: [ADTD] -> [TypeBinding]
