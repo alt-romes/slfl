@@ -1,9 +1,7 @@
-data Sem = Red | Green | Yellow Bool;
-data Test = Test (A * B * C);
+# data Nat = Zero | Succ Nat;
+# let main = {{ (Nat -o Unit) }};
+#
 
-let z = Red;
+data Sem = Green | Red | Yellow Bool;
 
-let main = case z of
-             Green => true
-           | Red => false
-           | Yellow x => x;
+let main = {{ (Bool -o Bool) }}

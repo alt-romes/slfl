@@ -282,7 +282,8 @@ ty :: Parser Type
 ty = tylit <|> parens type'
 
 tylit :: Parser Type 
-tylit =     sumty
+tylit =     try adty
+        <|> sumty
         <|> (reservedOp "1" >> return Unit)
         <|> (reservedOp "Bool" >> return Bool)
         <|> (reservedOp "A" >> return (Atom "A")) -- TODO: Melhor forma de fazer parse de atomos :)
@@ -297,7 +298,6 @@ tylit =     sumty
         <|> (reservedOp "d" >> return (TypeVar 3))
         <|> (reservedOp "e" >> return (TypeVar 4))
         <|> (reservedOp "f" >> return (TypeVar 5))
-        -- <|> (reservedOp "Nat"  >> return Nat )
 
 sumty :: Parser Type
 sumty = do
@@ -312,6 +312,10 @@ sumty = do
                  )
     reservedOp "}"
     return $ Sum sts
+
+adty :: Parser Type
+adty = do
+    ADT <$> identifier
 
 
 -- ...---...

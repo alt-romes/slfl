@@ -262,21 +262,24 @@ typeconstraint (CaseOf e exps) = do
     inferredexps <- mapM (\(s, ex) -> do
         case lookup s fctx of
             Just (Forall [] (Fun argtype (ADT _))) -> do -- Constructor takes an argument
-                tv <- fresh
                 put (Just (trivialScheme argtype):bctx, fctx)
+                (t', ce) <- typeconstraint ex
+                ctx' <- get
+                return $ Just (t', s, ce, ctx')
             Just (Forall [] (ADT _)) -> do -- Constructor does not take an argument
-                tv <- fresh
                 put (bctx, fctx)
-        (t', ce) <- typeconstraint ex
-        ctx' <- get
-        return (t', s, ce, ctx')
+                (t', ce) <- typeconstraint ex
+                ctx' <- get
+                return $ Just (t', s, ce, ctx')
+            _ -> return Nothing
         ) exps
     -- TODO: Probably doable in a more idiomatic way
-    let (t1', s1, ce1, ctx1') = head inferredexps
-    guard $ all ((== first catMaybes ctx1') . (\(_,_,_,c) -> first catMaybes c)) (tail inferredexps)
+    let inferredexps' = catMaybes inferredexps
+    let (t1', s1, ce1, ctx1') = head inferredexps'
+    guard $ all ((== first catMaybes ctx1') . (\(_,_,_,c) -> first catMaybes c)) (tail inferredexps')
     let adtname = getadtname fctx s1
-    guard $ all ((== adtname) . (\(_,constr,_,_) -> getadtname fctx constr)) (tail inferredexps)
-    writer ((t1', CaseOf ce (map (\(_,s,c,_) -> (s,c)) inferredexps)), Constraint st (ADT adtname):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps))
+    guard $ all ((== adtname) . (\(_,constr,_,_) -> getadtname fctx constr)) (tail inferredexps')
+    writer ((t1', CaseOf ce (map (\(_,s,c,_) -> (s,c)) inferredexps')), Constraint st (ADT adtname):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps'))
         where
             getadtname fctx s = case lookup s fctx of
                         Just (Forall [] (Fun _ (ADT adtname))) -> adtname -- Constructor takes an argument

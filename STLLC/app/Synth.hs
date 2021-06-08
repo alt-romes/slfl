@@ -7,12 +7,13 @@ import qualified Data.Map as Map
 import Control.Applicative
 import Control.Monad.Logic
 import Control.Monad.State
+import Control.Monad.Reader
 import Data.Maybe
 import Data.Bifunctor
 
 import Debug.Trace
 
-import CoreSyntax (Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, ExistentialTypeVar, Sum), Scheme (Forall))
+import CoreSyntax (Name, Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, ExistentialTypeVar, Sum, ADT), Scheme (Forall))
 import Syntax
 import Program
 import Util
@@ -23,11 +24,42 @@ type Delta = [(String, Type)] -- Linear hypothesis (not left asynchronous)
 type Omega = [(String, Type)] -- Ordered (linear?) hypothesis
 type Ctxt = (Gamma, Delta, Omega)   -- Delta out is a return value
 
+-- TODO: Faria sentido ter um contexto especial para os ADT constructors em vez de free context?
+
 type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 
-type SynthState = Int  -- variable number to be used, note: should we also use the state monad for the delta context???
+type SynthState = ([Constraint], Int)  -- (list of constraints added by the process, next index to instance a variable)
 
-type Synth a = LogicT (StateT [Constraint] (State SynthState)) a
+-- note: should we also use the state monad for the delta context???
+
+type Synth a = LogicT (StateT SynthState (Reader [ADTD])) a
+
+runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
+runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synth (g, d, []) t) st)
+
+addconstraint :: Constraint -> Synth ()
+addconstraint c = lift $ modify (first (c :))
+
+getadtcons :: Name -> Synth [(Name, Type)]
+getadtcons tyn = do
+    adtds <- lift $ lift ask
+    return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
+
+getadtds :: Synth [ADTD]
+getadtds = return []
+
+fresh :: Synth String
+fresh = do 
+    (cs, n) <- lift get
+    lift $ put (cs, n+1)
+    return $ getName n
+
+freshIndex :: Synth Int
+freshIndex = do 
+    (cs, n) <- lift get
+    lift $ put (cs, n+1)
+    return n
+
 
 letters :: [String]
 letters = [1..] >>= flip replicateM ['a'..'z']
@@ -35,17 +67,6 @@ letters = [1..] >>= flip replicateM ['a'..'z']
 getName :: Int -> String
 getName i = letters !! i
 
-fresh :: Synth String
-fresh = do 
-    n <- lift $ lift get 
-    lift $ lift $ put (n+1)
-    return $ getName n
-
-freshIndex :: Synth Int
-freshIndex = do 
-    n <- lift $ lift get 
-    lift $ lift $ put (n+1)
-    return n
 
 isAtomic :: Type -> Bool
 isAtomic t = case t of
@@ -122,13 +143,30 @@ synth (g, d, (n, Sum tys):o) t = do
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
+synth (g, d, (n, ADT tyn):o) t = do
+    adtds <- getadtcons tyn
+    ls <- mapM (\(name, vtype) ->
+        case vtype of
+          Unit -> do
+            (exp, d') <- synth (g, d, o) t
+            return (name, "", exp, d')
+          argty -> do
+            varid <- fresh
+            (exp, d') <- synth (g, d, (varid, argty):o) t
+            return (name, varid, exp, d')
+          -- TODO: polymorphic ADT
+        ) adtds
+    let (n1, varid1, e1, d1') = trace ("LS: " ++ show ls) $ head ls
+    guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
+    guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
+    return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
     nname <- fresh
     (exp, d') <- synth ((nname, Right a):g, d, o) t
     guard (nname `notElem` map fst d')
     return (LetBang nname (Var n) exp, d')
-
 
 ----- Non-canonical right sync rules ---------
 
@@ -188,7 +226,7 @@ focus c goal =
             -- TODO: Será que posso ter em vez disto uma substituição "solved" à qual sempre que quero adicionar uma constraint a resolve logo com as outras, falhando logo em vez de capturar constraints e juntar depois?
             et <- existencialInstantiate sch                                     -- tipo com existenciais
             (se, d') <- focus' (Just (n, et)) ctxt goal   -- fail ou success c restrições
-            constrs <- lift get
+            (constrs, _) <- lift get
             let unify = solveconstraintsExistential Map.empty constrs                                      -- resolve ou falha -- por conflito ou falta informação
             guard (isJust unify)                                                                -- por conflicto
             -- !TODO: EXEMPLO PARA TESTAR ISTO: guard (Set.disjoint (Set.fromList ns) (ftv $ apply (fromJust unify) et))            -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
@@ -250,7 +288,6 @@ focus c goal =
             nname <- fresh
             (expb, d')  <- focus' (Just (nname, b)) c goal
             (expa, d'') <- synth (g, d', []) a
-            css <- lift get
             return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
@@ -271,7 +308,7 @@ focus c goal =
                   if x == y then return (Var n, d)          -- ?a |- ?a succeeds
                             else empty                      -- ?a |- ?b fails
               _ -> do                                       -- ?a |-  t succeeds with constraint
-                  lift $ modify (Constraint (ExistentialTypeVar x) goal :)
+                  addconstraint $ Constraint (ExistentialTypeVar x) goal
                   return (Var n, d)
 
         ---- Proposition no longer synchronous --------
@@ -285,7 +322,7 @@ focus c goal =
                    -- left focus is atomic
                    case goal of
                      (ExistentialTypeVar x) -> do   -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
-                         lift $ modify (Constraint (ExistentialTypeVar x) h :)
+                         addconstraint $ Constraint (ExistentialTypeVar x) h
                          return (Var n, d)
                      _ -> do
                          guard (h == goal)          -- if is atomic and not the goal, fail
@@ -316,18 +353,19 @@ generalize ctxt t = Forall ns t
 
 ---- top level
 
-synthCtxAllType :: (Gamma, Delta) -> Type -> [Expr]
+synthCtxAllType :: (Gamma, Delta) -> [ADTD] -> Type -> [Expr]
 -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
-synthCtxAllType (g, d) t = let res = fst $ evalState (runStateT (observeAllT $ synth (g, d, []) t) []) 0 in
+synthCtxAllType c adts t =
+    let res = runSynth c t ([],0) adts in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res
 
-synthCtxType :: (Gamma, Delta) -> Type -> Expr
-synthCtxType c t = head $ synthCtxAllType c t
+synthCtxType :: (Gamma, Delta) -> [ADTD] -> Type -> Expr
+synthCtxType c adts t = head $ synthCtxAllType c adts t
 
 synthAllType :: Type -> [Expr]
-synthAllType = synthCtxAllType ([], [])
+synthAllType = synthCtxAllType ([], []) []
 
 synthScheme :: Scheme -> Expr
 synthScheme = undefined
@@ -336,11 +374,13 @@ synthScheme = undefined
 synthType :: Type -> Expr
 synthType t = head $ synthAllType t -- TODO: instanciate $ generalize t?
 
-synthMarks :: Expr -> Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks = editexp
+synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
+synthMarks ex adts = editexp
                 (\case {Mark {} -> True; _ -> False})
                     (\(Mark _ c t) ->
-                        trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t))
+                        trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)) ex
 
 synthMarksModule :: Program -> Program
-synthMarksModule (Program adts bs) = Program adts $ map (\(Binding n e) -> Binding n $ synthMarks e) bs
+synthMarksModule (Program adts bs) = Program adts $ map (\(Binding n e) -> Binding n $ synthMarks e adts) bs
+
+
