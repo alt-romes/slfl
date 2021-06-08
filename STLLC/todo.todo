@@ -2,5 +2,7 @@
 4) (\x -o true) devia falhar o typecheck por má utilização de recursos certo...
 5) escrever bons testes com polimorfismo
 6) ah espera - isto está okay, mas tenho de fazer anotações de tipo: can't infer mark type correctly in "let f = {{ ((a -o b) -o a -o b) }}; let main = {{ ... }} (\x : 1 -o let _ = x in true) <>"
+6.5) permitir type annotations
 7) Conseguir escrever no relatório as regras de forma a que o algoritmo seja recriável
 8) refactor caseof (sum, plus, adt)
+9) allow ADTs starting with A, B... (fix ADT parsing)

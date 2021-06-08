@@ -100,9 +100,9 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 ---- -oR
 synth (г, d, o) (Fun a b) = do
     name <- fresh
-    (exp, d') <- trace ("Synth Fun with " ++ show (name, a) ++ " get " ++ show b) synth (г, d, (name, a):o) b
-    trace "guard" guard (name `notElem` map fst d')
-    trace "guarded" return (Abs name (Just a) exp, d')
+    (exp, d') <- synth (г, d, (name, a):o) b
+    guard (name `notElem` map fst d')
+    return (Abs name (Just a) exp, d')
 
 ---- &R
 synth c (With a b) = do
@@ -165,7 +165,7 @@ synth (g, d, (n, ADT tyn):o) t = do
           -- TODO: polymorphic ADT
         ) adtds
     guard (not $ null ls) -- make sure constructors were found for this adtype
-    let (n1, varid1, e1, d1') = trace ("LS: " ++ show ls) $ head ls
+    let (n1, varid1, e1, d1') = head ls
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
@@ -188,12 +188,12 @@ synth (g, d, (n, Bang a):o) t = do
 ---- Synchronous left propositions to Delta ----
 
 synth (g, d, p:o) t =
-    trace (" put " ++ show p ++ " in delta") $ synth (g, p:d, o) t
+    synth (g, p:d, o) t
 
 ---- Synchronous rules -------------------------
 
 -- no more asynchronous propositions, focus
-synth (g, d, []) t = trace "focus!!" $ focus (g, d) t
+synth (g, d, []) t = focus (g, d) t
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
 -- because of laziness it'll only run until the first succeeds (bc of observe)
@@ -213,7 +213,7 @@ focus c goal =
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> trace ("focus on " ++ show x ++ " with goal " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
 
         decideLeftBang (g, din) goal = do
             case g of
@@ -279,6 +279,17 @@ focus c goal =
                    return (SumValue smts (tag, e), d')
                 })) empty sts
 
+        ---- ADT-R
+        focus' Nothing (g, d) (ADT tyn) = do
+            cons <- getadtcons tyn
+            foldr ((<|>) . (\(tag, argty) ->
+                   case argty of
+                     Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
+                     argtype -> do
+                       (arge, d') <- synth (g, d, []) argtype; -- !TODO: aqui parece-me fazer mais sentido dizer que queremos sintetizar um argumento para aquela função de tipo tal, mas como havia uma correlação com a regra do Plus, e no Plus é usado focus' à direita, fiquei a pensar se isto estava correto... parece que vai em desencontro às regras
+                       return (App (Var tag) arge, d')
+                )) empty cons
+
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
             (expa, d') <- synth (g, d, []) a
@@ -328,7 +339,7 @@ focus c goal =
         ---- if it is atomic, it'll either be the goal and instanciate it, or fail
         ---- if it's not atomic, and it's not left synchronous, unfocus
         focus' (Just nh@(n, h)) (g, d) goal =
-            trace ("focus left on " ++ show (n, h) ++ " to get goal " ++ show goal) $ if isAtomic h
+            if isAtomic h
                then do
                    -- left focus is atomic
                    case goal of
