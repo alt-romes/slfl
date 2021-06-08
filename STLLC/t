@@ -2,6 +2,6 @@
 # let main = {{ (Nat -o Unit) }};
 #
 
-data Sem = Green | Red | Yellow Bool;
+data Sem = Green | Red | Yellow;
 
-let main = {{ (Bool -o Bool) }}
+let main = {{ (Sem -o 1) }}

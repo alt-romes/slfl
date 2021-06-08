@@ -37,6 +37,9 @@ type Synth a = LogicT (StateT SynthState (Reader [ADTD])) a
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
 runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synth (g, d, []) t) st)
 
+initSynthState :: SynthState
+initSynthState = ([], 0)
+
 addconstraint :: Constraint -> Synth ()
 addconstraint c = lift $ modify (first (c :))
 
@@ -44,9 +47,6 @@ getadtcons :: Name -> Synth [(Name, Type)]
 getadtcons tyn = do
     adtds <- lift $ lift ask
     return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
-
-getadtds :: Synth [ADTD]
-getadtds = return []
 
 fresh :: Synth String
 fresh = do 
@@ -76,6 +76,14 @@ isAtomic t = case t of
                Atom _ -> True
                _ -> False
 
+assertADTHasCons :: Type -> Synth Bool
+assertADTHasCons t = case t of
+                       ADT name -> do
+                           cons <- getadtcons name
+                           return $ not $ null cons
+                       _ -> return True
+
+
 ---- subsitute var n with expn in expf
 substitute :: String -> Expr -> Expr -> Expr
 -- Propositions tend to appear only once due to linearity
@@ -92,9 +100,9 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 ---- -oR
 synth (г, d, o) (Fun a b) = do
     name <- fresh
-    (exp, d') <- synth (г, d, (name, a):o) b
-    guard (name `notElem` map fst d')
-    return (Abs name (Just a) exp, d')
+    (exp, d') <- trace ("Synth Fun with " ++ show (name, a) ++ " get " ++ show b) synth (г, d, (name, a):o) b
+    trace "guard" guard (name `notElem` map fst d')
+    trace "guarded" return (Abs name (Just a) exp, d')
 
 ---- &R
 synth c (With a b) = do
@@ -156,6 +164,7 @@ synth (g, d, (n, ADT tyn):o) t = do
             return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
+    guard (not $ null ls) -- make sure constructors were found for this adtype
     let (n1, varid1, e1, d1') = trace ("LS: " ++ show ls) $ head ls
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
@@ -179,12 +188,12 @@ synth (g, d, (n, Bang a):o) t = do
 ---- Synchronous left propositions to Delta ----
 
 synth (g, d, p:o) t =
-    synth (g, p:d, o) t
+    trace (" put " ++ show p ++ " in delta") $ synth (g, p:d, o) t
 
 ---- Synchronous rules -------------------------
 
 -- no more asynchronous propositions, focus
-synth (g, d, []) t = focus (g, d) t
+synth (g, d, []) t = trace "focus!!" $ focus (g, d) t
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
 -- because of laziness it'll only run until the first succeeds (bc of observe)
@@ -194,15 +203,17 @@ focus c goal =
     where
         decideRight :: FocusCtxt -> Type -> Synth (Expr, Delta)
 
-        decideRight c goal =
-            if isAtomic goal            -- to decide right, goal cannot be atomic
+        decideRight c goal = do
+            if isAtomic goal                            -- to decide right, goal cannot be atomic
                 then empty
-                else focus' Nothing c goal
+                else do
+                    assertADTHasCons goal >>= guard     -- to decide right, goal cannot be an ADT that has no constructors
+                    focus' Nothing c goal
 
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> trace ("focus on " ++ show x ++ " with goal " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
 
         decideLeftBang (g, din) goal = do
             case g of
@@ -317,7 +328,7 @@ focus c goal =
         ---- if it is atomic, it'll either be the goal and instanciate it, or fail
         ---- if it's not atomic, and it's not left synchronous, unfocus
         focus' (Just nh@(n, h)) (g, d) goal =
-            if isAtomic h
+            trace ("focus left on " ++ show (n, h) ++ " to get goal " ++ show goal) $ if isAtomic h
                then do
                    -- left focus is atomic
                    case goal of
@@ -356,7 +367,7 @@ generalize ctxt t = Forall ns t
 synthCtxAllType :: (Gamma, Delta) -> [ADTD] -> Type -> [Expr]
 -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
 synthCtxAllType c adts t =
-    let res = runSynth c t ([],0) adts in
+    let res = runSynth c t initSynthState adts in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res

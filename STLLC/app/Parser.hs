@@ -282,22 +282,18 @@ ty :: Parser Type
 ty = tylit <|> parens type'
 
 tylit :: Parser Type 
-tylit =     try adty
-        <|> sumty
+tylit =     sumty
         <|> (reservedOp "1" >> return Unit)
         <|> (reservedOp "Bool" >> return Bool)
         <|> (reservedOp "A" >> return (Atom "A")) -- TODO: Melhor forma de fazer parse de atomos :)
         <|> (reservedOp "B" >> return (Atom "B"))
         <|> (reservedOp "C" >> return (Atom "C"))
         <|> (reservedOp "D" >> return (Atom "D"))
-        <|> (reservedOp "E" >> return (Atom "E"))
-        <|> (reservedOp "F" >> return (Atom "F"))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: fazer parse de type variables ?? :)
         <|> (reservedOp "b" >> return (TypeVar 1))
         <|> (reservedOp "c" >> return (TypeVar 2))
         <|> (reservedOp "d" >> return (TypeVar 3))
-        <|> (reservedOp "e" >> return (TypeVar 4))
-        <|> (reservedOp "f" >> return (TypeVar 5))
+        <|> adty -- TODO: can't write ADTs starting by any of those letters above ^:) e não consegui resolver com o try
 
 sumty :: Parser Type
 sumty = do
