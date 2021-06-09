@@ -311,7 +311,7 @@ sumty = do
 
 adty :: Parser Type
 adty = do
-    ADT <$> identifier
+    ADT <$> identifier -- TODO: identifier must be uppercase
 
 
 -- ...---...

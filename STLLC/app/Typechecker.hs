@@ -29,6 +29,17 @@ type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 runinfer :: FreeCtxt -> CoreExpr -> Maybe (((Type, CoreExpr), [Constraint]), Ctxt)
 runinfer fc e = evalStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
 
+addtoboundctx :: Scheme -> Infer ()
+addtoboundctx c = modify (first (Just c :))
+
+getlastvarindex :: Infer Int
+getlastvarindex = gets (\(bc, _) -> length bc - 1)
+
+wasBLVConsumed :: Int -> Infer Bool
+wasBLVConsumed i = do
+    (bc, _) <- get
+    return $ isNothing $ bc !! (length bc - 1 - i) -- Appends are done to the head of the list, so check the index counting from the end
+
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
 typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
@@ -71,9 +82,10 @@ typeconstraint ce@(FUVar x) = do
 typeconstraint (Abs t1 e) = do
     tv <- fresh
     let t1' = fromMaybe tv t1
-    (bctx, fctx) <- get
-    put (Just (trivialScheme t1'):bctx, fctx)
+    addtoboundctx $ trivialScheme t1'
+    newvari <- getlastvarindex
     (t2, ce) <- typeconstraint e
+    wasBLVConsumed newvari >>= guard
     return (Fun t1' t2, Abs (Just t1') ce)
 
 --  -oE
@@ -96,9 +108,12 @@ typeconstraint (LetTensor e1 e2) = do
     tv1 <- fresh
     tv2 <- fresh
     (t, ce1) <- typeconstraint e1
-    (bctx, fctx) <- get
-    put (Just (trivialScheme tv2):Just (trivialScheme tv1):bctx, fctx)
+    addtoboundctx $ trivialScheme tv1
+    addtoboundctx $ trivialScheme tv2
+    lastvari <- getlastvarindex
     (t3, ce2) <- typeconstraint e2
+    wasBLVConsumed (lastvari - 1) >>= guard -- make sure linear variables were used and don't exit the binder
+    wasBLVConsumed lastvari >>= guard
     writer ((t3, LetTensor ce1 ce2), [Constraint t (Tensor tv1 tv2)])
 
 --- 1 ----------------------
@@ -158,14 +173,19 @@ typeconstraint (InjR t1 e) = do
 --  +E
 typeconstraint (CaseOfPlus e1 e2 e3) = do
     (pt, ce1) <- typeconstraint e1
-    (bctx, fctx) <- get
+    currentctx <- get
     tv1 <- fresh
     tv2 <- fresh
-    put (Just (trivialScheme tv1):bctx, fctx)
+    addtoboundctx $ trivialScheme tv1
+    lastvi1 <- getlastvarindex
     (t3, ce2) <- typeconstraint e2
+    wasBLVConsumed lastvi1 >>= guard -- make sure branch bound var doesn't escape
     ctx3 <- get
-    put (Just (trivialScheme tv2):bctx, fctx)
+    put currentctx -- reset context to synth with the same context as the one used above
+    addtoboundctx $ trivialScheme tv2
+    lastvi2 <- getlastvarindex
     (t4, ce3) <- typeconstraint e3
+    wasBLVConsumed lastvi2 >>= guard -- make sure branch bound var doesn't escape
     ctx4 <- get
     guard $ equalDeltas ctx3 ctx4
     writer ((t4, CaseOfPlus ce1 ce2 ce3), [Constraint t3 t4, Constraint pt (Plus tv1 tv2)])
@@ -183,9 +203,8 @@ typeconstraint (BangValue e) = do
 --  !E
 typeconstraint (LetBang e1 e2) = do
     (t1, ce1) <- typeconstraint e1
-    (bctx, fctx) <- get
     tv1 <- fresh
-    put (Just (trivialScheme tv1):bctx, fctx)
+    addtoboundctx $ trivialScheme tv1 -- this var can, and will, escape because it'll be used unrestrictedly
     (t2, ce2) <- typeconstraint e2
     writer ((t2, LetBang ce1 ce2), [Constraint t1 (Bang tv1)])
 
@@ -196,8 +215,7 @@ typeconstraint (LetIn e1 e2) = do
     (t1, ce1) <- typeconstraint e1
     c'@(bctx, fctx) <- get 
     guard $ equalDeltas c c' -- LetIn makes first variable unrestricted, so e1 should typecheck on an empty delta
-    let t1' = generalize c' t1 
-    put (Just t1':bctx, fctx)
+    addtoboundctx $ generalize c' t1
     (t2, ce2) <- typeconstraint e2
     return (t2, LetIn ce1 ce2)
 
@@ -221,7 +239,7 @@ typeconstraint Tru = return (Bool, Tru)
 typeconstraint Fls = return (Bool, Fls)
 
 -- TODO: if true then { ... } else false should synthetize a bool, but doesn't...
-typeconstraint (IfThenElse e1 e2 e3) = do
+typeconstraint (IfThenElse e1 e2 e3) = do -- !TODO: Remove bools, make ifthenelse part of desugaring
     (t1, ce1) <- typeconstraint e1
     ctx1 <- get
     (t2, ce2) <- typeconstraint e2
@@ -245,7 +263,7 @@ typeconstraint (CaseOfSum e exps) = do
     (bctx, fctx) <- get
     inferredexps <- mapM (\(s, ex) -> do
         tv <- fresh
-        put (Just (trivialScheme tv):bctx, fctx)
+        addtoboundctx $ trivialScheme tv
         (t', ce) <- typeconstraint ex
         ctx' <- get
         return (t', s, ce, ctx')
@@ -258,16 +276,18 @@ typeconstraint (CaseOfSum e exps) = do
 -- TODO: Refactor whole function
 typeconstraint (CaseOf e exps) = do
     (st, ce) <- typeconstraint e
-    (bctx, fctx) <- get
+    currentctx@(bctx, fctx) <- get
     inferredexps <- mapM (\(s, ex) -> do
+        put currentctx -- reset ctx for every branch
         case lookup s fctx of
             Just (Forall [] (Fun argtype (ADT _))) -> do -- Constructor takes an argument
-                put (Just (trivialScheme argtype):bctx, fctx)
+                addtoboundctx $ trivialScheme argtype
+                lastvi <- getlastvarindex
                 (t', ce) <- typeconstraint ex
+                wasBLVConsumed lastvi >>= guard -- Variable bound in branch must be linearly
                 ctx' <- get
                 return $ Just (t', s, ce, ctx')
             Just (Forall [] (ADT _)) -> do -- Constructor does not take an argument
-                put (bctx, fctx)
                 (t', ce) <- typeconstraint ex
                 ctx' <- get
                 return $ Just (t', s, ce, ctx')

@@ -7,4 +7,4 @@ run:
 	STLLC mymodules/5.ll
 
 test:
-	cabal test
+	./run-tests.sh

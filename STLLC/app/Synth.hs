@@ -235,17 +235,17 @@ focus c goal =
             -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
             -- TODO: Do i need this verification everytime I add a constraint? Kind of makes sense, to detect issues right away
             -- TODO: Será que posso ter em vez disto uma substituição "solved" à qual sempre que quero adicionar uma constraint a resolve logo com as outras, falhando logo em vez de capturar constraints e juntar depois?
-            et <- existencialInstantiate sch                                     -- tipo com existenciais
+            (et, etvars) <- existencialInstantiate sch                                     -- tipo com existenciais
             (se, d') <- focus' (Just (n, et)) ctxt goal   -- fail ou success c restrições
             (constrs, _) <- lift get
             let unify = solveconstraintsExistential Map.empty constrs                                      -- resolve ou falha -- por conflito ou falta informação
             guard (isJust unify)                                                                -- por conflicto
-            -- !TODO: EXEMPLO PARA TESTAR ISTO: guard (Set.disjoint (Set.fromList ns) (ftv $ apply (fromJust unify) et))            -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
+            guard (Set.disjoint (Set.fromList etvars) (ftv $ apply (fromJust unify) et))        -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
             return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
-                where                                                                           -- TODO: É isto certo?
+                where
                     existencialInstantiate (Forall ns t) = do
-                        nevs <- mapM (const $ ExistentialTypeVar <$> freshIndex) ns
-                        return $ apply (Map.fromList $ zip ns nevs) t
+                        netvs <- mapM (const $ do {i <- freshIndex; return (ExistentialTypeVar i, i)}) ns
+                        return (apply (Map.fromList $ zip ns $ map fst netvs) t, map snd netvs)
 
 
         focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)
@@ -282,11 +282,11 @@ focus c goal =
         ---- ADT-R
         focus' Nothing (g, d) (ADT tyn) = do
             cons <- getadtcons tyn
-            foldr ((<|>) . (\(tag, argty) ->
+            foldr ((<|>) . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype -> do
-                       (arge, d') <- synth (g, d, []) argtype; -- !TODO: aqui parece-me fazer mais sentido dizer que queremos sintetizar um argumento para aquela função de tipo tal, mas como havia uma correlação com a regra do Plus, e no Plus é usado focus' à direita, fiquei a pensar se isto estava correto... parece que vai em desencontro às regras
+                       (arge, d') <- synth (g, d, []) argtype;
                        return (App (Var tag) arge, d')
                 )) empty cons
 
