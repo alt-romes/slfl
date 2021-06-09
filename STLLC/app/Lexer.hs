@@ -4,7 +4,13 @@ import Text.Parsec
 import qualified Text.Parsec.Token as Tok
 import Text.Parsec.Language
 
+
+
 type Parser = Parsec String Int
+
+-------------------------------------------------------------------------------
+-- Functions
+-------------------------------------------------------------------------------
 
 lexer :: Tok.TokenParser Int
 lexer = Tok.makeTokenParser style
@@ -35,3 +41,4 @@ contents p = do
   r <- p
   eof
   return r
+

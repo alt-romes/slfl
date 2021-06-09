@@ -1,13 +1,1 @@
-# data Nat = Zero | Succ Nat;
-# let main = {{ (Nat -o Unit) }};
-#
-
-
-
-
-
-
-
-data Sem = Green Bool | Red | Yellow;
-
-let main = {{ (Sem -o Sem) }}
+let main = \x -o true

@@ -1,23 +1,27 @@
-module Parser where
+module Parser (parseExpr, parseModule, parseType) where
 
 import Prelude hiding (Bool, sum)
+import Text.Parsec
+import qualified Text.Parsec.Expr as Ex 
+import Data.Maybe
+import Data.Either
+import Debug.Trace
+
 
 import Lexer
 import CoreSyntax
 import Syntax
 import Program
 
-import Text.Parsec
-import qualified Text.Parsec.Expr as Ex 
 
-import Data.Maybe
-import Data.Either
-import Debug.Trace
 
--- Parsing Expressions
+-------------------------------------------------------------------------------
+-- Expression Parsing
+-------------------------------------------------------------------------------
 
 variable :: Parser Expr 
 variable = Var <$> identifier
+
 
 -- A -o B
 lambda :: Parser Expr 
@@ -26,6 +30,7 @@ lambda = do
     x <- identifier
     t <- option Nothing (do { reservedOp ":"; Just <$> ty })
     try (do { reservedOp "-o"; Syntax.Abs x t <$> expr }) <|> do {reservedOp "->"; Syntax.UnrestrictedAbs x t <$> expr }
+
 
 -- A (*) B
 tensor :: Parser Expr
@@ -37,20 +42,24 @@ tensor = do
     reservedOp ">"
     return $ Syntax.TensorValue e1 e2 
 
+
 lettensorpattern :: Parser Pattern
 lettensorpattern = do
     i1 <- identifier
     reservedOp "*"
     TensorPattern i1 <$> identifier
 
+
 -- 1
 unit :: Parser Expr 
 unit = reserved "<>" >> return Syntax.UnitValue -- TODO : <<><*><>> breaks...
+
 
 letunitpattern :: Parser Pattern
 letunitpattern = do
     reserved "_"
     return UnitPattern
+
 
 -- A & B
 with :: Parser Expr 
@@ -62,6 +71,7 @@ with = do
     reservedOp ">"
     return $ Syntax.WithValue e1 e2
 
+
 proj :: Parser Expr 
 proj = 
     do 
@@ -71,6 +81,7 @@ proj =
     do 
     reserved "snd"
     Syntax.Snd <$> expr
+
 
 -- A (+) B
 plus :: Parser Expr
@@ -85,6 +96,7 @@ plus =
     reserved "inr"
     t1 <- option Nothing (try $ do { t <- ty; reservedOp ":"; return $ Just t})
     Syntax.InjR t1 <$> expr
+
 
 caseplus :: Parser Expr
 caseplus = do
@@ -101,22 +113,25 @@ caseplus = do
     reservedOp "=>"
     Syntax.CaseOfPlus e1 i1 e2 i2 <$> expr
 
+
 -- !A
 bang :: Parser Expr
 bang = do
     reservedOp "!"
     Syntax.BangValue <$> expr
 
+
 letbangpattern :: Parser Pattern
 letbangpattern = do
     reservedOp "!"
     BangPattern <$> identifier
 
+
 -- Bool
 bool :: Parser Expr 
 bool = (reserved "true" >> return Syntax.Tru)
    <|> (reserved "false" >> return Syntax.Fls)
-    -- <|> isZero 
+
 
 letexp :: Parser Expr
 letexp = do
@@ -132,9 +147,11 @@ letexp = do
         BangPattern i1 -> return $ Syntax.LetBang i1 e1 e2
         VanillaPattern i1 -> return $ Syntax.LetIn i1 e1 e2
 
+
 letpattern :: Parser Pattern
 letpattern = do
     try lettensorpattern <|> try letunitpattern <|> try letbangpattern <|> letinpattern
+
 
 -- if M then N else P
 ite :: Parser Expr 
@@ -147,7 +164,6 @@ ite = do
     Syntax.IfThenElse cond tr <$> expr
 
 
--- let x = M in N
 letinpattern :: Parser Pattern
 letinpattern = VanillaPattern <$> identifier
 
@@ -158,6 +174,7 @@ sumtypebranch = do
     t <- option Nothing (do { reservedOp ":"; Just <$> ty })
     reservedOp ";"
     return (tag, t)
+
 
 sum :: Parser Expr
 sum = do
@@ -170,6 +187,7 @@ sum = do
     cls2 <- many (try sumtypebranch)
     reservedOp "}"
     return $ Syntax.SumValue (cls1 ++ cls2) (tag, e)
+    
 
 casebranch :: Parser (String, String, Expr)
 casebranch = do
@@ -178,6 +196,7 @@ casebranch = do
     reservedOp "=>"
     e <- expr
     return (tag, id, e)
+
 
 casesum :: Parser Expr
 casesum = do 
@@ -188,6 +207,7 @@ casesum = do
     c1 <- casebranch
     cls <- many (do {reservedOp "|"; casebranch})
     return $ Syntax.CaseOfSum e1 (c1:cls)
+
 
 caseadt :: Parser Expr
 caseadt = do
@@ -205,21 +225,10 @@ caseof = try casesum
       <|> caseadt
 
 
--- num :: Parser Expr 
--- num =
---     (reserved "Z" >> return Zero)
---     <|> do 
---         reserved "succ"
---         Succ <$> expr
-
--- isZero :: Parser Expr 
--- isZero = do
---     reserved "isZero"
---     IsZero <$> expr
-
 pairepxr :: Parser Expr
 pairepxr = try tensor -- try tensor because "with" is also between "< >"... looks unclear - seria melhor outra opção :)
         <|> try with
+
 
 aexp :: Parser Expr 
 aexp =   parens expr 
@@ -248,15 +257,12 @@ aexp =   parens expr
 
      <|> mark
 
-     -- <|> isZero
-     -- <|> num 
 
 expr :: Parser Expr 
 expr = aexp >>= \x -> 
          (many1 aexp >>= \xs -> return (foldl Syntax.App x xs))
          <|> return x
 
--- Typed placeholder for partial synthesis
 
 mark :: Parser Expr
 mark = reservedOp "{{" >> (typedmark <|> emptymark)
@@ -276,10 +282,16 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
             return $ Syntax.Mark i [] Nothing
 
 
--- Parsing Types 
+
+
+
+-------------------------------------------------------------------------------
+-- Type Parsing
+-------------------------------------------------------------------------------
 
 ty :: Parser Type 
 ty = tylit <|> parens type'
+
 
 tylit :: Parser Type 
 tylit =     sumty
@@ -295,6 +307,7 @@ tylit =     sumty
         <|> (reservedOp "d" >> return (TypeVar 3))
         <|> adty -- TODO: can't write ADTs starting by any of those letters above ^:) e não consegui resolver com o try
 
+
 sumty :: Parser Type
 sumty = do
     reservedOp "+"
@@ -308,6 +321,7 @@ sumty = do
                  )
     reservedOp "}"
     return $ Sum sts
+
 
 adty :: Parser Type
 adty = do
@@ -329,7 +343,12 @@ type' = Ex.buildExpressionParser tyops ty
             ]]
 
 
--- Parsing modules
+
+
+
+-------------------------------------------------------------------------------
+-- Top (Level) Parsing
+-------------------------------------------------------------------------------
 
 argument :: Parser (String, Maybe Type)
 argument = do
@@ -337,20 +356,23 @@ argument = do
     argtype <- option Nothing (do { reservedOp ":"; Just <$> ty})
     return (argname, argtype)
 
+
 letdecl :: Parser Binding
 letdecl = do
-  reserved "let" <|> reserved "var"
-  name <- identifier
-  args <- many argument
-  reservedOp "="
-  body <- expr
-  return $ Binding name $ foldr (uncurry Syntax.Abs) body args
+    reserved "let" <|> reserved "var"
+    name <- identifier
+    args <- many argument
+    reservedOp "="
+    body <- expr
+    return $ Binding name $ foldr (uncurry Syntax.Abs) body args
+
 
 datacon :: Parser (Name, Type)
 datacon = do
     name <- identifier
     t <- option Unit ty
     return (name, t)
+
 
 datatype :: Parser ADTD
 datatype = do
@@ -362,14 +384,17 @@ datatype = do
     optional (reservedOp ";")
     return $ ADTD name (con:cons)
 
+
 val :: Parser Binding
 val = Binding "main" <$> expr
+
 
 top :: Parser Binding
 top = do
   x <- letdecl <|> val
   optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!, é tudo menos optional, menos na ultima linha :P
   return x
+
 
 modl :: Parser Program
 modl = do
@@ -378,7 +403,12 @@ modl = do
     return $ Program adts bs
 
 
----- TOP LEVEL ------------
+
+
+
+-------------------------------------------------------------------------------
+-- Exported Functions
+-------------------------------------------------------------------------------
 
 parseExpr :: String -> Expr
 parseExpr i = case runParser (contents expr) 0 "<stdin>" i of
@@ -394,3 +424,4 @@ parseType :: String -> Type
 parseType i = case runParser (contents ty) 0 "<stdin>" i of
                 Left x -> errorWithoutStackTrace $ "[Type Parse] Failed: " ++ show x
                 Right x -> x
+

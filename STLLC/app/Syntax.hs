@@ -1,13 +1,19 @@
-module Syntax where 
+module Syntax (Binding(..), Expr(..), Pattern(..)) where 
 
 import Data.Maybe
-
 import Prelude hiding (Bool)
+
+
 import CoreSyntax (Type, Scheme, Name)
 
+
+
+-------------------------------------------------------------------------------
+-- Datatypes
+-------------------------------------------------------------------------------
+
 data Binding = Binding Name Expr
-instance (Show Binding) where
-    show (Binding s e) = "let " ++ s ++ " =\n" ++ show e ++ ";\n"
+
 
 data Expr
 
@@ -61,7 +67,6 @@ data Expr
 
     | UnrestrictedAbs String (Maybe Type) Expr
 
-    -- não temos :)
 
 data Pattern
     = TensorPattern String String
@@ -69,6 +74,17 @@ data Pattern
     | BangPattern String
     
     | VanillaPattern String
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- Instances
+-------------------------------------------------------------------------------
+
+instance (Show Binding) where
+    show (Binding s e) = "let " ++ s ++ " =\n" ++ show e ++ ";\n"
 
 
 instance (Show Expr) where
@@ -125,3 +141,4 @@ instance (Show Expr) where
             showexpr' d (UnrestrictedAbs x Nothing e) = indent d ++ "(λ" ++ x ++ " -> " ++ showexpr' (d+1) e ++ ")"
 
             indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
+

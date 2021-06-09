@@ -1,17 +1,23 @@
-module Desugar where
+module Desugar (desugarExpr, desugarModule) where
+
+import Control.Monad.Reader
+import Data.List
+import Data.Maybe
+import Debug.Trace
+
 
 import CoreSyntax
 import Syntax
 import Program
 
-import Control.Monad.Reader
-import Data.List
-import Data.Maybe
 
-import Debug.Trace
 
-data Mult = Linear | Unr | Unknown deriving (Eq, Show)
+-------------------------------------------------------------------------------
+-- Datatypes
+-------------------------------------------------------------------------------
+
 newtype Var a = Var Mult deriving (Eq, Show)
+data Mult = Linear | Unr | Unknown deriving (Eq, Show)
 
 linVar = Desugar.Var Linear
 unVar = Desugar.Var Unr
@@ -20,8 +26,13 @@ unknownVar = Desugar.Var Unknown
 type DesugarEnv = [(Name, Desugar.Var Mult)]
 type Desugar = Reader DesugarEnv
 
-inEnv :: (Name, Desugar.Var Mult) -> Desugar a -> Desugar a
-inEnv (x,e) = local (\env -> (x,e):env)
+
+
+
+
+-------------------------------------------------------------------------------
+-- Functions
+-------------------------------------------------------------------------------
 
 lookupVar :: Name -> Desugar CoreExpr
 lookupVar x = do
@@ -33,6 +44,17 @@ lookupVar x = do
                 Unr -> return $ BUVar $ fromJust $ elemIndex (x, Desugar.Var mult) env
         Nothing -> return $ FUVar x
 
+
+inEnv :: (Name, Desugar.Var Mult) -> Desugar a -> Desugar a
+inEnv (x,e) = local (\env -> (x,e):env)
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- Main Logic
+-------------------------------------------------------------------------------
 
 desugar :: Expr -> Desugar CoreExpr
 desugar (Syntax.Var x) = lookupVar x
@@ -96,10 +118,6 @@ desugar (Syntax.IfThenElse e1 e2 e3) = do
 desugar Syntax.Tru = return CoreSyntax.Tru
 desugar Syntax.Fls = return CoreSyntax.Fls
 
-
--- | SumValue [(String, Maybe Type)] (String, Expr)
--- | CaseOfSum Expr [(String, String, Expr)]
-
 desugar (Syntax.SumValue mts (t, e)) = do
     e' <- desugar e
     return $ CoreSyntax.SumValue mts (t, e')
@@ -125,10 +143,16 @@ desugar (Syntax.UnrestrictedAbs i (Just t) e) = desugar (Syntax.Abs i (Just $ Ba
 desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Syntax.LetBang i (Syntax.Var i) e))
 
 
----- TOP LEVEL ----
+
+
+
+-------------------------------------------------------------------------------
+-- Exported Functions
+-------------------------------------------------------------------------------
 
 desugarExpr :: Expr -> CoreExpr
 desugarExpr exp = runReader (desugar exp) []
+
 
 desugarModule :: Program -> CoreProgram
 desugarModule (Program adts bindings) = CoreProgram adts $ map desugarModule' bindings

@@ -1,22 +1,24 @@
 {-# LANGUAGE LambdaCase #-}
-module Evaluate where
+module Evaluate (evalExpr, evalModule) where
 
 import Data.List
 import Data.Maybe
+import Debug.Trace
+
 
 import CoreSyntax
 import Program
 import Util
 
-import Debug.Trace
 
--- TODO: https://hackage.haskell.org/package/containers-0.4.0.0/docs/Data-Map.html
 
 type BoundCtxt = [CoreExpr]
 type FreeCtxt = [(String, CoreExpr)]
 type Ctxt = (BoundCtxt, FreeCtxt)
 
--- Note: the typechecker should make sure the expression is valid 
+-------------------------------------------------------------------------------
+-- Functions
+-------------------------------------------------------------------------------
 
 substitute :: CoreExpr -> CoreExpr -> CoreExpr
 substitute = substitute' 0
@@ -41,7 +43,15 @@ substitute = substitute' 0
         substitute' d (LetIn e1 e2) v = LetIn (substitute' d e1 v) (substitute' d e2 v)
         substitute' d e v = e      -- atomic expressions
 
--- eval --- Ctxt, CoreExpr -> CoreExpr 
+
+
+
+
+-- Note: the typechecker should have already made sure the expression is valid 
+-------------------------------------------------------------------------------
+-- Main Logic
+-------------------------------------------------------------------------------
+
 eval :: Ctxt -> CoreExpr -> CoreExpr
 
 --- hyp --------------------
@@ -69,7 +79,6 @@ eval ctxt@(bctxt, fctxt) (App e1 e2) =
 --- * ----------------------
 
 --  *I
---
 eval c (TensorValue e1 e2) =
     let e1' = eval c e1 in
     let e2' = eval c e2 in
@@ -172,11 +181,13 @@ eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) =
         let expbranch = fromJust $ lookup tag exps in -- If it's well typed we can assume the lookup to work
             eval (e:bctxt, fctxt) expbranch
 
--- end eval ------------
 
 
 
----- TOP LEVEL ------------
+
+-------------------------------------------------------------------------------
+-- Exported Functions
+-------------------------------------------------------------------------------
 
 evalExpr :: CoreExpr -> CoreExpr
 evalExpr = eval ([], [])

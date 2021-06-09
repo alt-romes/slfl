@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Synth where
+module Synth (synthAllType, synthType, synthScheme, synthMarks, synthMarksModule) where
 
 import Data.List
 import qualified Data.Set as Set
@@ -10,49 +10,67 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Data.Maybe
 import Data.Bifunctor
-
 import Debug.Trace
 
-import CoreSyntax (Name, Type (Fun, Tensor, Unit, With, Plus, Bang, Bool, Atom, TypeVar, ExistentialTypeVar, Sum, ADT), Scheme (Forall))
+
+import CoreSyntax (Name, Type(..), Scheme(..))
 import Syntax
 import Program
 import Util
 import Constraints
 
-type Gamma = [(String, Either Scheme Type)] -- Unrestricted hypothesis
-type Delta = [(String, Type)] -- Linear hypothesis (not left asynchronous)
-type Omega = [(String, Type)] -- Ordered (linear?) hypothesis
+
+
+-- TODO: refactor the Delta_Out into the state monad???
+-- TODO: Faria sentido ter um contexto especial para os ADT constructors em vez de usar free context?
+
+type Gamma = [(String, Either Scheme Type)] -- Unrestricted hypothesis              (Γ)
+type Delta = [(String, Type)]       -- Linear hypothesis (not left asynchronous)    (Δ)
+type Omega = [(String, Type)]       -- Ordered (linear?) hypothesis                 (Ω)
 type Ctxt = (Gamma, Delta, Omega)   -- Delta out is a return value
-
--- TODO: Faria sentido ter um contexto especial para os ADT constructors em vez de free context?
-
 type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
+
+-------------------------------------------------------------------------------
+-- Synth "Monad"
+-------------------------------------------------------------------------------
+
+type Synth a = LogicT (StateT SynthState (Reader [ADTD])) a 
+
 
 type SynthState = ([Constraint], Int)  -- (list of constraints added by the process, next index to instance a variable)
 
--- note: should we also use the state monad for the delta context???
-
-type Synth a = LogicT (StateT SynthState (Reader [ADTD])) a
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
 runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synth (g, d, []) t) st)
 
+
 initSynthState :: SynthState
 initSynthState = ([], 0)
 
+
+
+
+
+-------------------------------------------------------------------------------
+-- Functions
+-------------------------------------------------------------------------------
+
 addconstraint :: Constraint -> Synth ()
 addconstraint c = lift $ modify (first (c :))
+
 
 getadtcons :: Name -> Synth [(Name, Type)]
 getadtcons tyn = do
     adtds <- lift $ lift ask
     return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
 
+
 fresh :: Synth String
 fresh = do 
     (cs, n) <- lift get
     lift $ put (cs, n+1)
     return $ getName n
+
 
 freshIndex :: Synth Int
 freshIndex = do 
@@ -61,41 +79,66 @@ freshIndex = do
     return n
 
 
+assertADTHasCons :: Type -> Synth Bool
+assertADTHasCons t =
+    case t of
+       ADT name -> do
+           cons <- getadtcons name
+           return $ not $ null cons
+       _        ->
+           return True
+
+
+isAtomic :: Type -> Bool
+isAtomic t =
+    case t of
+       Bool                 -> True
+       TypeVar _            -> True
+       ExistentialTypeVar _ -> True
+       Atom _               -> True
+       _                    -> False
+
+
+---- subsitute var n with expn in expf
+substitute :: String -> Expr -> Expr -> Expr
+substitute n expn = editexp (\case {Var _ -> True; _ -> False}) (\v@(Var x) -> if x == n then expn else v)
+
+
+-- TODO: Make Generic and move to constraints?
+ftvctx :: FocusCtxt -> Set.Set Int
+ftvctx = ftvctx' Set.empty
+    where
+        ftvctx' :: Set.Set Int -> FocusCtxt -> Set.Set Int
+        ftvctx' acc (gc, dc) = Set.unions (map (ftvctx'' . snd) gc) `Set.union` Set.unions (map (ftv . snd) dc)
+        ftvctx'' = \case {Right t -> ftv t; Left sch -> ftvsch sch}
+        ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
+
+
+-- TODO: Make Generic and move to constraints?
+generalize :: FocusCtxt -> Type -> Scheme
+generalize ctxt t = Forall ns t 
+    where ns = Set.toList $ Set.difference (ftv t) (ftvctx ctxt)
+
+
+-- TODO: Move to util
 letters :: [String]
 letters = [1..] >>= flip replicateM ['a'..'z']
+
 
 getName :: Int -> String
 getName i = letters !! i
 
 
-isAtomic :: Type -> Bool
-isAtomic t = case t of
-               Bool -> True
-               TypeVar _ -> True
-               ExistentialTypeVar _ -> True
-               Atom _ -> True
-               _ -> False
-
-assertADTHasCons :: Type -> Synth Bool
-assertADTHasCons t = case t of
-                       ADT name -> do
-                           cons <- getadtcons name
-                           return $ not $ null cons
-                       _ -> return True
 
 
----- subsitute var n with expn in expf
-substitute :: String -> Expr -> Expr -> Expr
--- Propositions tend to appear only once due to linearity
-substitute n expn = editexp (\case {Var _ -> True; _ -> False}) (\v@(Var x) -> if x == n then expn else v)
 
----- Synthetizer -----------------------------
+-------------------------------------------------------------------------------
+-- Main Logic
+-------------------------------------------------------------------------------
 
 synth :: Ctxt -> Type -> Synth (Expr, Delta)
 
----- Right asynchronous rules -----------------
-
----- forall a . T (async)  =>   instantiate T   (a' ...) -- TODO: Estou a assumir que se houverem type variables no tipo é como se já tivessem sido "instanciadas", e então começo a síntese sempre com um tipo simples, por isso este passo já não existe correto?
+---- * Right asynchronous rules * -----------------
 
 ---- -oR
 synth (г, d, o) (Fun a b) = do
@@ -111,10 +154,11 @@ synth c (With a b) = do
     guard (d' == d'')
     return (WithValue expa expb, d')
 
--- no more synchronous right propositions, start inverting the ordered context (omega)
+-- no more synchronous right propositions, start inverting the ordered context (Ω)
 
 
----- Left asynchronous rules ------------------
+
+---- * Left asynchronous rules * ------------------
 
 ---- *L
 synth (g, d, (n, Tensor a b):o) t = do
@@ -151,6 +195,7 @@ synth (g, d, (n, Sum tys):o) t = do
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
+---- adtL
 synth (g, d, (n, ADT tyn):o) t = do
     adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
@@ -177,31 +222,28 @@ synth (g, d, (n, Bang a):o) t = do
     guard (nname `notElem` map fst d')
     return (LetBang nname (Var n) exp, d')
 
------ Non-canonical right sync rules ---------
 
--- synth (g, d, (n, Bool):o) t = do
---     (expa, d') <- synth (g, d, o) t
---     (expb, d'') <- synth (g, d, o) t
---     guard (d' == d'')
---     return (IfThenElse (Var n) expa expb, d')
 
----- Synchronous left propositions to Delta ----
+---- * Synchronous left propositions to Δ * -------
 
 synth (g, d, p:o) t =
     synth (g, p:d, o) t
 
----- Synchronous rules -------------------------
+
+
+---- * Synchronous rules * -------------------------
 
 -- no more asynchronous propositions, focus
+
 synth (g, d, []) t = focus (g, d) t
 
+
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
--- because of laziness it'll only run until the first succeeds (bc of observe)
 focus c goal =
     decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal
 
     where
-        decideRight :: FocusCtxt -> Type -> Synth (Expr, Delta)
+        decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
 
         decideRight c goal = do
             if isAtomic goal                            -- to decide right, goal cannot be atomic
@@ -210,10 +252,12 @@ focus c goal =
                     assertADTHasCons goal >>= guard     -- to decide right, goal cannot be an ADT that has no constructors
                     focus' Nothing c goal
 
+
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
               _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+
 
         decideLeftBang (g, din) goal = do
             case g of
@@ -221,6 +265,7 @@ focus c goal =
               _ -> foldr ((<|>) . (\case {
                                         (n, Right x) -> focus' (Just (n, x)) (g, din) goal;
                                         (n, Left sch) -> focusSch (n, sch) (g, din) goal})) empty g
+
         
             
         ---- Eliminating Schemes
@@ -248,9 +293,10 @@ focus c goal =
                         return (apply (Map.fromList $ zip ns $ map fst netvs) t, map snd netvs)
 
 
+
         focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)
 
-        ---- Right synchronous rules ------------------
+        ---- * Right synchronous rules * ------------------
 
         ---- *R
         focus' Nothing c@(g, d) (Tensor a b) = do
@@ -279,7 +325,7 @@ focus c goal =
                    return (SumValue smts (tag, e), d')
                 })) empty sts
 
-        ---- ADT-R
+        ---- adtR
         focus' Nothing (g, d) (ADT tyn) = do
             cons <- getadtcons tyn
             foldr ((<|>) . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
@@ -296,14 +342,9 @@ focus c goal =
             guard (d == d')
             return (BangValue expa, d')
 
-        -- all right propositions focused on are synchronous; this pattern matching should be extensive
 
-        ----- Non-canonical right sync rules ---------
 
-        -- focus' Nothing (g, d) Bool = return (Tru, d) <|> return (Fls, d)
-        ---- TODO: Factor (Bool, Unit, etc) into "Literal?"
-
-        ---- Left synchronous rules -------------------
+        ---- * Left synchronous rules * -------------------
 
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
@@ -324,6 +365,7 @@ focus c goal =
                 (rt, d') <- focus' (Just (nname, b)) c goal
                 return (substitute nname (Snd (Var n)) rt, d')
 
+        ---- ∃L (?)
         focus' (Just (n, ExistentialTypeVar x)) (g, d) goal =
             case goal of
               (ExistentialTypeVar y) ->
@@ -333,11 +375,14 @@ focus c goal =
                   addconstraint $ Constraint (ExistentialTypeVar x) goal
                   return (Var n, d)
 
-        ---- Proposition no longer synchronous --------
+
+
+        ---- * Proposition no longer synchronous * --------
 
         ---- left focus is either atomic or not.
         ---- if it is atomic, it'll either be the goal and instanciate it, or fail
         ---- if it's not atomic, and it's not left synchronous, unfocus
+
         focus' (Just nh@(n, h)) (g, d) goal =
             if isAtomic h
                then do
@@ -346,55 +391,60 @@ focus c goal =
                      (ExistentialTypeVar x) -> do   -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
                          addconstraint $ Constraint (ExistentialTypeVar x) h
                          return (Var n, d)
-                     _ -> do
+                   
+                     _                      -> do
                          guard (h == goal)          -- if is atomic and not the goal, fail
                          return (Var n, d)
                else
-                   ---- left focus is not atomic and not left synchronous, unfocus
+                   -- left focus is not atomic and not left synchronous, unfocus
                    synth (g, d, [nh]) goal
 
+
+
         ---- right focus is not synchronous, unfocus. if it is atomic we fail
+
         focus' Nothing (g, d) goal = do
             (e, d') <- synth (g, d, []) goal
             return (e, d')
 
 
----- util
 
-ftvctx :: FocusCtxt -> Set.Set Int
-ftvctx = ftvctx' Set.empty
-    where
-        ftvctx' :: Set.Set Int -> FocusCtxt -> Set.Set Int
-        ftvctx' acc (gc, dc) = Set.unions (map (ftvctx'' . snd) gc) `Set.union` Set.unions (map (ftv . snd) dc)
-        ftvctx'' = \case {Right t -> ftv t; Left sch -> ftvsch sch}
-        ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
 
-generalize :: FocusCtxt -> Type -> Scheme
-generalize ctxt t = Forall ns t 
-    where ns = Set.toList $ Set.difference (ftv t) (ftvctx ctxt)
 
----- top level
+-------------------------------------------------------------------------------
+-- Functions
+-------------------------------------------------------------------------------
 
 synthCtxAllType :: (Gamma, Delta) -> [ADTD] -> Type -> [Expr]
--- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
-synthCtxAllType c adts t =
+synthCtxAllType c adts t = -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
     let res = runSynth c t initSynthState adts in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res
 
+
 synthCtxType :: (Gamma, Delta) -> [ADTD] -> Type -> Expr
 synthCtxType c adts t = head $ synthCtxAllType c adts t
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- Exported Functions
+-------------------------------------------------------------------------------
 
 synthAllType :: Type -> [Expr]
 synthAllType = synthCtxAllType ([], []) []
 
-synthScheme :: Scheme -> Expr
-synthScheme = undefined
 
--- TODO: i'm assuming this type might contain type variables, and those will be used in the synth process as universal
 synthType :: Type -> Expr
-synthType t = head $ synthAllType t -- TODO: instanciate $ generalize t?
+synthType t = head $ synthAllType t -- TODO: instanciate $ generalize t? TODO: i'm assuming this type might contain type variables, and those will be used in the synth process as universal 
+
+
+synthScheme :: Scheme -> Expr
+synthScheme = undefined -- forall a . T (async)  =>   instantiate T   (a' ...) -- TODO: Estou a assumir que se houverem type variables no tipo é como se já tivessem sido "instanciadas", e então começo a síntese sempre com um tipo simples, por isso este passo já não existe correto?
+
 
 synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
 synthMarks ex adts = editexp
@@ -402,7 +452,7 @@ synthMarks ex adts = editexp
                     (\(Mark _ c t) ->
                         trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)) ex
 
+
 synthMarksModule :: Program -> Program
 synthMarksModule (Program adts bs) = Program adts $ map (\(Binding n e) -> Binding n $ synthMarks e adts) bs
-
 

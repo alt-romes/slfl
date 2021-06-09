@@ -1,11 +1,16 @@
 {-# LANGUAGE LambdaCase #-}
 module Util where
-    
+
+import qualified Data.Map as Map
+
 import CoreSyntax
 import Syntax
 import Program
 
-import qualified Data.Map as Map
+
+
+-- TODO: GIANT REFACTOR
+
 
 findDelete :: (Eq a) => a -> [(a, b)] -> [(a, b)] -> (Maybe b, [(a, b)])
 findDelete _ [] _ = (Nothing, [])
@@ -71,3 +76,4 @@ editexp c f e = if c e then f e else editexp' c f e
         editexp' c f (Syntax.IfThenElse e1 e2 e3) = Syntax.IfThenElse (editexp c f e1) (editexp c f e2) (editexp c f e3)
         editexp' c f (Syntax.LetIn x e1 e2) = Syntax.LetIn x (editexp c f e1) (editexp c f e2)
         editexp' c f e = e      -- atomic expressions
+

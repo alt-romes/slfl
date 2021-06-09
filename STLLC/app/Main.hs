@@ -1,4 +1,7 @@
-module Main where
+module Main (main) where
+
+import System.Environment
+
 
 import CoreSyntax
 import Syntax
@@ -10,17 +13,7 @@ import Evaluate
 import Synth
 import Util
 
-import Data.Either
-import Control.Monad.Reader
-
-import Control.Monad.Trans 
-import System.Console.Haskeline
-
-import System.Environment
-import System.IO
-
 -- import Text.Parsec
-import Debug.Trace
 
 -- process :: String -> IO ()
 -- process line = print $ parseExpr line
@@ -35,26 +28,32 @@ import Debug.Trace
 --             Just input -> liftIO (process input) >> loop
 
 
----- Single Expressions
+
+-------------------------------------------------------------------------------
+-- Inline Programs
+-------------------------------------------------------------------------------
 
 mainparse :: String -> Expr
 mainparse = parseExpr
 
+
 maindesugar :: String -> CoreExpr
 maindesugar = desugarExpr . mainparse
+
 
 maintypecheck :: String -> Scheme
 maintypecheck = typecheckExpr . maindesugar
 
+
 maineval :: String -> CoreExpr
 maineval = evalExpr . maindesugar
+
 
 mainsynth :: String -> Expr
 mainsynth t =
     let surroundtype = '(':t ++ ")" in
         synthType (parseType surroundtype)
 
--- TODO: Se eu chamasse _ <- maintypecheck s; e depois e <- maineval s; ele apenas ia correr (desugarExpr . parseExpr) uma vez por causa de memoization certo?
 
 mainsynthAll :: String -> [Expr]
 mainsynthAll t =
@@ -62,12 +61,18 @@ mainsynthAll t =
         synthAllType (parseType surroundtype)
 
 
----- Modules
+
+
+
+-------------------------------------------------------------------------------
+-- Full Programs
+-------------------------------------------------------------------------------
 
 mainparseModule :: String -> IO Program
 mainparseModule fname = do
     input <- readFile fname
     return $ parseModule fname input
+
 
 maindesugarModule :: String -> IO CoreProgram
 maindesugarModule fname = do
@@ -75,17 +80,18 @@ maindesugarModule fname = do
    let cbindings = desugarModule bindings -- Desugaring is automatically followed by typechecking+inference
    return $ typeinferModule cbindings
 
--- when defining a function you can only use the ones defined above
 
 maintypecheckModule :: String -> IO [TypeBinding]
 maintypecheckModule fname = do
     cbindings <- maindesugarModule fname
     return $ typecheckModule cbindings
 
+
 mainevalModule :: String -> IO CoreExpr
 mainevalModule fname = do
     cbindings <- maindesugarModule fname
     return $ evalModule cbindings
+
 
 mainsynthMarksModule :: String -> IO Program
 mainsynthMarksModule fname = do
@@ -96,7 +102,11 @@ mainsynthMarksModule fname = do
 
 
 
----- Main
+
+
+-------------------------------------------------------------------------------
+-- Main
+-------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
@@ -106,7 +116,7 @@ main = do
                [] -> if null action
                         then "(A -o A)"
                         else "llcprogs/main.llc"
-               (arg:oargs) -> arg)
+               (argx:_) -> argx)
     case action of
       "synth" -> print $ mainsynth arg
       "all" -> print $ mainsynthAll arg
@@ -120,3 +130,4 @@ main = do
       "fparse" -> print $ mainparse arg
       "parse" -> mainparseModule arg >>= print
       _ -> print $ mainsynth action
+
