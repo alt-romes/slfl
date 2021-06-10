@@ -77,7 +77,7 @@ mainparseModule fname = do
 maindesugarModule :: String -> IO CoreProgram
 maindesugarModule fname = do
    bindings <- mainparseModule fname
-   let cbindings = desugarModule bindings -- Desugaring is automatically followed by typechecking+inference
+   let cbindings = desugarModule bindings -- desugaring is automatically followed by typechecking+inference
    return $ typeinferModule cbindings
 
 

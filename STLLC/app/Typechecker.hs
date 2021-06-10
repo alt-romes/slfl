@@ -52,6 +52,9 @@ runinfer :: FreeCtxt -> CoreExpr -> Maybe (((Type, CoreExpr), [Constraint]), Ctx
 runinfer fc e = evalStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
 
 
+
+
+
 -------------------------------------------------------------------------------
 -- Functions
 -------------------------------------------------------------------------------
@@ -105,6 +108,7 @@ ftvctx = ftvctx' Set.empty
         ftvctx' :: Set.Set Int -> Ctxt -> Set.Set Int
         ftvctx' acc (bc, fc) = Set.unions (map ftvsch (catMaybes bc)) `Set.union` Set.unions (map (ftvsch . snd) fc)
         ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
+
 
 
 

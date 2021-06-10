@@ -36,15 +36,15 @@ type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 type Synth a = LogicT (StateT SynthState (Reader [ADTD])) a 
 
 
-type SynthState = ([Constraint], Int)  -- (list of constraints added by the process, next index to instance a variable)
+type SynthState = ([Constraint], Int, Delta)  -- (list of constraints added by the process, next index to instance a variable, delta out)
 
 
-runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
+runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [Expr]
 runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synth (g, d, []) t) st)
 
 
 initSynthState :: SynthState
-initSynthState = ([], 0)
+initSynthState = ([], 0, [])
 
 
 
@@ -55,7 +55,7 @@ initSynthState = ([], 0)
 -------------------------------------------------------------------------------
 
 addconstraint :: Constraint -> Synth ()
-addconstraint c = lift $ modify (first (c :))
+addconstraint c = lift $ modify (\ (cs, i, d) -> (c:cs, i, d))
 
 
 getadtcons :: Name -> Synth [(Name, Type)]
@@ -64,17 +64,25 @@ getadtcons tyn = do
     return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
 
 
+getdelta :: Synth Delta
+getdelta = lift $ gets $ \ (_, _, d) -> d
+
+
+putdelta :: Delta -> Synth ()
+putdelta d = lift $ modify $ \ (cs, i, _) -> (cs, i, d)
+
+
 fresh :: Synth String
 fresh = do 
-    (cs, n) <- lift get
-    lift $ put (cs, n+1)
+    (cs, n, d) <- lift get
+    lift $ put (cs, n+1, d)
     return $ getName n
 
 
 freshIndex :: Synth Int
 freshIndex = do 
-    (cs, n) <- lift get
-    lift $ put (cs, n+1)
+    (cs, n, d) <- lift get
+    lift $ put (cs, n+1, d)
     return n
 
 
@@ -135,23 +143,25 @@ getName i = letters !! i
 -- Main Logic
 -------------------------------------------------------------------------------
 
-synth :: Ctxt -> Type -> Synth (Expr, Delta)
+synth :: Ctxt -> Type -> Synth Expr
 
 ---- * Right asynchronous rules * -----------------
 
 ---- -oR
 synth (г, d, o) (Fun a b) = do
     name <- fresh
-    (exp, d') <- synth (г, d, (name, a):o) b
-    guard (name `notElem` map fst d')
-    return (Abs name (Just a) exp, d')
+    exp <- synth (г, d, (name, a):o) b
+    guard . (name `notElem`) . map fst =<< getdelta
+    return $ Abs name (Just a) exp
 
 ---- &R
 synth c (With a b) = do
-    (expa, d') <- synth c a
-    (expb, d'') <- synth c b
+    expa <- synth c a
+    d' <- getdelta
+    expb <- synth c b
+    d'' <- getdelta
     guard (d' == d'')
-    return (WithValue expa expb, d')
+    return $ WithValue expa expb
 
 -- no more synchronous right propositions, start inverting the ordered context (Ω)
 
@@ -163,36 +173,40 @@ synth c (With a b) = do
 synth (g, d, (n, Tensor a b):o) t = do
     n1 <- fresh
     n2 <- fresh
-    (expt, d') <- synth (g, d, (n2, b):(n1, a):o) t
-    guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
-    return (LetTensor n1 n2 (Var n) expt, d')
+    expt <- synth (g, d, (n2, b):(n1, a):o) t
+    (\ d' -> guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))) =<< getdelta
+    return $ LetTensor n1 n2 (Var n) expt
 
 ---- 1L
 synth (g, d, (n, Unit):o) t = do
-    (expt, d') <- synth (g, d, o) t
-    return (LetUnit (Var n) expt, d')
+    expt <- synth (g, d, o) t
+    return $ LetUnit (Var n) expt
 
 ---- +L
 synth (g, d, (n, Plus a b):o) t = do
     n1 <- fresh
     n2 <- fresh
-    (expa, d') <- synth (g, d, (n1, a):o) t
-    (expb, d'')  <- synth (g, d, (n2, b):o) t
+    expa <- synth (g, d, (n1, a):o) t
+    d' <- getdelta
+    expb  <- synth (g, d, (n2, b):o) t
+    d'' <- getdelta
     guard (d' == d'')
     guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
-    return (CaseOfPlus (Var n) n1 expa n2 expb, d')
+    return $ CaseOfPlus (Var n) n1 expa n2 expb
 
 ---- sumL
 synth (g, d, (n, Sum tys):o) t = do
     ls <- mapM (\(name, ct) -> do
         varid <- fresh
-        (exp, d') <- synth (g, d, (varid, ct):o) t
+        exp <- synth (g, d, (varid, ct):o) t
+        d' <- getdelta
         return (name, varid, exp, d')
         ) tys
     let (n1, varid1, e1, d1') = head ls
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
-    return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
+    putdelta d1'
+    return $ CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls)
 
 ---- adtL
 synth (g, d, (n, ADT tyn):o) t =
@@ -201,11 +215,13 @@ synth (g, d, (n, ADT tyn):o) t =
     ls <- mapM (\(name, vtype) ->
         case vtype of
           Unit -> do
-            (exp, d') <- synth (g, d, o) t
+            exp <- synth (g, d, o) t
+            d' <- getdelta
             return (name, "", exp, d')
           argty -> do
             varid <- fresh
-            (exp, d') <- synth (g, d, (varid, argty):o) t
+            d' <- getdelta
+            exp <- synth (g, d, (varid, argty):o) t
             return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
@@ -213,15 +229,16 @@ synth (g, d, (n, ADT tyn):o) t =
     let (n1, varid1, e1, d1') = head ls
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
-    return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+    putdelta d1'
+    return $ CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls)
 
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
     nname <- fresh
-    (exp, d') <- synth ((nname, Right a):g, d, o) t
-    guard (nname `notElem` map fst d')
-    return (LetBang nname (Var n) exp, d')
+    exp <- synth ((nname, Right a):g, d, o) t
+    guard . (nname `notElem`) . map fst =<< getdelta
+    return $ LetBang nname (Var n) exp
 
 
 
