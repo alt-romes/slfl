@@ -22,7 +22,6 @@ import Constraints
 
 
 -- TODO: refactor the Delta_Out into the state monad???
--- TODO: Faria sentido ter um contexto especial para os ADT constructors em vez de usar free context?
 
 type Gamma = [(String, Either Scheme Type)] -- Unrestricted hypothesis              (Γ)
 type Delta = [(String, Type)]       -- Linear hypothesis (not left asynchronous)    (Δ)
@@ -92,10 +91,8 @@ assertADTHasCons t =
 isAtomic :: Type -> Bool
 isAtomic t =
     case t of
-       Bool                 -> True
        TypeVar _            -> True
        ExistentialTypeVar _ -> True
-       Atom _               -> True
        _                    -> False
 
 
@@ -145,8 +142,8 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 ---- -oR
 synth (г, d, o) (Fun a b) = do
     name <- fresh
-    (exp, d') <- synth (г, d, (name, a):o) b
-    guard (name `notElem` map fst d')
+    (exp, d') <- trace ("put " ++ show a ++ " in context to get " ++ show b) $ synth (г, d, (name, a):o) b
+    trace "out" $ guard (name `notElem` map fst d')
     return (Abs name (Just a) exp, d')
 
 ---- &R
@@ -198,7 +195,8 @@ synth (g, d, (n, Sum tys):o) t = do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, (n, ADT tyn):o) t = do
+synth (g, d, (n, ADT tyn):o) t =
+    do
     adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
         case vtype of
@@ -216,6 +214,11 @@ synth (g, d, (n, ADT tyn):o) t = do
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+    <|>
+    do
+    guard $ ADT tyn == t            -- !TODO: Assim deixamos de ter aquela propriedade de que não recordo o nome de desconstruirmos sempre tudo para voltar a construir, mas à partida não está errada certo?, simplesmente damos logo a variável mais cedo
+    focus (g, (n, ADT tyn):d) t  -- TODO: A instanciação de Vars costuma ser quando se está focado no contexto ... posso fazer isto assim preemptivamente aqui? foi um bocado por intuição mas não sei se posso estragar as regras assim... :)
+
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
@@ -241,8 +244,8 @@ synth (g, d, []) t = focus (g, d) t
 
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
-focus c goal =
-    decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal
+focus c goal = trace ("Focus on " ++ show goal ++ " with ctx: " ++ show c)
+    (decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal)
 
     where
         decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
@@ -258,7 +261,7 @@ focus c goal =
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> trace ("decide left " ++ show x ++ " to prove goal " ++ show goal) focus' (Just x) (g, delete x din) goal)) empty din
 
 
         decideLeftBang (g, din) goal = do
@@ -385,21 +388,22 @@ focus c goal =
         ---- if it is atomic, it'll either be the goal and instanciate it, or fail
         ---- if it's not atomic, and it's not left synchronous, unfocus
 
-        focus' (Just nh@(n, h)) (g, d) goal =
-            if isAtomic h
-               then do
-                   -- left focus is atomic
-                   case goal of
-                     (ExistentialTypeVar x) -> do   -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
-                         addconstraint $ Constraint (ExistentialTypeVar x) h
+        focus' (Just nh@(n, h)) (g, d) goal
+          | isAtomic h                      -- left focus is atomic
+          = do case goal of
+                 (ExistentialTypeVar x)     -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
+                   -> do addconstraint $ Constraint (ExistentialTypeVar x) h
                          return (Var n, d)
-                   
-                     _                      -> do
-                         guard (h == goal)          -- if is atomic and not the goal, fail
-                         return (Var n, d)
-               else
-                   -- left focus is not atomic and not left synchronous, unfocus
-                   synth (g, d, [nh]) goal
+                 _ -> do guard (h == goal)  -- if is atomic and not the goal, fail
+                         return (Var n, d)  -- else, instantiate it
+
+          | case goal of
+              (ADT tyn) -> h == ADT tyn     -- !TODO: Assim deixamos de ter aquela propriedade de que não recordo o nome de desconstruirmos sempre tudo para voltar a construir, mas à partida não está errada certo?
+              _ -> False
+          = return (Var n, d)               -- left focus is not atomic and not left synchronous, but we can stop deconstructing and instanciate the ADT right away.
+
+          | otherwise
+          = synth (g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
 
 
 

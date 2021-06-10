@@ -52,12 +52,6 @@ data Expr
 
     | Mark Int [(String, Scheme)] (Maybe Type)
 
-    | IfThenElse Expr Expr Expr
-
-    -- Bool
-    | Tru
-    | Fls
-
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, Expr)
     | CaseOfSum Expr [(String, String, Expr)]
@@ -116,12 +110,6 @@ instance (Show Expr) where
             showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (Mark _ _ t) = "{{ " ++ show t ++ " }}"
-            showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++ 
-                                                    indent (d+1) ++ "then " ++ showexpr' (d+1) e2 ++
-                                                    indent (d+1) ++ "else " ++ showexpr' (d+1) e3
-            showexpr' d Tru = "true"
-            showexpr' d Fls = "false"
-            -- | CaseOfSum Expr [(String, String, Expr)]
             showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
                 foldl (\p (s, mt) -> p ++ indent (d+2) ++ s ++ maybe "" (\t -> " : " ++ show t) mt ++ ";") "" mts
                 ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"

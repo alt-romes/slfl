@@ -110,14 +110,6 @@ desugar (Syntax.LetIn id e1 e2) = do
 
 desugar (Syntax.Mark i c t) = return $ CoreSyntax.Mark i c t
 
-desugar (Syntax.IfThenElse e1 e2 e3) = do
-    e1' <- desugar e1
-    e2' <- desugar e2
-    CoreSyntax.IfThenElse e1' e2' <$> desugar e3
-
-desugar Syntax.Tru = return CoreSyntax.Tru
-desugar Syntax.Fls = return CoreSyntax.Fls
-
 desugar (Syntax.SumValue mts (t, e)) = do
     e' <- desugar e
     return $ CoreSyntax.SumValue mts (t, e')

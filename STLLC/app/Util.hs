@@ -39,15 +39,13 @@ copyMarksTypes (Binding n e) (CoreBinding _ ce) = Binding n $ copyMarksTypes' (g
         getMarksTypes m (CoreSyntax.CaseOfPlus e e' e'') = getMarksTypes m e `Map.union` getMarksTypes m e' `Map.union` getMarksTypes m e''
         getMarksTypes m (CoreSyntax.BangValue e) = getMarksTypes m e
         getMarksTypes m (CoreSyntax.LetIn e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
-        getMarksTypes m (CoreSyntax.IfThenElse e e' e'') = getMarksTypes m e `Map.union` getMarksTypes m e' `Map.union` getMarksTypes m e''
         getMarksTypes m a = m
 
         copyMarksTypes' :: MarksTypes -> Expr -> Expr
         copyMarksTypes' m e =
             Syntax.transform (\case
                 (Syntax.Mark i _ t) -> let (c, t) = Map.findWithDefault (error "[Copy Marks Types] Failed to find mark index in map, make sure to use the same expression desugared and non-desugared when copying marks types.") i m in Syntax.Mark i c t;
-                                     x -> x) e
+                 x -> x) e
 
 copyMarksTypesModule :: Program -> CoreProgram -> Program
 copyMarksTypesModule (Program adts bs) (CoreProgram _ cbs) = Program adts $ zipWith copyMarksTypes bs cbs
-

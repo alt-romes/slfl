@@ -106,8 +106,6 @@ instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
 -------------------------------------------------------------------------------
 
 unify :: Type -> Type -> Maybe Subst 
-unify Bool Bool = Just Map.empty
-unify (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unify Unit Unit = Just Map.empty
 unify (ADT x) (ADT y) = if x == y then Just Map.empty else Nothing
 unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (TypeVar y)
@@ -139,8 +137,6 @@ unify _ _ = Nothing
 
 
 unifyExistential :: Type -> Type -> Maybe Subst 
-unifyExistential Bool Bool = Just Map.empty
-unifyExistential (Atom x) (Atom y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ADT x) (ADT y) = if x == y then Just Map.empty else Nothing
 unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing

@@ -56,11 +56,6 @@ data CoreExpr
 
     | Mark Int [(String, Scheme)] (Maybe Type)
 
-    -- Bool
-    | Tru
-    | Fls
-    | IfThenElse CoreExpr CoreExpr CoreExpr
-
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, CoreExpr)
     | CaseOfSum CoreExpr [(String, CoreExpr)]
@@ -83,10 +78,6 @@ data Type
 
     | TypeVar Int       -- Type variable (uninterpreted type) used for reconstruction
     | ExistentialTypeVar Int
-
-    | Bool
-    
-    | Atom String
 
     | Sum [(String, Type)]
 
@@ -123,8 +114,6 @@ instance (Show Type) where
     show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"
     show (Plus t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
     show (Bang t1) = "(! " ++ show t1 ++ ")"
-    show Bool = "Bool"
-    show (Atom x) = x
     show (TypeVar x) = letters !! x
     show (ExistentialTypeVar x) = "?" ++ letters !! x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
@@ -169,21 +158,6 @@ transform f e = runIdentity (transformM (return . f) e)
 
 
 
--- TODO: porque é que prefiro a de cima em vez de esta? porque posso utilizar o estado com as monads? desde que a função não dependa de nenhum estado dentro de monads não faz diferença certo
-descend2 :: (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
-descend2 f (BLVar x) = f $ BLVar x
-descend2 f (BUVar x) = f $ BUVar x
-descend2 f (FLVar x) = f $ FLVar x
-descend2 f (FUVar x) = f $ FUVar x
-descend2 f (Abs t e) = f (Abs t $ descend2 f e)
-descend2 f (App e1 e2) = f (App (descend2 f e1) (descend2 f e2))
-descend2 _ _ = undefined
-
-
-
-
-
-
 
 
 -------------------------------------------------------------------------------
@@ -215,11 +189,6 @@ showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
 showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 showexpr' _ (Mark _ _ t) = "{{ " ++ show t ++ " }}"
-showexpr' d (IfThenElse e1 e2 e3) = indent d ++ "if " ++ showexpr' d e1 ++ 
-                                        indent (d+1) ++ "then " ++ showexpr' (d+1) e2 ++
-                                        indent (d+1) ++ "else " ++ showexpr' (d+1) e3
-showexpr' _ Tru = "true"
-showexpr' _ Fls = "false"
 showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
     foldl (\p (s', t) -> p ++ indent (d+2) ++ s' ++ " : " ++ show (fromJust t) ++ ";") "" mts
     ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
@@ -237,8 +206,10 @@ showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e +
             "| " ++ t ++ " " ++ "?" ++ " => " ++
                 showexpr' (d+2) ex) "" exps
 
+
 indent :: Int -> String
 indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
+
 
 letters :: [String]
 letters = [1..] >>= flip replicateM ['a'..'z']

@@ -289,7 +289,7 @@ typeconstraint (LetIn e1 e2) = do
     (t2, ce2) <- typeconstraint e2
     return (t2, LetIn ce1 ce2)
 
---- Synth marker ---
+--- Synth marker -----------
 
 typeconstraint (Mark i _ t) = do
     tv <- fresh
@@ -302,23 +302,6 @@ typeconstraint (Mark i _ t) = do
                 if null ns
                    then nontrivialschemes xs acc
                    else nontrivialschemes xs ((n, Forall ns t):acc)
-
---- Bool -------------------
-
-typeconstraint Tru = return (Bool, Tru)
-typeconstraint Fls = return (Bool, Fls)
-
--- TODO: if true then { ... } else false should synthetize a bool, but doesn't...
-typeconstraint (IfThenElse e1 e2 e3) = do -- !TODO: Remove bools, make ifthenelse part of desugaring
-    (t1, ce1) <- typeconstraint e1
-    ctx1 <- get
-    (t2, ce2) <- typeconstraint e2
-    ctx2 <- get
-    put ctx1
-    (t3, ce3) <- typeconstraint e3
-    ctx3 <- get
-    guard $ equalDeltas ctx2 ctx3
-    writer ((t3, IfThenElse ce1 ce2 ce3), [Constraint t2 t3, Constraint t1 Bool])
 
 --- Sum --------------------
 

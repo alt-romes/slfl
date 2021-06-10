@@ -153,17 +153,6 @@ eval ctxt@(bctxt, fctxt) (LetIn e1 e2) =
 
 eval _ (Mark _ _ t) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
 
---- Bool -------------------
-
-eval ctxt Tru = Tru
-eval ctxt Fls = Fls
-
-eval ctxt (IfThenElse e1 e2 e3) =
-    let cond = eval ctxt e1 in
-    case cond of
-        Tru -> eval ctxt e2
-        Fls -> eval ctxt e3
-
 --- Sum Type ---------------
 
 eval ctxt (SumValue mts (tag, e)) =
@@ -175,7 +164,7 @@ eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) =
         let expbranch = fromJust $ lookup tag exps in -- If it's well typed we can assume the lookup to work
             eval (e:bctxt, fctxt) expbranch
 
-
+-- TODO: CaseOf ADT
 
 
 

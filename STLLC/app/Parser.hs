@@ -1,6 +1,6 @@
 module Parser (parseExpr, parseModule, parseType) where
 
-import Prelude hiding (Bool, sum)
+import Prelude hiding (sum)
 import Text.Parsec
 import qualified Text.Parsec.Expr as Ex 
 import Data.Maybe
@@ -127,12 +127,6 @@ letbangpattern = do
     BangPattern <$> identifier
 
 
--- Bool
-bool :: Parser Expr 
-bool = (reserved "true" >> return Syntax.Tru)
-   <|> (reserved "false" >> return Syntax.Fls)
-
-
 letexp :: Parser Expr
 letexp = do
     reserved "let"
@@ -151,17 +145,6 @@ letexp = do
 letpattern :: Parser Pattern
 letpattern = do
     try lettensorpattern <|> try letunitpattern <|> try letbangpattern <|> letinpattern
-
-
--- if M then N else P
-ite :: Parser Expr 
-ite = do
-    reserved "if"
-    cond <- expr 
-    reserved "then"
-    tr <- expr 
-    reserved "else"
-    Syntax.IfThenElse cond tr <$> expr
 
 
 letinpattern :: Parser Pattern
@@ -232,29 +215,16 @@ pairepxr = try tensor -- try tensor because "with" is also between "< >"... look
 
 aexp :: Parser Expr 
 aexp =   parens expr 
-
      <|> lambda 
-
      <|> pairepxr
-
      <|> unit -- not correctly parsing <<>*<>>
-
      <|> proj
-
      <|> plus
      <|> sum
      <|> caseof
-
      <|> bang
-
      <|> letexp
-
-     <|> bool 
-
-     <|> ite 
-
      <|> variable
-
      <|> mark
 
 
@@ -296,16 +266,11 @@ ty = tylit <|> parens type'
 tylit :: Parser Type 
 tylit =     sumty
         <|> (reservedOp "1" >> return Unit)
-        <|> (reservedOp "Bool" >> return Bool)
-        <|> (reservedOp "A" >> return (Atom "A")) -- TODO: Melhor forma de fazer parse de atomos :)
-        <|> (reservedOp "B" >> return (Atom "B"))
-        <|> (reservedOp "C" >> return (Atom "C"))
-        <|> (reservedOp "D" >> return (Atom "D"))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: fazer parse de type variables ?? :)
         <|> (reservedOp "b" >> return (TypeVar 1))
         <|> (reservedOp "c" >> return (TypeVar 2))
         <|> (reservedOp "d" >> return (TypeVar 3))
-        <|> adty -- TODO: can't write ADTs starting by any of those letters above ^:) e não consegui resolver com o try
+        <|> adty -- TODO: can't write ADTs starting by any of those letters above ^:) e não consegui resolver com o try (fazer "starts with uppercase" e assim)
 
 
 sumty :: Parser Type
