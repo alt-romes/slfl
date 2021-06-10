@@ -4,6 +4,7 @@ module Evaluate (evalExpr, evalModule) where
 import Data.List
 import Data.Maybe
 import Debug.Trace
+import Control.Monad.State
 
 
 import CoreSyntax
@@ -21,27 +22,20 @@ type Ctxt = (BoundCtxt, FreeCtxt)
 -------------------------------------------------------------------------------
 
 substitute :: CoreExpr -> CoreExpr -> CoreExpr
-substitute = substitute' 0
+substitute e v = evalState (transformM (substitute' v) e) 0
     where
-        substitute' :: Int -> CoreExpr -> CoreExpr -> CoreExpr
-        substitute' d bl@(BLVar x) v = if x == d then v else bl
-        substitute' d bu@(BUVar x) v = if x == d then v else bu
-        substitute' d (Abs t e) v = Abs t $ substitute' (d+1) e v
-        substitute' d (App e1 e2) v = App (substitute' d e1 v) (substitute' d e2 v)
-        substitute' d (TensorValue e1 e2) v = TensorValue (substitute' d e1 v) (substitute' d e2 v)
-        substitute' d (LetTensor e1 e2) v = LetTensor (substitute' d e1 v) (substitute' d e2 v)
-        substitute' d (LetUnit e1 e2) v = LetUnit (substitute' d e1 v) (substitute' d e2 v)
-        substitute' d (WithValue e1 e2) v = WithValue (substitute' d e1 v) (substitute' d e2 v)
-        substitute' d (Fst e) v = Fst $ substitute' d e v
-        substitute' d (Snd e) v = Snd $ substitute' d e v
-        substitute' d (InjL t e) v = InjL t $ substitute' d e v
-        substitute' d (InjR t e) v = InjR t $ substitute' d e v
-        substitute' d (CaseOfPlus e1 e2 e3) v = CaseOfPlus (substitute' d e1 v) (substitute' d e2 v) (substitute' d e3 v)
-        substitute' d (BangValue e) v = BangValue (substitute' d e v)
-        substitute' d (LetBang e1 e2) v = LetBang (substitute' d e1 v) (substitute' d e2 v)
-        substitute' d (IfThenElse e1 e2 e3) v = IfThenElse (substitute' d e1 v) (substitute' d e2 v) (substitute' d e3 v)
-        substitute' d (LetIn e1 e2) v = LetIn (substitute' d e1 v) (substitute' d e2 v)
-        substitute' d e v = e      -- atomic expressions
+        substitute' :: CoreExpr -> CoreExpr -> State Int CoreExpr
+        substitute' v bl@(BLVar x) = do
+            d <- get
+            if x == d
+               then return v
+               else return bl
+        substitute' v bu@(BUVar x) = do
+            d <- get
+            if x == d
+               then return v
+               else return bu
+        substitute' v e = return e
 
 
 

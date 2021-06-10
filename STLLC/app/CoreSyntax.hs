@@ -138,34 +138,34 @@ instance (Show Type) where
 -- Traversal
 -------------------------------------------------------------------------------
 
-transformM :: (Monad m, Applicative m) => (CoreExpr -> CoreExpr) -> CoreExpr -> m CoreExpr
-transformM f (BLVar x) = pure $ f $ BLVar x
-transformM f (BUVar x) = pure $ f $ BUVar x
-transformM f (FLVar x) = pure $ f $ FLVar x
-transformM f (FUVar x) = pure $ f $ FUVar x
-transformM f (Abs t e) = f <$> (Abs t <$> transformM f e)
-transformM f (App e1 e2) = f <$> (App <$> transformM f e1 <*> transformM f e2)
-transformM f (TensorValue e1 e2) = f <$> (TensorValue <$> transformM f e1 <*> transformM f e2)
-transformM f (LetTensor e1 e2) = f <$> (LetTensor <$> transformM f e1 <*> transformM f e2)
-transformM f UnitValue = pure $ f UnitValue
-transformM f (LetUnit e1 e2) = f <$> (LetUnit <$> transformM f e1 <*> transformM f e2)
-transformM f (WithValue e1 e2) = f <$> (WithValue <$> transformM f e1 <*> transformM f e2)
-transformM f (Fst e) = f <$> (Fst <$> transformM f e)
-transformM f (Snd e) = f <$> (Snd <$> transformM f e)
-transformM f (InjL t e) = f <$> (InjL t <$> transformM f e)
-transformM f (InjR t e) = f <$> (InjR t <$> transformM f e)
-transformM f (CaseOfPlus e1 e2 e3) = f <$> (CaseOfPlus <$> transformM f e1 <*> transformM f e2 <*> transformM f e3)
-transformM f (BangValue e) = f <$> (BangValue <$> transformM f e)
-transformM f (LetBang e1 e2) = f <$> (LetBang <$> transformM f e1 <*> transformM f e2)
-transformM f (LetIn e1 e2) = f <$> (LetIn <$> transformM f e1 <*> transformM f e2)
-transformM f (Mark a b t) = pure $ f $ Mark a b t
-transformM f (SumValue mts (s, e)) = f <$> (SumValue mts . (,) s <$> transformM f e)
-transformM f (CaseOfSum e ls) = f <$> (CaseOfSum <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
-transformM f (CaseOf e ls) = f <$> (CaseOf <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
+transformM :: (Monad m, Applicative m) => (CoreExpr -> m CoreExpr) -> CoreExpr -> m CoreExpr
+transformM f (BLVar x) = f $ BLVar x
+transformM f (BUVar x) = f $ BUVar x
+transformM f (FLVar x) = f $ FLVar x
+transformM f (FUVar x) = f $ FUVar x
+transformM f (Abs t e) = f . Abs t =<< transformM f e
+transformM f (App e1 e2) = f =<< (App <$> transformM f e1 <*> transformM f e2)
+transformM f (TensorValue e1 e2) = f =<< (TensorValue <$> transformM f e1 <*> transformM f e2)
+transformM f (LetTensor e1 e2) = f =<< (LetTensor <$> transformM f e1 <*> transformM f e2)
+transformM f UnitValue = f UnitValue
+transformM f (LetUnit e1 e2) = f =<< (LetUnit <$> transformM f e1 <*> transformM f e2)
+transformM f (WithValue e1 e2) = f =<< (WithValue <$> transformM f e1 <*> transformM f e2)
+transformM f (Fst e) = f . Fst =<< transformM f e
+transformM f (Snd e) = f . Snd =<< transformM f e
+transformM f (InjL t e) = f . InjL t =<< transformM f e
+transformM f (InjR t e) = f . InjR t =<< transformM f e
+transformM f (CaseOfPlus e1 e2 e3) = f =<< (CaseOfPlus <$> transformM f e1 <*> transformM f e2 <*> transformM f e3)
+transformM f (BangValue e) = f . BangValue =<< transformM f e
+transformM f (LetBang e1 e2) = f =<< (LetBang <$> transformM f e1 <*> transformM f e2)
+transformM f (LetIn e1 e2) = f =<< (LetIn <$> transformM f e1 <*> transformM f e2)
+transformM f (Mark a b t) = f $ Mark a b t
+transformM f (SumValue mts (s, e)) = f . SumValue mts . (,) s =<< transformM f e
+transformM f (CaseOfSum e ls) = f =<< (CaseOfSum <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
+transformM f (CaseOf e ls) = f =<< (CaseOf <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
 
 
 transform :: (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
-transform f e = runIdentity (transformM f e)
+transform f e = runIdentity (transformM (return . f) e)
 
 
 
