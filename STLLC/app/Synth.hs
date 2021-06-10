@@ -142,8 +142,8 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 ---- -oR
 synth (г, d, o) (Fun a b) = do
     name <- fresh
-    (exp, d') <- trace ("put " ++ show a ++ " in context to get " ++ show b) $ synth (г, d, (name, a):o) b
-    trace "out" $ guard (name `notElem` map fst d')
+    (exp, d') <- synth (г, d, (name, a):o) b
+    guard (name `notElem` map fst d')
     return (Abs name (Just a) exp, d')
 
 ---- &R
@@ -214,10 +214,6 @@ synth (g, d, (n, ADT tyn):o) t =
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
-    <|>
-    do
-    guard $ ADT tyn == t            -- !TODO: Assim deixamos de ter aquela propriedade de que não recordo o nome de desconstruirmos sempre tudo para voltar a construir, mas à partida não está errada certo?, simplesmente damos logo a variável mais cedo
-    focus (g, (n, ADT tyn):d) t  -- TODO: A instanciação de Vars costuma ser quando se está focado no contexto ... posso fazer isto assim preemptivamente aqui? foi um bocado por intuição mas não sei se posso estragar as regras assim... :)
 
 
 ---- !L
@@ -244,8 +240,8 @@ synth (g, d, []) t = focus (g, d) t
 
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
-focus c goal = trace ("Focus on " ++ show goal ++ " with ctx: " ++ show c)
-    (decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal)
+focus c goal =
+    decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal
 
     where
         decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
@@ -261,7 +257,7 @@ focus c goal = trace ("Focus on " ++ show goal ++ " with ctx: " ++ show c)
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> trace ("decide left " ++ show x ++ " to prove goal " ++ show goal) focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
 
 
         decideLeftBang (g, din) goal = do
@@ -396,12 +392,6 @@ focus c goal = trace ("Focus on " ++ show goal ++ " with ctx: " ++ show c)
                          return (Var n, d)
                  _ -> do guard (h == goal)  -- if is atomic and not the goal, fail
                          return (Var n, d)  -- else, instantiate it
-
-          | case goal of
-              (ADT tyn) -> h == ADT tyn     -- !TODO: Assim deixamos de ter aquela propriedade de que não recordo o nome de desconstruirmos sempre tudo para voltar a construir, mas à partida não está errada certo?
-              _ -> False
-          = return (Var n, d)               -- left focus is not atomic and not left synchronous, but we can stop deconstructing and instanciate the ADT right away.
-
           | otherwise
           = synth (g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
 
