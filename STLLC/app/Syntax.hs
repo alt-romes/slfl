@@ -1,7 +1,8 @@
-module Syntax (Binding(..), Expr(..), Pattern(..)) where 
+module Syntax (Binding(..), Expr(..), Pattern(..), transformM, transform) where 
 
 import Data.Maybe
 import Prelude hiding (Bool)
+import Data.Functor.Identity
 
 
 import CoreSyntax (Type, Scheme, Name)
@@ -141,4 +142,38 @@ instance (Show Expr) where
             showexpr' d (UnrestrictedAbs x Nothing e) = indent d ++ "(λ" ++ x ++ " -> " ++ showexpr' (d+1) e ++ ")"
 
             indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- Traversal
+-------------------------------------------------------------------------------
+
+transformM :: (Monad m, Applicative m) => (Expr -> Expr) -> Expr -> m Expr
+transformM f (Var x) = pure $ f $ Var x
+transformM f (Abs x t e) = f <$> (Abs x t <$> transformM f e)
+transformM f (App e1 e2) = f <$> (App <$> transformM f e1 <*> transformM f e2)
+transformM f (TensorValue e1 e2) = f <$> (TensorValue <$> transformM f e1 <*> transformM f e2)
+transformM f (LetTensor x y e1 e2) = f <$> (LetTensor x y <$> transformM f e1 <*> transformM f e2)
+transformM f UnitValue = pure $ f UnitValue
+transformM f (LetUnit e1 e2) = f <$> (LetUnit <$> transformM f e1 <*> transformM f e2)
+transformM f (WithValue e1 e2) = f <$> (WithValue <$> transformM f e1 <*> transformM f e2)
+transformM f (Fst e) = f <$> (Fst <$> transformM f e)
+transformM f (Snd e) = f <$> (Snd <$> transformM f e)
+transformM f (InjL t e) = f <$> (InjL t <$> transformM f e)
+transformM f (InjR t e) = f <$> (InjR t <$> transformM f e)
+transformM f (CaseOfPlus e1 x e2 y e3) = f <$> (CaseOfPlus <$> transformM f e1 <*> pure x <*> transformM f e2 <*> pure y <*> transformM f e3)
+transformM f (BangValue e) = f <$> (BangValue <$> transformM f e)
+transformM f (LetBang x e1 e2) = f <$> (LetBang x <$> transformM f e1 <*> transformM f e2)
+transformM f (LetIn x e1 e2) = f <$> (LetIn x <$> transformM f e1 <*> transformM f e2)
+transformM f (Mark a b t) = pure $ f $ Mark a b t
+transformM f (SumValue mts (s, e)) = f <$> (SumValue mts . (,) s <$> transformM f e)
+transformM f (CaseOfSum e ls) = f <$> (CaseOfSum <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
+transformM f (CaseOf e ls) = f <$> (CaseOf <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
+
+
+transform :: (Expr -> Expr) -> Expr -> Expr
+transform f e = runIdentity (transformM f e)
 

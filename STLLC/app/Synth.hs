@@ -101,8 +101,10 @@ isAtomic t =
 
 ---- subsitute var n with expn in expf
 substitute :: String -> Expr -> Expr -> Expr
-substitute n expn = editexp (\case {Var _ -> True; _ -> False}) (\v@(Var x) -> if x == n then expn else v)
-
+substitute n expn = transform (\case
+                                v@(Var x) -> if x == n then expn else v
+                                x -> x)
+-- descendM
 
 -- TODO: Make Generic and move to constraints?
 ftvctx :: FocusCtxt -> Set.Set Int
@@ -447,10 +449,10 @@ synthScheme = undefined -- forall a . T (async)  =>   instantiate T   (a' ...) -
 
 
 synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks ex adts = editexp
-                (\case {Mark {} -> True; _ -> False})
-                    (\(Mark _ c t) ->
-                        trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)) ex
+synthMarks ex adts = transform (\case
+                                (Mark _ c t) -> trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
+                                x -> x
+                               ) ex
 
 
 synthMarksModule :: Program -> Program

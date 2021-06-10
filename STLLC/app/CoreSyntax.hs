@@ -1,8 +1,10 @@
-module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..)) where 
+module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..), transformM, transform) where 
 
 import Prelude hiding (Bool)
 import Control.Monad
 import Data.Maybe
+import Data.Bifunctor
+import Data.Functor.Identity
 
 
 
@@ -100,6 +102,8 @@ data Type
 -- Instances
 -------------------------------------------------------------------------------
 
+---- * Show * ----
+
 instance (Show CoreBinding) where
     show (CoreBinding s e) = s ++ ":\n" ++ show e ++ "\n"
 
@@ -131,7 +135,59 @@ instance (Show Type) where
 
 
 -------------------------------------------------------------------------------
--- Util 
+-- Traversal
+-------------------------------------------------------------------------------
+
+transformM :: (Monad m, Applicative m) => (CoreExpr -> CoreExpr) -> CoreExpr -> m CoreExpr
+transformM f (BLVar x) = pure $ f $ BLVar x
+transformM f (BUVar x) = pure $ f $ BUVar x
+transformM f (FLVar x) = pure $ f $ FLVar x
+transformM f (FUVar x) = pure $ f $ FUVar x
+transformM f (Abs t e) = f <$> (Abs t <$> transformM f e)
+transformM f (App e1 e2) = f <$> (App <$> transformM f e1 <*> transformM f e2)
+transformM f (TensorValue e1 e2) = f <$> (TensorValue <$> transformM f e1 <*> transformM f e2)
+transformM f (LetTensor e1 e2) = f <$> (LetTensor <$> transformM f e1 <*> transformM f e2)
+transformM f UnitValue = pure $ f UnitValue
+transformM f (LetUnit e1 e2) = f <$> (LetUnit <$> transformM f e1 <*> transformM f e2)
+transformM f (WithValue e1 e2) = f <$> (WithValue <$> transformM f e1 <*> transformM f e2)
+transformM f (Fst e) = f <$> (Fst <$> transformM f e)
+transformM f (Snd e) = f <$> (Snd <$> transformM f e)
+transformM f (InjL t e) = f <$> (InjL t <$> transformM f e)
+transformM f (InjR t e) = f <$> (InjR t <$> transformM f e)
+transformM f (CaseOfPlus e1 e2 e3) = f <$> (CaseOfPlus <$> transformM f e1 <*> transformM f e2 <*> transformM f e3)
+transformM f (BangValue e) = f <$> (BangValue <$> transformM f e)
+transformM f (LetBang e1 e2) = f <$> (LetBang <$> transformM f e1 <*> transformM f e2)
+transformM f (LetIn e1 e2) = f <$> (LetIn <$> transformM f e1 <*> transformM f e2)
+transformM f (Mark a b t) = pure $ f $ Mark a b t
+transformM f (SumValue mts (s, e)) = f <$> (SumValue mts . (,) s <$> transformM f e)
+transformM f (CaseOfSum e ls) = f <$> (CaseOfSum <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
+transformM f (CaseOf e ls) = f <$> (CaseOf <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
+
+
+transform :: (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
+transform f e = runIdentity (transformM f e)
+
+
+
+-- TODO: porque é que prefiro a de cima em vez de esta? porque posso utilizar o estado com as monads? desde que a função não dependa de nenhum estado dentro de monads não faz diferença certo
+descend2 :: (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
+descend2 f (BLVar x) = f $ BLVar x
+descend2 f (BUVar x) = f $ BUVar x
+descend2 f (FLVar x) = f $ FLVar x
+descend2 f (FUVar x) = f $ FUVar x
+descend2 f (Abs t e) = f (Abs t $ descend2 f e)
+descend2 f (App e1 e2) = f (App (descend2 f e1) (descend2 f e2))
+descend2 _ _ = undefined
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- Util
 -------------------------------------------------------------------------------
 
 showexpr' :: Int -> CoreExpr -> String -- Use Int (depth) to indent the code
