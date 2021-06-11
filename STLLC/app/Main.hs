@@ -74,7 +74,7 @@ mainparseModule fname = do
     return $ parseModule fname input
 
 
-maindesugarModule :: String -> IO CoreProgram
+maindesugarModule :: String -> IO Program
 maindesugarModule fname = do
    bindings <- mainparseModule fname
    let cbindings = desugarModule bindings -- desugaring is automatically followed by typechecking+inference
@@ -97,8 +97,7 @@ mainsynthMarksModule :: String -> IO Program
 mainsynthMarksModule fname = do
     bindings <- mainparseModule fname
     ctbindings <- maindesugarModule fname -- TODO: por causa tb de memoization aqui não faz mal chamar tudo de novo em vez de aproveitar os resultados do primeiro parse right
-    let nbindings = copyMarksTypesModule bindings ctbindings -- copy marks types to the non-desugared expression from the desugared+inferred expression 
-    return $ synthMarksModule nbindings
+    return $ synthMarksModule ctbindings 
 
 
 

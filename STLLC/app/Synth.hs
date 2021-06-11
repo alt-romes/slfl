@@ -21,8 +21,6 @@ import Constraints
 
 
 
--- TODO: refactor the Delta_Out into the state monad???
-
 type Gamma = [(String, Either Scheme Type)] -- Unrestricted hypothesis              (Γ)
 type Delta = [(String, Type)]       -- Linear hypothesis (not left asynchronous)    (Δ)
 type Omega = [(String, Type)]       -- Ordered (linear?) hypothesis                 (Ω)
@@ -444,11 +442,13 @@ synthScheme = undefined -- forall a . T (async)  =>   instantiate T   (a' ...) -
 
 synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
 synthMarks ex adts = transform (\case
-                                (Mark _ c t) -> trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType (map (second Left) c, []) adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
+                                (Mark _ c t) -> trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType c adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
                                 x -> x
                                ) ex
 
 
+-- pre: program has been type inferred
 synthMarksModule :: Program -> Program
-synthMarksModule (Program adts bs) = Program adts $ map (\(Binding n e) -> Binding n $ synthMarks e adts) bs
+synthMarksModule p = let (Program adts bs ts cs) = makeFrontendMarksCtx p in
+                         Program adts (map (\(Binding n e) -> Binding n $ synthMarks e adts) bs) ts cs
 

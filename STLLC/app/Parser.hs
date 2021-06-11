@@ -9,7 +9,7 @@ import Debug.Trace
 
 
 import Lexer
-import CoreSyntax
+import CoreSyntax hiding (Var(..))
 import Syntax
 import Program
 
@@ -242,14 +242,14 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i [] (Just plhty)
+            return $ Syntax.Mark i ([], []) (Just plhty)
 
         emptymark = do
             reservedOp "..."
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i [] Nothing
+            return $ Syntax.Mark i ([], []) Nothing
 
 
 
@@ -365,7 +365,7 @@ modl :: Parser Program
 modl = do
     adts <- many datatype
     bs <- many top
-    return $ Program adts bs
+    return $ Program adts bs [] []
 
 
 

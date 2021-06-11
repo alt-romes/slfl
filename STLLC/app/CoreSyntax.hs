@@ -1,4 +1,5 @@
-module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..), transformM, transform) where 
+module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
+    TypeBinding(..), Var(..), Mult(..), transformM, transform) where 
 
 import Prelude hiding (Bool)
 import Control.Monad
@@ -15,6 +16,9 @@ type Name = String
 -------------------------------------------------------------------------------
 
 data CoreBinding = CoreBinding Name CoreExpr
+
+
+data TypeBinding = TypeBinding String Scheme
 
 
 data CoreExpr
@@ -54,7 +58,7 @@ data CoreExpr
 
     | LetIn CoreExpr CoreExpr
 
-    | Mark Int [(String, Scheme)] (Maybe Type)
+    | Mark Int ([Maybe Var], [(String, Scheme)]) (Maybe Type) -- TODO: Once again assuming we can't have free linear variables
 
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, CoreExpr)
@@ -63,6 +67,13 @@ data CoreExpr
     | CaseOf CoreExpr [(String, CoreExpr)]
 
     deriving (Eq)
+
+
+data Var = Var
+    { varMult :: Mult 
+    , unVar   :: Scheme
+    } deriving (Eq, Show)
+data Mult = Lin | Unr deriving (Eq, Show)
 
 
 data Scheme = Forall [Int] Type deriving (Eq)
@@ -99,12 +110,12 @@ instance (Show CoreBinding) where
     show (CoreBinding s e) = s ++ ":\n" ++ show e ++ "\n"
 
 
+instance (Show TypeBinding) where
+    show (TypeBinding s sch) = s ++ ":\n    " ++ show sch ++ "\n"
+
+
 instance (Show CoreExpr) where
     show e = showexpr' 0 e
-
-
-instance (Show Scheme) where
-    show (Forall ns t) = (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ ". ") ++ show t
 
 
 instance (Show Type) where 
@@ -118,6 +129,10 @@ instance (Show Type) where
     show (ExistentialTypeVar x) = "?" ++ letters !! x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
     show (ADT t) = t
+
+
+instance (Show Scheme) where
+    show (Forall ns t) = (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ ". ") ++ show t
 
 
 

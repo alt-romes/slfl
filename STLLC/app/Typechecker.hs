@@ -16,30 +16,9 @@ import Constraints
 import Util (findDelete)
 
 
-type BoundCtxt = [Maybe Scheme]
-type FreeCtxt = [(String, Scheme)]
+type BoundCtxt = [Maybe Var] -- Left is unrestricted hypothesis, right is linear and might have been consumed
+type FreeCtxt = [(String, Scheme)] -- TODO: i'm assuming all free ctx variables are unrestricted, since we can't really do free ctx linear vars
 type Ctxt = (BoundCtxt, FreeCtxt)
-
--------------------------------------------------------------------------------
--- Datatypes
--------------------------------------------------------------------------------
-
-data TypeBinding = TypeBinding String Scheme
-
-
-
-
-
--------------------------------------------------------------------------------
--- Instances
--------------------------------------------------------------------------------
-
-instance (Show TypeBinding) where
-    show (TypeBinding s sch) = s ++ ":\n    " ++ show sch ++ "\n"
-
-
-
-
 
 -------------------------------------------------------------------------------
 -- Infer "Monad"
@@ -59,8 +38,12 @@ runinfer fc e = evalStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) 
 -- Functions
 -------------------------------------------------------------------------------
 
-addtoboundctx :: Scheme -> Infer ()
-addtoboundctx c = modify (first (Just c :))
+addtoblinctx :: Scheme -> Infer ()
+addtoblinctx c = modify (first (Just (Var Lin c) :))
+
+
+addtobunrctx :: Scheme -> Infer ()
+addtobunrctx c = modify (first (Just (Var Unr c) :))
 
 
 wasBLVConsumed :: Int -> Infer Bool
@@ -106,7 +89,7 @@ ftvctx :: Ctxt -> Set.Set Int
 ftvctx = ftvctx' Set.empty
     where
         ftvctx' :: Set.Set Int -> Ctxt -> Set.Set Int
-        ftvctx' acc (bc, fc) = Set.unions (map ftvsch (catMaybes bc)) `Set.union` Set.unions (map (ftvsch . snd) fc)
+        ftvctx' acc (bc, fc) = Set.unions (map (ftvsch . unVar) (catMaybes bc)) `Set.union` Set.unions (map (ftvsch . snd) fc)
         ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
 
 
@@ -124,10 +107,10 @@ typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
 typeconstraint ce@(BLVar x) = do
     ctx <- get
-    let (pre, maybesch:end) = splitAt x $ fst ctx
-    sch <- lift $ lift $ lift maybesch
+    let (pre, maybeschv:end) = splitAt x $ fst ctx
+    schv <- lift $ lift $ lift maybeschv
     put (pre ++ Nothing:end, snd ctx)
-    t <- instantiate sch
+    t <- instantiate $ unVar schv
     return (t, ce)
 
 typeconstraint ce@(FLVar x) = do
@@ -141,7 +124,7 @@ typeconstraint ce@(FLVar x) = do
 typeconstraint ce@(BUVar x) = do
     ctx <- get
     sch <- lift $ lift $ lift $ fst ctx !! x
-    t <- instantiate sch
+    t <- instantiate $ unVar sch
     return (t, ce)
 
 typeconstraint ce@(FUVar x) = do
@@ -156,7 +139,7 @@ typeconstraint ce@(FUVar x) = do
 typeconstraint (Abs t1 e) = do
     tv <- fresh
     let t1' = fromMaybe tv t1
-    addtoboundctx $ trivialScheme t1'
+    addtoblinctx $ trivialScheme t1'
     newvari <- getlastvarindex
     (t2, ce) <- typeconstraint e
     wasBLVConsumed newvari >>= guard
@@ -182,8 +165,8 @@ typeconstraint (LetTensor e1 e2) = do
     tv1 <- fresh
     tv2 <- fresh
     (t, ce1) <- typeconstraint e1
-    addtoboundctx $ trivialScheme tv1
-    addtoboundctx $ trivialScheme tv2
+    addtoblinctx $ trivialScheme tv1
+    addtoblinctx $ trivialScheme tv2
     lastvari <- getlastvarindex
     (t3, ce2) <- typeconstraint e2
     wasBLVConsumed (lastvari - 1) >>= guard -- make sure linear variables were used and don't exit the binder
@@ -250,13 +233,13 @@ typeconstraint (CaseOfPlus e1 e2 e3) = do
     currentctx <- get
     tv1 <- fresh
     tv2 <- fresh
-    addtoboundctx $ trivialScheme tv1
+    addtoblinctx $ trivialScheme tv1
     lastvi1 <- getlastvarindex
     (t3, ce2) <- typeconstraint e2
     wasBLVConsumed lastvi1 >>= guard -- make sure branch bound var doesn't escape
     ctx3 <- get
     put currentctx -- reset context to synth with the same context as the one used above
-    addtoboundctx $ trivialScheme tv2
+    addtoblinctx $ trivialScheme tv2
     lastvi2 <- getlastvarindex
     (t4, ce3) <- typeconstraint e3
     wasBLVConsumed lastvi2 >>= guard -- make sure branch bound var doesn't escape
@@ -278,7 +261,7 @@ typeconstraint (BangValue e) = do
 typeconstraint (LetBang e1 e2) = do
     (t1, ce1) <- typeconstraint e1
     tv1 <- fresh
-    addtoboundctx $ trivialScheme tv1 -- this var can, and will, escape because it'll be used unrestrictedly
+    addtobunrctx $ trivialScheme tv1 -- this var can, and will, escape because it'll be used unrestrictedly
     (t2, ce2) <- typeconstraint e2
     writer ((t2, LetBang ce1 ce2), [Constraint t1 (Bang tv1)])
 
@@ -289,7 +272,7 @@ typeconstraint (LetIn e1 e2) = do
     (t1, ce1) <- typeconstraint e1
     c'@(bctx, fctx) <- get 
     guard $ equalDeltas c c' -- LetIn makes first variable unrestricted, so e1 should typecheck on an empty delta
-    addtoboundctx $ generalize c' t1
+    addtobunrctx $ generalize c' t1
     (t2, ce2) <- typeconstraint e2
     return (t2, LetIn ce1 ce2)
 
@@ -297,15 +280,9 @@ typeconstraint (LetIn e1 e2) = do
 
 typeconstraint (Mark i _ t) = do
     tv <- fresh
-    (bc, fc) <- get
+    c@(bc, fc) <- get
     let t' = fromMaybe tv t
-    return (t', Mark i (nontrivialschemes fc []) (Just t')) -- TODO: Apenas contexto quantificado universalmente no free context vai poder ser utilizado na mark porque tenho a certeza que é unrestricted e porque não tenho de inventar um nome novo que não pensei ainda como fazer, se quisessemos utilizar coisas do contexto linear tenho de modificar as variáveis para elas terem informação sobre se são lineares ou não para poder guardar na Mark o contexto linear e o unrestricted para o saber passar para o sintetisador
-        where
-            nontrivialschemes [] acc = acc
-            nontrivialschemes ((n, Forall ns t):xs) acc =
-                if null ns
-                   then nontrivialschemes xs acc
-                   else nontrivialschemes xs ((n, Forall ns t):acc)
+    return (t', Mark i c (Just t'))
 
 --- Sum --------------------
 
@@ -324,7 +301,7 @@ typeconstraint (CaseOfSum e exps) = do
     (bctx, fctx) <- get
     inferredexps <- mapM (\(s, ex) -> do
         tv <- fresh
-        addtoboundctx $ trivialScheme tv
+        addtoblinctx $ trivialScheme tv
         (t', ce) <- typeconstraint ex
         ctx' <- get
         return (t', s, ce, ctx')
@@ -346,7 +323,7 @@ typeconstraint (CaseOf e exps) = do
         put currentctx -- reset ctx for every branch
         case lookup s fctx of
             Just (Forall [] (Fun argtype (ADT _))) -> do -- Constructor takes an argument
-                addtoboundctx $ trivialScheme argtype
+                addtoblinctx $ trivialScheme argtype
                 lastvi <- getlastvarindex
                 (t', ce) <- typeconstraint ex
                 wasBLVConsumed lastvi >>= guard -- Variable bound in branch must be linearly
@@ -411,32 +388,27 @@ typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _) -> ce) (typeinfer [] e)
 
 
-typeinferModule :: CoreProgram -> CoreProgram -- typecheck and use inferred types
-typeinferModule (CoreProgram adts cbs) =
-    let (finalcbs, finalsubst) = typeinferModule' cbs (processadts adts) Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
-        CoreProgram adts $ apply finalsubst finalcbs
+typeinferModule :: Program -> Program -- typecheck and use inferred types
+typeinferModule (Program adts bs ts cbs) =
+    let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts) Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+        let finalcbs' = apply finalsubst finalcbs in
+            Program adts bs finalts finalcbs'
     where
-        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Subst -> ([CoreBinding], Subst)
+        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Subst -> ([CoreBinding], [TypeBinding], Subst)
         typeinferModule' corebindings acc subst =
             case corebindings of
-              [] -> ([], subst)
+              [] -> ([], acc, subst)
               b@(CoreBinding n ce):corebindings' -> do
                  let (btype, bexpr, subst') =
                          fromMaybe (errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) $
                              typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce
-                 first (CoreBinding n bexpr :) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype):acc) subst'
+                 (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype):acc) subst'
 
 
 typecheckExpr :: CoreExpr -> Scheme
 typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
 
 
-typecheckModule :: CoreProgram -> [TypeBinding]
-typecheckModule (CoreProgram adts cbs) = typecheckModule' cbs $ processadts adts
-    where
-        typecheckModule' cbs acc = 
-            if null cbs then []
-            else let b@(CoreBinding n ce):xs = cbs in
-                 let tb = TypeBinding n $ generalize ([],[]) $ maybe (errorWithoutStackTrace ("[Typecheck Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) (\(t, _, _) -> t) $ typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce in
-                     tb:typecheckModule' xs (tb:acc)
+typecheckModule :: Program -> [TypeBinding]
+typecheckModule = reverse . _tbinds . typeinferModule
 

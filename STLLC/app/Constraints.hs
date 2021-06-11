@@ -77,6 +77,10 @@ instance Substitutable CoreExpr where
     apply s e = e
 
 
+instance Substitutable Var where
+    apply s (Var m sch) = Var m $ apply s sch
+
+
 instance Substitutable CoreBinding where
     apply s (CoreBinding n e') = CoreBinding n (apply s e')
 

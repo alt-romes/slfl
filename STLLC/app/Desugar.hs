@@ -6,7 +6,7 @@ import Data.Maybe
 import Debug.Trace
 
 
-import CoreSyntax
+import CoreSyntax hiding (Var(..), Mult(..))
 import Syntax
 import Program
 
@@ -108,7 +108,9 @@ desugar (Syntax.LetIn id e1 e2) = do
     e2' <- inEnv (id, unVar) (desugar e2)
     return $ CoreSyntax.LetIn e1' e2' -- se quisesse fazer desugar do let in para uma abstração tinha também de passar todo o contexto para o typechecker, porque sem passar mais informação ela é incompleta
 
-desugar (Syntax.Mark i c t) = return $ CoreSyntax.Mark i c t
+desugar (Syntax.Mark i ([], []) t) = return $ CoreSyntax.Mark i ([], []) t
+desugar (Syntax.Mark i c t) = error "We don't try to desugar programs with Marks that already have a context. The context should be attributed after inference and before synth"
+
 
 desugar (Syntax.SumValue mts (t, e)) = do
     e' <- desugar e
@@ -146,7 +148,7 @@ desugarExpr :: Expr -> CoreExpr
 desugarExpr exp = runReader (desugar exp) []
 
 
-desugarModule :: Program -> CoreProgram
-desugarModule (Program adts bindings) = CoreProgram adts $ map desugarModule' bindings
+desugarModule :: Program -> Program
+desugarModule (Program adts bindings ts cs) = Program adts bindings ts $ map desugarModule' bindings
     where desugarModule' (Binding name exp) = CoreBinding name $ runReader (desugar exp) [] 
 

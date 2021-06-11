@@ -8,3 +8,6 @@ run:
 
 test:
 	./run-tests.sh
+
+clean:
+	cabal clean
