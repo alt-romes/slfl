@@ -449,6 +449,6 @@ synthMarks ex adts = transform (\case
 
 -- pre: program has been type inferred
 synthMarksModule :: Program -> Program
-synthMarksModule p = let (Program adts bs ts cs) = makeFrontendMarksCtx p in
+synthMarksModule p = let (Program adts bs ts cs) = completeFrontendMarksCtx p in
                          Program adts (map (\(Binding n e) -> Binding n $ synthMarks e adts) bs) ts cs
 

@@ -16,6 +16,7 @@ import Constraints
 import Util (findDelete)
 
 
+
 type BoundCtxt = [Maybe Var] -- Left is unrestricted hypothesis, right is linear and might have been consumed
 type FreeCtxt = [(String, Scheme)] -- TODO: i'm assuming all free ctx variables are unrestricted, since we can't really do free ctx linear vars
 type Ctxt = (BoundCtxt, FreeCtxt)
