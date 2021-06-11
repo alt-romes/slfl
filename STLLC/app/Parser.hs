@@ -332,6 +332,14 @@ letdecl = do
     return $ Binding name $ foldr (uncurry Syntax.Abs) body args
 
 
+typeannot :: Parser TypeBinding
+typeannot = do
+    reserved "type"
+    name <- identifier
+    reserved "::"
+    TypeBinding name . trivialScheme <$> ty
+
+
 datacon :: Parser (Name, Type)
 datacon = do
     name <- identifier
@@ -364,8 +372,9 @@ top = do
 modl :: Parser Program
 modl = do
     adts <- many datatype
+    ts <- many typeannot
     bs <- many top
-    return $ Program adts bs [] []
+    return $ Program adts bs ts []
 
 
 

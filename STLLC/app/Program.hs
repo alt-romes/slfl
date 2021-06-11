@@ -69,12 +69,13 @@ completeFrontendMarksCtx (Program as bs ts cs) =                    -- !TODO: É
                         getMarksTypes m (CoreSyntax.Mark i c t) = --Map.insert i (c,t) m
                             Map.insert i (adaptmc c, t) m
                                 where
-                                    adaptmc (bc, fc) = (map (\(n,s) -> case s of
-                                                                         Forall [] t -> (n, Right t)
-                                                                         s' -> (n, Left s')
-                                                       ) fc, []) -- Preciso fazer typechecker para a frontend se quiser usar o bound context....
+                                    adaptmc (bc, fc) = (map (\(n,s) ->
+                                        case s of
+                                          Forall [] t -> (n, Right t)
+                                          s' -> (n, Left s')
+                                       ) fc, []) -- Preciso fazer typechecker para a frontend se quiser usar o bound context....
                             
-                        getMarksTypes m (CoreSyntax.Abs _ e) = getMarksTypes m e
+                        getMarksTypes m (CoreSyntax.Abs _ e) = let x = getMarksTypes m e in x
                         getMarksTypes m (CoreSyntax.App e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
                         getMarksTypes m (CoreSyntax.TensorValue e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
                         getMarksTypes m (CoreSyntax.LetTensor e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
@@ -87,6 +88,7 @@ completeFrontendMarksCtx (Program as bs ts cs) =                    -- !TODO: É
                         getMarksTypes m (CoreSyntax.CaseOfPlus e e' e'') = getMarksTypes m e `Map.union` getMarksTypes m e' `Map.union` getMarksTypes m e''
                         getMarksTypes m (CoreSyntax.BangValue e) = getMarksTypes m e
                         getMarksTypes m (CoreSyntax.LetIn e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
+                        getMarksTypes m (CoreSyntax.LetBang e e') = getMarksTypes m e `Map.union` getMarksTypes m e'
                         getMarksTypes m (CoreSyntax.SumValue _ (n, e)) = getMarksTypes m e
                         getMarksTypes m (CoreSyntax.CaseOfSum e ls) = getMarksTypes m e `Map.union` foldr (Map.union . getMarksTypes m . snd) Map.empty ls
                         getMarksTypes m (CoreSyntax.CaseOf e ls) = getMarksTypes m e `Map.union` foldr (Map.union . getMarksTypes m . snd) Map.empty ls

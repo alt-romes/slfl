@@ -99,7 +99,7 @@ substitute :: String -> Expr -> Expr -> Expr
 substitute n expn = transform (\case
                                 v@(Var x) -> if x == n then expn else v
                                 x -> x)
--- descendM
+
 
 -- TODO: Make Generic and move to constraints?
 ftvctx :: FocusCtxt -> Set.Set Int
@@ -115,15 +115,6 @@ ftvctx = ftvctx' Set.empty
 generalize :: FocusCtxt -> Type -> Scheme
 generalize ctxt t = Forall ns t 
     where ns = Set.toList $ Set.difference (ftv t) (ftvctx ctxt)
-
-
--- TODO: Move to util
-letters :: [String]
-letters = [1..] >>= flip replicateM ['a'..'z']
-
-
-getName :: Int -> String
-getName i = letters !! i
 
 
 
@@ -442,7 +433,7 @@ synthScheme = undefined -- forall a . T (async)  =>   instantiate T   (a' ...) -
 
 synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
 synthMarks ex adts = transform (\case
-                                (Mark _ c t) -> trace ("CONTEXT OF MARK : " ++ show c ++ " TYPE OF MARK : " ++ show t) $ synthCtxType c adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
+                                (Mark _ c t) -> synthCtxType c adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
                                 x -> x
                                ) ex
 

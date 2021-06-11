@@ -1,11 +1,14 @@
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
-    TypeBinding(..), Var(..), Mult(..), transformM, transform) where 
+    TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme) where 
 
 import Prelude hiding (Bool)
 import Control.Monad
 import Data.Maybe
 import Data.Bifunctor
 import Data.Functor.Identity
+
+
+import Util
 
 
 
@@ -176,6 +179,18 @@ transform f e = runIdentity (transformM (return . f) e)
 
 
 -------------------------------------------------------------------------------
+-- Functions
+-------------------------------------------------------------------------------
+
+-- pre: No free tvars in t
+trivialScheme :: Type -> Scheme 
+trivialScheme = Forall []
+
+
+
+
+
+-------------------------------------------------------------------------------
 -- Util
 -------------------------------------------------------------------------------
 
@@ -203,7 +218,7 @@ showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " o
 showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
 showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-showexpr' _ (Mark _ _ t) = "{{ " ++ show t ++ " }}"
+showexpr' _ (Mark i c t) = "{{ " ++ show i ++ " : " ++ show t ++ " in context" ++ show c ++ " }}"
 showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
     foldl (\p (s', t) -> p ++ indent (d+2) ++ s' ++ " : " ++ show (fromJust t) ++ ";") "" mts
     ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
@@ -224,8 +239,4 @@ showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e +
 
 indent :: Int -> String
 indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
-
-
-letters :: [String]
-letters = [1..] >>= flip replicateM ['a'..'z']
 

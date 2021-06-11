@@ -1,1 +1,9 @@
-let main = \x -o true
+
+
+data A = A;
+data B = B;
+
+data Som = Yellow (1 * 1);
+
+type main :: (Som -o (A * B))
+let main = {{ ... }}

@@ -119,9 +119,9 @@ main = do
     case action of
       "synth" -> print $ mainsynth arg
       "all" -> print $ mainsynthAll arg
-      "complete" -> mainsynthMarksModule arg >>= print 
+      "complete" -> mainsynthMarksModule arg >>= print . _binds
       "fdesugar" -> print $ maindesugar arg
-      "desugar" -> maindesugarModule arg >>= print
+      "desugar" -> maindesugarModule arg >>= print . _cbinds
       "ftype" -> print $ maintypecheck arg
       "type" -> maintypecheckModule arg >>= mapM_ print
       "feval" -> print $ maineval arg

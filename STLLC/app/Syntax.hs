@@ -160,6 +160,7 @@ transformM f (Mark a b t) = pure $ f $ Mark a b t
 transformM f (SumValue mts (s, e)) = f <$> (SumValue mts . (,) s <$> transformM f e)
 transformM f (CaseOfSum e ls) = f <$> (CaseOfSum <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
 transformM f (CaseOf e ls) = f <$> (CaseOf <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
+transformM f (UnrestrictedAbs x t e) = f <$> (UnrestrictedAbs x t <$> transformM f e)
 
 
 transform :: (Expr -> Expr) -> Expr -> Expr

@@ -28,8 +28,8 @@ type Ctxt = (BoundCtxt, FreeCtxt)
 type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 
 
-runinfer :: FreeCtxt -> CoreExpr -> Maybe (((Type, CoreExpr), [Constraint]), Ctxt)
-runinfer fc e = evalStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) (length fc)
+runinfer :: FreeCtxt -> Int -> CoreExpr -> Maybe ((((Type, CoreExpr), [Constraint]), Ctxt), Int)
+runinfer fc i e = runStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) i
 
 
 
@@ -73,11 +73,6 @@ instantiate (Forall ns t) = do
     fs <- mapM (const fresh) ns 
     let s = Map.fromList $ zip ns fs 
     return $ apply s t
-
-
--- pre: No free tvars in t
-trivialScheme :: Type -> Scheme 
-trivialScheme = Forall []
 
 
 generalize :: Ctxt -> Type -> Scheme
@@ -349,13 +344,13 @@ typeconstraint (CaseOf e exps) = do
                         Just (Forall [] (ADT adtname)) -> adtname -- Constructor does not take an argument
 
 
-typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst)
-typeinfer fc e = do
-    (((ctype, cexp), constraints), (bc, _)) <- runinfer fc e
+typeinfer :: FreeCtxt -> Int -> CoreExpr -> Maybe (Type, CoreExpr, Subst, Int)
+typeinfer fc i e = do
+    ((((ctype, cexp), constraints), (bc, _)), i') <- runinfer fc i e
     -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
-    return (ctype', cexp', s)
+    return (ctype', cexp', s, i')
     -- TODO: Maybe factor into another function?
     -- TODO: Typeinfer should return a scheme? let sch = generalize ([],[]) ctype'
     -- TODO: Generalize and instantiate from the beginning to get free vars starting from a, b ... ?
@@ -378,6 +373,11 @@ processadts = concatMap processadt
                 processcns (cn, ty) = TypeBinding cn (trivialScheme (Fun ty (ADT tn)))
 
 
+instantiateFrom :: Int -> Scheme -> Type
+instantiateFrom i (Forall ns t) = do
+    let fs = take (length ns) $ map TypeVar [(i+1)..]
+    let s = Map.fromList $ zip ns fs 
+    apply s t
 
 
 
@@ -386,28 +386,34 @@ processadts = concatMap processadt
 -------------------------------------------------------------------------------
 
 typeinferExpr :: CoreExpr -> CoreExpr
-typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _) -> ce) (typeinfer [] e)
+typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] 0 e)
 
 
 typeinferModule :: Program -> Program -- typecheck and use inferred types
 typeinferModule (Program adts bs ts cbs) =
-    let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts) Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+    let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts ++ ts) 0 Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
         let finalcbs' = apply finalsubst finalcbs in
             Program adts bs finalts finalcbs'
     where
-        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Subst -> ([CoreBinding], [TypeBinding], Subst)
-        typeinferModule' corebindings acc subst =
+        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Int -> Subst -> ([CoreBinding], [TypeBinding], Subst)
+        typeinferModule' corebindings acc i subst =
             case corebindings of
               [] -> ([], acc, subst)
               b@(CoreBinding n ce):corebindings' -> do
-                 let (btype, bexpr, subst') =
+                 let (btype, bexpr, subst', i') =
                          fromMaybe (errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) $
-                             typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) ce
-                 (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype):acc) subst'
+                             typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) i ce
+                 case lookup n (map (\(TypeBinding n t) -> (n, t)) acc) of
+                   Just sch@(Forall names type') -> do
+                         let subst'' = fromMaybe (errorWithoutStackTrace "[Typeinfer Module] Failed solving cs against annotation") (solveconstraints subst' [Constraint btype (instantiateFrom i' sch)]) -- TODO: instantiateFrom i' type'
+                         let (btype', bexpr') = apply subst'' (btype, bexpr) in
+                             (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype'):acc) (i' + length names) subst''
+                   Nothing ->
+                         (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype):acc) i' subst'
 
 
 typecheckExpr :: CoreExpr -> Scheme
-typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _) -> t) (typeinfer [] e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
+typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _, _) -> t) (typeinfer [] 0 e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
 
 
 typecheckModule :: Program -> [TypeBinding]
