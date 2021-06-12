@@ -1,6 +1,7 @@
 module Main (main) where
 
 import System.Environment
+import Debug.Trace
 
 
 import CoreSyntax
@@ -12,20 +13,6 @@ import Typechecker
 import Evaluate
 import Synth
 import Util
-
--- import Text.Parsec
-
--- process :: String -> IO ()
--- process line = print $ parseExpr line
-
--- interpret :: IO ()
--- interpret = runInputT defaultSettings loop 
---     where 
---     loop = do 
---         minput <- getInputLine "> "
---         case minput of 
---             Nothing -> outputStrLn "Bye."
---             Just input -> liftIO (process input) >> loop
 
 
 

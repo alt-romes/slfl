@@ -375,7 +375,7 @@ processadts = concatMap processadt
 
 instantiateFrom :: Int -> Scheme -> Type
 instantiateFrom i (Forall ns t) = do
-    let fs = take (length ns) $ map TypeVar [(i+1)..]
+    let fs = take (length ns) $ map TypeVar [i..]
     let s = Map.fromList $ zip ns fs 
     apply s t
 
@@ -389,6 +389,8 @@ typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] 0 e)
 
 
+-- TODO: Refactor this function
+-- !TODO: Rever como estou a fazer as type annotations com o prof
 typeinferModule :: Program -> Program -- typecheck and use inferred types
 typeinferModule (Program adts bs ts cbs) =
     let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts ++ ts) 0 Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
@@ -402,20 +404,29 @@ typeinferModule (Program adts bs ts cbs) =
               b@(CoreBinding n ce):corebindings' -> do
                  let (btype, bexpr, subst', i') =
                          fromMaybe (errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) $
-                             typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) i ce
+                             typeinfer ((n, Forall [0, 1] (Fun (TypeVar 0) (TypeVar 1))):map (\(TypeBinding n t) -> (n, t)) acc) i ce
                  case lookup n (map (\(TypeBinding n t) -> (n, t)) acc) of
                    Just sch@(Forall names type') -> do
                          let subst'' = fromMaybe (errorWithoutStackTrace "[Typeinfer Module] Failed solving cs against annotation") (solveconstraints subst' [Constraint btype (instantiateFrom i' sch)]) -- TODO: instantiateFrom i' type'
                          let (btype', bexpr') = apply subst'' (btype, bexpr) in
-                             (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype'):acc) (i' + length names) subst''
+                             (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):acc) (i' + length names) subst''
                    Nothing ->
-                         (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype):acc) i' subst'
+                         (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype):acc) i' subst'
+
+        cleanLetters :: Type -> Type
+        cleanLetters t = instantiateFrom 0 $ generalize ([], []) t
 
 
 typecheckExpr :: CoreExpr -> Scheme
 typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _, _) -> t) (typeinfer [] 0 e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
 
 
+-- pre : Program must have been previously type inferred
 typecheckModule :: Program -> [TypeBinding]
-typecheckModule = reverse . _tbinds . typeinferModule
+typecheckModule = reverse . _tbinds
+    -- if and $ zipWith (\ (CoreBinding n1 _) (TypeBinding n2 _) -> n1 == n2) (_cbinds p) (_tbinds p)
+    --    then -- all core bindings already have type bindings
+    --         reverse $ _tbinds p
+    --    else -- not all core bindings have type bindings yet
+    --         reverse $ _tbinds $ typeinferModule p
 
