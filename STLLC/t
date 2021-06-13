@@ -1,9 +1,0 @@
-
-
-
-data ABC = A | B | C;
-
-let rectest x = case x of
-                      A => <>
-                    | B => rectest A
-                    | C => rectest B;

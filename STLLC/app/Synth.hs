@@ -89,6 +89,7 @@ assertADTHasCons t =
 isAtomic :: Type -> Bool
 isAtomic t =
     case t of
+       TyLit _              -> True
        TypeVar _            -> True
        ExistentialTypeVar _ -> True
        _                    -> False
@@ -198,7 +199,7 @@ synth (g, d, (n, ADT tyn):o) t =
             return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
-    guard (not $ null ls) -- make sure constructors were found for this adtype
+    guard (length ls == length adtds) -- make sure all constructors were decomposed
     let (n1, varid1, e1, d1') = head ls
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
@@ -302,13 +303,13 @@ focus c goal =
         focus' Nothing c (Plus a b) = do
             (il, d') <- focus' Nothing c a
             return (InjL (Just b) il, d')
-            <|> do
+            `interleave` do
             (ir, d') <- focus' Nothing c b
             return (InjR (Just a) ir, d')
 
         ---- sumR
         focus' Nothing c (Sum sts) =
-            foldr ((<|>) . (\(tag, goalt) ->
+            foldr (interleave . (\(tag, goalt) ->
                 do {
                    (e, d') <- focus' Nothing c goalt;
                    let smts = map (second Just) $ delete (tag, goalt) sts in
@@ -318,7 +319,7 @@ focus c goal =
         ---- adtR
         focus' Nothing (g, d) (ADT tyn) = do
             cons <- getadtcons tyn
-            foldr ((<|>) . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
+            foldr (interleave . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype -> do

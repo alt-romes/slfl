@@ -1,5 +1,5 @@
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
-    TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme) where 
+    TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme, Literal(..), getLitType, TyLiteral(..)) where 
 
 import Prelude hiding (Bool)
 import Control.Monad
@@ -26,7 +26,8 @@ data TypeBinding = TypeBinding String Scheme
 
 data CoreExpr
 
-    = BLVar Int             -- bound linear/restricted var
+    = Lit Literal
+    | BLVar Int             -- bound linear/restricted var
     | BUVar Int             -- bound unrestricted var
     | FLVar String          -- free linear/restricted var
     | FUVar String          -- free unrestricted var
@@ -72,6 +73,10 @@ data CoreExpr
     deriving (Eq)
 
 
+newtype Literal = Nat Integer deriving (Eq, Show)
+
+
+
 data Var = Var
     { varMult :: Mult 
     , unVar   :: Scheme
@@ -83,7 +88,8 @@ data Scheme = Forall [Int] Type deriving (Eq)
 
 
 data Type
-    = Fun Type Type     -- A -o B 
+    = TyLit TyLiteral
+    | Fun Type Type     -- A -o B 
     | Tensor Type Type  -- A * B    -- multiplicative conjunction
     | Unit              -- 1
     | With Type Type    -- A & B    -- additive conjuntion
@@ -98,6 +104,9 @@ data Type
     | ADT String
     
     deriving (Eq)
+
+
+data TyLiteral = Natural deriving (Eq, Show)
 
 
 
@@ -122,6 +131,7 @@ instance (Show CoreExpr) where
 
 
 instance (Show Type) where 
+    show (TyLit l) = show l
     show (Fun t1 t2) = "(" ++ show t1 ++ " -o " ++ show t2 ++ ")"
     show (Tensor t1 t2) = "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
     show Unit = "1"
@@ -141,11 +151,12 @@ instance (Show Scheme) where
 
 
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Traversal
 -------------------------------------------------------------------------------
 
 transformM :: (Monad m, Applicative m) => (CoreExpr -> m CoreExpr) -> CoreExpr -> m CoreExpr
+transformM f (Lit x) = f $ Lit x
 transformM f (BLVar x) = f $ BLVar x
 transformM f (BUVar x) = f $ BUVar x
 transformM f (FLVar x) = f $ FLVar x
@@ -187,6 +198,10 @@ trivialScheme :: Type -> Scheme
 trivialScheme = Forall []
 
 
+getLitType :: Literal -> Type
+getLitType (Nat x) = TyLit Natural
+
+
 
 
 
@@ -195,6 +210,7 @@ trivialScheme = Forall []
 -------------------------------------------------------------------------------
 
 showexpr' :: Int -> CoreExpr -> String -- Use Int (depth) to indent the code
+showexpr' _ (Lit x) = "Lit(" ++ show x ++ ")"
 showexpr' _ (BLVar x) = "BL(" ++ show x ++ ")"
 showexpr' _ (BUVar x) = "BU(" ++ show x ++ ")"
 showexpr' _ (FLVar x) = "FL(" ++ show x ++ ")"

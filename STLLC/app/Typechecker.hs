@@ -99,6 +99,10 @@ ftvctx = ftvctx' Set.empty
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
 typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
+--- lit --------------------
+
+typeconstraint ce@(Lit x) = return (getLitType x, ce)
+
 --- hyp --------------------
 
 typeconstraint ce@(BLVar x) = do
@@ -381,6 +385,8 @@ instantiateFrom i (Forall ns t) = do
 
 
 
+
+
 -------------------------------------------------------------------------------
 -- Exported Functions
 -------------------------------------------------------------------------------
@@ -404,7 +410,8 @@ typeinferModule (Program adts bs ts cbs) =
               b@(CoreBinding n ce):corebindings' -> do
                  let (btype, bexpr, subst', i') =
                          fromMaybe (errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) $
-                             typeinfer ((n, Forall [0, 1] (Fun (TypeVar 0) (TypeVar 1))):map (\(TypeBinding n t) -> (n, t)) acc) i ce
+                             -- typeinfer ((n, Forall [0, 1] (Fun (TypeVar 0) (TypeVar 1))):map (\(TypeBinding n t) -> (n, t)) acc) i ce
+                             typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) i ce
                  case lookup n (map (\(TypeBinding n t) -> (n, t)) acc) of
                    Just sch@(Forall names type') -> do
                          let subst'' = fromMaybe (errorWithoutStackTrace "[Typeinfer Module] Failed solving cs against annotation") (solveconstraints subst' [Constraint btype (instantiateFrom i' sch)]) -- TODO: instantiateFrom i' type'

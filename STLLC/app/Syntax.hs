@@ -5,7 +5,7 @@ import Prelude hiding (Bool)
 import Data.Functor.Identity
 
 
-import CoreSyntax (Type, Scheme, Name)
+import CoreSyntax (Type, Scheme, Name, Literal(..))
 
 
 
@@ -18,7 +18,8 @@ data Binding = Binding Name Expr
 
 data Expr
 
-    = Var String
+    = Lit Literal
+    | Var String
 
     -- A -o B
     | Abs String (Maybe Type) Expr     -- \x:T -> M . with Bruijn indices
@@ -86,6 +87,7 @@ instance (Show Expr) where
     show e = showexpr' 0 e
         where
             showexpr' :: Int -> Expr -> String -- Use Int (depth) to indent the code
+            showexpr' d (Lit x) = show x
             showexpr' d (Var x) = x
             showexpr' d (Abs x (Just t) e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -o " ++ showexpr' (d+1) e ++ ")"
             showexpr' d (Abs x Nothing e) = indent d ++ "(λ" ++ x ++ " -o " ++ showexpr' (d+1) e ++ ")"
@@ -140,6 +142,7 @@ instance (Show Expr) where
 -------------------------------------------------------------------------------
 
 transformM :: (Monad m, Applicative m) => (Expr -> Expr) -> Expr -> m Expr
+transformM f (Lit x) = pure $ f $ Lit x
 transformM f (Var x) = pure $ f $ Var x
 transformM f (Abs x t e) = f <$> (Abs x t <$> transformM f e)
 transformM f (App e1 e2) = f <$> (App <$> transformM f e1 <*> transformM f e2)

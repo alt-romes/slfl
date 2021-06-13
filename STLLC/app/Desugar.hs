@@ -57,6 +57,8 @@ inEnv (x,e) = local (\env -> (x,e):env)
 -------------------------------------------------------------------------------
 
 desugar :: Expr -> Desugar CoreExpr
+desugar (Syntax.Lit x) = return $ CoreSyntax.Lit x
+
 desugar (Syntax.Var x) = lookupVar x
     
 desugar (Syntax.Abs x t e) = do

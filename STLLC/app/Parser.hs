@@ -212,6 +212,9 @@ pairepxr :: Parser Expr
 pairepxr = try tensor -- try tensor because "with" is also between "< >"... looks unclear - seria melhor outra opção :)
         <|> try with
 
+num :: Parser Expr
+num = do
+    Syntax.Lit . Nat <$> natural
 
 aexp :: Parser Expr 
 aexp =   parens expr 
@@ -226,6 +229,7 @@ aexp =   parens expr
      <|> letexp
      <|> variable
      <|> mark
+     <|> num
 
 
 expr :: Parser Expr 
@@ -266,6 +270,7 @@ ty = tylit <|> parens type'
 tylit :: Parser Type 
 tylit =     sumty
         <|> (reservedOp "1" >> return Unit)
+        <|> (reserved "Nat" >> return (TyLit Natural))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: fazer parse de type variables ?? :)
         <|> (reservedOp "b" >> return (TypeVar 1))
         <|> (reservedOp "c" >> return (TypeVar 2))
