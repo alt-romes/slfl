@@ -413,10 +413,10 @@ typeinferModule (Program adts bs ts cbs) =
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition for this function name
                     Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked
-                        case typeinfer ((n, Forall [] (Fun (TypeVar i) (TypeVar (i+1)))):tbs_pairs) (i+2) ce of
+                        case typeinfer ((n, Forall [] (TypeVar i)):tbs_pairs) (i+1) ce of -- TODO: Queremos assim com a' ou queremos Fun a' b' ? É que se for o segundo depois não podiamos ter coisas como variáveis
                           Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                           Just (btype, bexpr, subst', i') ->
-                              case solveconstraints subst' [Constraint (Fun (TypeVar i) (TypeVar (i+1))) btype] of -- Solve type annotation with actual type
+                              case solveconstraints subst' [Constraint (TypeVar i) btype] of -- Solve type annotation with actual type
                                 Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type when typing: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                                 Just subst'' ->
                                   let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
