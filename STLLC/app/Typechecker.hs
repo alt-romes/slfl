@@ -283,7 +283,6 @@ typeconstraint (Mark i _ t) = do
     tv <- fresh
     c@(bc, fc) <- get
     let t' = fromMaybe tv t
-    -- return (t', Mark i (bc, removeRepeated fc) (Just t'))
     return (t', Mark i (bc, fc) (Just t'))
 
 --- Sum --------------------
@@ -387,29 +386,6 @@ instantiateFrom i (Forall ns t) = do
     apply s t
 
 
-removeRepeated :: FreeCtxt -> FreeCtxt
-removeRepeated fc =
-            case fc of
-                [] -> []
-                s@(n, Forall ns t):xs -> case lookup n xs of
-                                           Nothing -> s:removeRepeated xs
-                                           Just s'@(Forall ns' t') -> if length ns <= length ns' -- this case is more specific, or more recent(?)
-                                                                          then s:removeRepeated (deleteBy (\a b -> fst a == fst b) (n, undefined) xs)
-                                                                          else removeRepeated xs
-
-
-removeRepeatedB :: [TypeBinding] -> [TypeBinding]
-removeRepeatedB ts =
-            case ts of
-                [] -> []
-                s@(TypeBinding n (Forall ns t)):xs -> case lookup n $ map (\(TypeBinding a b) -> (a, b)) xs of
-                                           Nothing -> s:removeRepeatedB xs
-                                           Just s'@(Forall ns' t') -> if length ns <= length ns' -- this case is more specific, or more recent(?)
-                                                                          then s:removeRepeatedB (deleteBy (\(TypeBinding a _) (TypeBinding b _) -> a == b) (TypeBinding n undefined) xs)
-                                                                          else removeRepeatedB xs
-
-
-
 
 
 
@@ -432,7 +408,6 @@ typeinferModule (Program adts bs ts cbs) =
         typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Int -> Subst -> ([CoreBinding], [TypeBinding], Subst)
         typeinferModule' corebindings knownts i subst = -- Corebindings to process, knownts = known type bindings, i = next var nº to use in inference, subst = substitution to compose with when solving next constraints
             case corebindings of
-              -- [] -> ([], removeRepeatedB knownts, subst)
               [] -> ([], knownts, subst)
               b@(CoreBinding n ce):corebindings' ->
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
