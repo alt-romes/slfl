@@ -434,7 +434,7 @@ synthScheme = undefined -- forall a . T (async)  =>   instantiate T   (a' ...) -
 
 synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
 synthMarks ex adts = transform (\case
-                                (Mark _ c t) -> synthCtxType c adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
+                                (Mark _ c t) -> trace ("Synth mark with ctx " ++ show c) $ synthCtxType c adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
                                 x -> x
                                ) ex
 

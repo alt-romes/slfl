@@ -1,6 +1,7 @@
 module Typechecker (typeinferExpr, typeinferModule, typecheckExpr, typecheckModule, TypeBinding(..)) where
 
 import Debug.Trace
+import Data.List
 import Data.Bifunctor (first, second)
 import Data.Maybe
 import qualified Data.Map as Map
@@ -282,7 +283,8 @@ typeconstraint (Mark i _ t) = do
     tv <- fresh
     c@(bc, fc) <- get
     let t' = fromMaybe tv t
-    return (t', Mark i c (Just t'))
+    -- return (t', Mark i (bc, removeRepeated fc) (Just t'))
+    return (t', Mark i (bc, fc) (Just t'))
 
 --- Sum --------------------
 
@@ -354,6 +356,7 @@ typeinfer fc i e = do
     -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
+    -- TODO: generate new constraint with the inferred type, and apply a new substitution over the core expression to resolve the marks "recursive" context
     return (ctype', cexp', s, i')
     -- TODO: Maybe factor into another function?
     -- TODO: Typeinfer should return a scheme? let sch = generalize ([],[]) ctype'
@@ -384,6 +387,29 @@ instantiateFrom i (Forall ns t) = do
     apply s t
 
 
+removeRepeated :: FreeCtxt -> FreeCtxt
+removeRepeated fc =
+            case fc of
+                [] -> []
+                s@(n, Forall ns t):xs -> case lookup n xs of
+                                           Nothing -> s:removeRepeated xs
+                                           Just s'@(Forall ns' t') -> if length ns <= length ns' -- this case is more specific, or more recent(?)
+                                                                          then s:removeRepeated (deleteBy (\a b -> fst a == fst b) (n, undefined) xs)
+                                                                          else removeRepeated xs
+
+
+removeRepeatedB :: [TypeBinding] -> [TypeBinding]
+removeRepeatedB ts =
+            case ts of
+                [] -> []
+                s@(TypeBinding n (Forall ns t)):xs -> case lookup n $ map (\(TypeBinding a b) -> (a, b)) xs of
+                                           Nothing -> s:removeRepeatedB xs
+                                           Just s'@(Forall ns' t') -> if length ns <= length ns' -- this case is more specific, or more recent(?)
+                                                                          then s:removeRepeatedB (deleteBy (\(TypeBinding a _) (TypeBinding b _) -> a == b) (TypeBinding n undefined) xs)
+                                                                          else removeRepeatedB xs
+
+
+
 
 
 
@@ -404,28 +430,37 @@ typeinferModule (Program adts bs ts cbs) =
             Program adts bs finalts finalcbs'
     where
         typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Int -> Subst -> ([CoreBinding], [TypeBinding], Subst)
-        typeinferModule' corebindings acc i subst =
+        typeinferModule' corebindings knownts i subst = -- Corebindings to process, knownts = known type bindings, i = next var nº to use in inference, subst = substitution to compose with when solving next constraints
             case corebindings of
-              [] -> ([], acc, subst)
-              b@(CoreBinding n ce):corebindings' -> do
-                 let (btype, bexpr, subst', i') =
-                         fromMaybe (errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show acc)) $
-                             -- typeinfer ((n, Forall [0, 1] (Fun (TypeVar 0) (TypeVar 1))):map (\(TypeBinding n t) -> (n, t)) acc) i ce
-                             typeinfer (map (\(TypeBinding n t) -> (n, t)) acc) i ce
-                 case lookup n (map (\(TypeBinding n t) -> (n, t)) acc) of
-                   Just sch@(Forall names type') -> do
-                         let subst'' = fromMaybe (errorWithoutStackTrace "[Typeinfer Module] Failed solving cs against annotation") (solveconstraints subst' [Constraint btype (instantiateFrom i' sch)]) -- TODO: instantiateFrom i' type'
-                         let (btype', bexpr') = apply subst'' (btype, bexpr) in
-                             (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):acc) (i' + length names) subst''
-                   Nothing ->
-                         (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype):acc) i' subst'
+              -- [] -> ([], removeRepeatedB knownts, subst)
+              [] -> ([], knownts, subst)
+              b@(CoreBinding n ce):corebindings' ->
+                  let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
+                  case lookup n tbs_pairs of                                    -- Check if we already have a type definition for this function name
+                    Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked
+                        case typeinfer ((n, Forall [] (Fun (TypeVar i) (TypeVar (i+1)))):tbs_pairs) (i+2) ce of
+                          Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+                          Just (btype, bexpr, subst', i') ->
+                              case solveconstraints subst' [Constraint (Fun (TypeVar i) (TypeVar (i+1))) btype] of -- Solve type annotation with actual type
+                                Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type when typing: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+                                Just subst'' ->
+                                  let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
+                                  (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $
+                                      typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) i' subst''
+                    Just (Forall schnames schty) ->                             -- Function name is already typed, and already in the context, so no need to add again
+                        case typeinfer tbs_pairs i ce of
+                          Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+                          Just (btype, bexpr, subst', i') -> 
+                              (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ -- Add this corebinding to the result
+                                  typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype):knownts) i' subst' -- Recursive call and add new typebinding to known type bindings
+
 
         cleanLetters :: Type -> Type
         cleanLetters t = instantiateFrom 0 $ generalize ([], []) t
 
 
 typecheckExpr :: CoreExpr -> Scheme
-typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _, _) -> t) (typeinfer [] 0 e) -- TODO: porque é que o prof não queria que isto devolvêsse Scheme?
+typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _, _) -> t) (typeinfer [] 0 e) -- TODO: porque é que o prof não queria que isto devolvesse Scheme?
 
 
 -- pre : Program must have been previously type inferred
