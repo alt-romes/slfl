@@ -38,11 +38,16 @@ type SynthState = ([Constraint], Int)  -- (list of constraints added by the proc
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
-runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synth (g, d, []) t) st)
+runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st)
+    where
+        synthComplete (g, d, o) t = do
+            (e, d') <- synth (g, d, o) t
+            guard $ null d'
+            return (e, d')
 
 
-initSynthState :: SynthState
-initSynthState = ([], 0)
+initSynthState :: Int -> SynthState
+initSynthState i = ([], i)
 
 
 
@@ -185,18 +190,17 @@ synth (g, d, (n, Sum tys):o) t = do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, (n, ADT tyn):o) t =
-    do
+synth (g, d, (n, ADT tyn):o) t = trace ("3 deconstruct type " ++ show (n, ADT tyn) ++ " to get " ++ show t ++ " with ctx " ++ show (g, d, o)) $ do
     adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
         case vtype of
           Unit -> do
-            (exp, d') <- synth (g, d, o) t
-            return (name, "", exp, d')
+            (exp, d') <- trace ("4 synthing just " ++ show t) $ synth (g, d, o) t
+            trace ("5 synthed to " ++ show exp) $ return (name, "", exp, d')
           argty -> do
             varid <- fresh
-            (exp, d') <- synth (g, d, (varid, argty):o) t
-            return (name, varid, exp, d')
+            (exp, d') <- trace ("6 synth " ++ show t ++ " with ctx " ++ show (g,d, (varid, argty):o)) $ synth (g, d, (varid, argty):o) t
+            trace "7" $ return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
     guard (length ls == length adtds) -- make sure all constructors were decomposed
@@ -241,20 +245,20 @@ focus c goal =
                 then empty
                 else do
                     assertADTHasCons goal >>= guard     -- to decide right, goal cannot be an ADT that has no constructors
-                    focus' Nothing c goal
+                    trace ("8 focus right on " ++ show goal) $ focus' Nothing c goal
 
 
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> trace ("9 focus left on " ++ show x ++ " with " ++ show (g, din) ++ " to get " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
 
 
         decideLeftBang (g, din) goal = do
             case g of
               []   -> empty
               _ -> foldr ((<|>) . (\case {
-                                        (n, Right x) -> focus' (Just (n, x)) (g, din) goal;
+                                        (n, Right x) -> trace ("10 focus left bang on " ++ show x ++ " with " ++ show (g, din) ++ " to get " ++ show goal) $ focus' (Just (n, x)) (g, din) goal;
                                         (n, Left sch) -> focusSch (n, sch) (g, din) goal})) empty g
 
         
@@ -401,16 +405,16 @@ focus c goal =
 -- Functions
 -------------------------------------------------------------------------------
 
-synthCtxAllType :: (Gamma, Delta) -> [ADTD] -> Type -> [Expr]
-synthCtxAllType c adts t = -- TODO : Print error se snd != [] ? Já não deve acontecer porque estamos a usar a LogicT
-    let res = runSynth c t initSynthState adts in
+synthCtxAllType :: (Gamma, Delta) -> Int -> [ADTD] -> Type -> [Expr]
+synthCtxAllType c i adts t =
+    let res = runSynth c t (initSynthState i) adts in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res
 
 
-synthCtxType :: (Gamma, Delta) -> [ADTD] -> Type -> Expr
-synthCtxType c adts t = head $ synthCtxAllType c adts t
+synthCtxType :: (Gamma, Delta) -> Int -> [ADTD] -> Type -> Expr
+synthCtxType c i adts t = head $ synthCtxAllType c i adts t
 
 
 
@@ -421,7 +425,7 @@ synthCtxType c adts t = head $ synthCtxAllType c adts t
 -------------------------------------------------------------------------------
 
 synthAllType :: Type -> [Expr]
-synthAllType = synthCtxAllType ([], []) []
+synthAllType = synthCtxAllType ([], []) 0 []
 
 
 synthType :: Type -> Expr
@@ -433,10 +437,36 @@ synthScheme = undefined -- forall a . T (async)  =>   instantiate T   (a' ...) -
 
 
 synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks ex adts = transform (\case
-                                (Mark _ c t) -> trace ("Synth mark with ctx " ++ show c) $ synthCtxType c adts (fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t)
-                                x -> x
-                               ) ex
+synthMarks ex adts = transform transformfunc ex
+    where
+        transformfunc =
+            \case
+                (Mark _ name c@(fc, bc) t) -> 
+                    let t' = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t in
+                    case name of
+                      Nothing    -> -- Non-recursive Mark
+                        trace ("Synth mark " ++ show t' ++ " with ctx " ++ show c) $
+                        synthCtxType c 0 adts t'
+                      Just name' -> -- Recursive Mark
+                        trace ("Synth mark with ctx " ++ show ((name', Left $ generalize ([], []) t'):fc, (name', t'):bc)) $
+                        case t' of
+                          Fun (ADT tyn) t2 ->
+                              let adtcons = concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adts in
+                              let i = 0 in
+                              Abs (getName i) (Just (ADT tyn)) $ CaseOf (Var (getName i)) (synthBranches adtcons (i+1))
+                              where
+                                  synthBranches :: [(Name, Type)] -> Int -> [(String, String, Expr)]
+                                  synthBranches adtcons i = map (\(name, vtype) ->
+                                        case vtype of
+                                          Unit -> do
+                                            (name, "", synthCtxType c i adts t2)
+                                          argty -> do
+                                            (name, getName i, synthCtxType ((name', Left $ generalize ([], []) t'):fc, (getName i, argty):(name', t'):bc) (i+1) adts t2) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
+                                      ) adtcons
+                          _ ->
+                              error "[Synth Mark] Recursive mark must be of type a -> b"
+                x -> x
+                           
 
 
 -- pre: program has been type inferred

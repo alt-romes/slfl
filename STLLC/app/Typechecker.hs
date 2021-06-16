@@ -279,11 +279,11 @@ typeconstraint (LetIn e1 e2) = do
 
 --- Synth marker -----------
 
-typeconstraint (Mark i _ t) = do
+typeconstraint (Mark i n _ t) = do
     tv <- fresh
     c@(bc, fc) <- get
     let t' = fromMaybe tv t
-    return (t', Mark i (bc, fc) (Just t'))
+    return (t', Mark i n (bc, fc) (Just t'))
 
 --- Sum --------------------
 

@@ -1,3 +1,5 @@
 data Num = Zero | Succ Num;
 
-let main x y = main x y
+# synth rec main :: (Num -o Num);
+
+let main = {{ (Num -o Num) }}

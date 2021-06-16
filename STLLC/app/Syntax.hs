@@ -51,7 +51,7 @@ data Expr
 
     | LetIn String Expr Expr
 
-    | Mark Int ([(String, Either Scheme Type)], [(String, Type)]) (Maybe Type)
+    | Mark Int (Maybe Name) ([(String, Either Scheme Type)], [(String, Type)]) (Maybe Type)
 
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, Expr)
@@ -111,7 +111,7 @@ instance (Show Expr) where
             showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
             showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-            showexpr' d (Mark _ _ t) = "{{ " ++ show t ++ " }}"
+            showexpr' d (Mark _ _ _ t) = "{{ " ++ show t ++ " }}"
             showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
                 foldl (\p (s, mt) -> p ++ indent (d+2) ++ s ++ maybe "" (\t -> " : " ++ show t) mt ++ ";") "" mts
                 ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
@@ -159,7 +159,7 @@ transformM f (CaseOfPlus e1 x e2 y e3) = f <$> (CaseOfPlus <$> transformM f e1 <
 transformM f (BangValue e) = f <$> (BangValue <$> transformM f e)
 transformM f (LetBang x e1 e2) = f <$> (LetBang x <$> transformM f e1 <*> transformM f e2)
 transformM f (LetIn x e1 e2) = f <$> (LetIn x <$> transformM f e1 <*> transformM f e2)
-transformM f (Mark a b t) = pure $ f $ Mark a b t
+transformM f (Mark a b c t) = pure $ f $ Mark a b c t
 transformM f (SumValue mts (s, e)) = f <$> (SumValue mts . (,) s <$> transformM f e)
 transformM f (CaseOfSum e ls) = f <$> (CaseOfSum <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
 transformM f (CaseOf e ls) = f <$> (CaseOf <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)

@@ -94,7 +94,7 @@ plus =
     <|> 
     do
     reserved "inr"
-    t1 <- option Nothing (try $ do { t <- ty; reservedOp ":"; return $ Just t})
+    t1 <- option Nothing (try $ do { t <- ty; reservedOp ":"; return $ Just t })
     Syntax.InjR t1 <$> expr
 
 
@@ -212,9 +212,11 @@ pairepxr :: Parser Expr
 pairepxr = try tensor -- try tensor because "with" is also between "< >"... looks unclear - seria melhor outra opção :)
         <|> try with
 
+
 num :: Parser Expr
 num = do
     Syntax.Lit . Nat <$> natural
+
 
 aexp :: Parser Expr 
 aexp =   parens expr 
@@ -246,14 +248,14 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i ([], []) (Just plhty)
+            return $ Syntax.Mark i Nothing ([], []) (Just plhty)
 
         emptymark = do
             reservedOp "..."
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i ([], []) Nothing
+            return $ Syntax.Mark i Nothing ([], []) Nothing
 
 
 
@@ -339,10 +341,22 @@ letdecl = do
 
 typeannot :: Parser TypeBinding
 typeannot = do
-    reserved "type"
+    reserved "annot"
     name <- identifier
     reserved "::"
     TypeBinding name . trivialScheme <$> ty
+
+
+synthrec :: Parser Binding
+synthrec = do
+    reserved "synth"
+    reserved "rec"
+    name <- identifier
+    reserved "::"
+    t <- ty
+    i <- getState
+    putState $ i+1
+    return $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just t)
 
 
 datacon :: Parser (Name, Type)
@@ -369,7 +383,7 @@ val = Binding "main" <$> expr
 
 top :: Parser Binding
 top = do
-  x <- letdecl <|> val
+  x <- letdecl <|> synthrec <|> val
   optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!, é tudo menos optional, menos na ultima linha :P
   return x
 

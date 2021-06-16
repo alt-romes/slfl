@@ -21,7 +21,7 @@ type Name = String
 data CoreBinding = CoreBinding Name CoreExpr
 
 
-data TypeBinding = TypeBinding String Scheme
+data TypeBinding = TypeBinding String Scheme deriving (Eq)
 
 
 data CoreExpr
@@ -62,7 +62,7 @@ data CoreExpr
 
     | LetIn CoreExpr CoreExpr
 
-    | Mark Int ([Maybe Var], [(String, Scheme)]) (Maybe Type) -- TODO: Once again assuming we can't have free linear variables
+    | Mark Int (Maybe Name) ([Maybe Var], [(String, Scheme)]) (Maybe Type) -- TODO: Once again assuming we can't have free linear variables
 
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, CoreExpr)
@@ -151,7 +151,7 @@ instance (Show Scheme) where
 
 
 
-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Traversal
 -------------------------------------------------------------------------------
 
@@ -176,7 +176,7 @@ transformM f (CaseOfPlus e1 e2 e3) = f =<< (CaseOfPlus <$> transformM f e1 <*> t
 transformM f (BangValue e) = f . BangValue =<< transformM f e
 transformM f (LetBang e1 e2) = f =<< (LetBang <$> transformM f e1 <*> transformM f e2)
 transformM f (LetIn e1 e2) = f =<< (LetIn <$> transformM f e1 <*> transformM f e2)
-transformM f (Mark a b t) = f $ Mark a b t
+transformM f (Mark a n b t) = f $ Mark a n b t
 transformM f (SumValue mts (s, e)) = f . SumValue mts . (,) s =<< transformM f e
 transformM f (CaseOfSum e ls) = f =<< (CaseOfSum <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
 transformM f (CaseOf e ls) = f =<< (CaseOf <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
@@ -234,7 +234,7 @@ showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " o
 showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
 showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-showexpr' _ (Mark i c t) = "{{ " ++ show i ++ " : " ++ show t ++ " in context" ++ show c ++ " }}"
+showexpr' _ (Mark i n c t) = "{{ " ++ show i ++ " : " ++ show t ++ " in context" ++ show c ++ " }}"
 showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
     foldl (\p (s', t) -> p ++ indent (d+2) ++ s' ++ " : " ++ show (fromJust t) ++ ";") "" mts
     ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
