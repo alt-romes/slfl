@@ -5,10 +5,13 @@ import Data.Maybe
 import Control.Monad.State
 import GHC.Generics (Generic)
 import Control.DeepSeq
+import Prelude hiding (Bool, (<>))
+import Text.PrettyPrint
 import Data.Functor.Identity
 
 
 import CoreSyntax (Type, Scheme, Name, Literal(..))
+import Util
 
 
 
@@ -70,11 +73,11 @@ data Expr
 
 
 data Pattern
-    = TensorPattern String String
+    = TensorPattern Name Name
     | UnitPattern
-    | BangPattern String
+    | BangPattern Name
     
-    | VanillaPattern String
+    | VanillaPattern Name
 
 
 
@@ -148,6 +151,39 @@ instance (Show Expr) where
             showexpr' d (UnrestrictedAbs x _ e) = indent d ++ "(λ" ++ x ++ " => " ++ showexpr' (d+1) e ++ ")"
 
             indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
+    -- TODO: Pretty print:
+    -- show = render . ppr 0
+
+
+instance Pretty Expr where
+    ppr p e = case e of
+        Syntax.Lit l -> ppr p l
+        Syntax.Var x -> text x
+        Syntax.Abs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "-o" <+> ppr (p+1) e
+        Syntax.Abs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "-o" <+> ppr (p+1) e
+        Syntax.App e1 e2 -> ppr (p+1) e1 <+> ppr (p+1) e2
+        Syntax.TensorValue e1 e2 -> char '<' <+> ppr p e1 <+> char '*' <+> ppr p e2 <+> char '>'
+        Syntax.LetTensor u v e1 e2 -> text "let" <+> text u <> char '*' <> text v <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
+        Syntax.UnitValue -> text "<>"
+        Syntax.LetUnit e1 e2 -> text "let" <+> char '_' <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
+        Syntax.WithValue e1 e2 -> char '<' <+> ppr p e1 <+> char '&' <+> ppr p e2 <+> char '>'
+        Syntax.Fst e -> parensIf (p>0) $ text "fst" <+> ppr (p+1) e
+        Syntax.Snd e -> parensIf (p>0) $ text "snd" <+> ppr (p+1) e
+        Syntax.InjL Nothing e -> text "inl" <+> ppr (p+1) e
+        Syntax.InjL (Just t) e -> text "inl" <+> ppr (p+1) e <+> char ':' <+> pp t
+        Syntax.InjR Nothing e -> text "inr" <+> ppr (p+1) e
+        Syntax.InjR (Just t) e -> text "inr" <+> pp t <+> char ':' <+> ppr (p+1) e
+        Syntax.CaseOfPlus e1 x e2 y e3 -> text "case" <+> ppr p e1 <+> text "of" <+> text "inl" <+> text x <+> text "=>" <+> ppr p e2 <+> char '|' <+> text "inr" <+> text y <+> text "=>" <+> ppr p e3
+        Syntax.BangValue e -> char '!' <+> ppr p e
+        Syntax.LetBang x e1 e2 -> text "let" <+> char '!' <> text x <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
+        Syntax.LetIn x e1 e2 -> text "let" <+> text x <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
+        Syntax.Mark _ _ _ Nothing -> text "{{" <+> text "..." <+> text "}}"
+        Syntax.Mark _ _ _ (Just t) -> text "{{" <+> ppr p t <+> text "}}"
+        Syntax.SumValue mts (s, e) -> text "union" <+> char '{' <+> foldl undefined empty mts <+> text s <+> pp e <+> char '}' -- TODO
+        Syntax.CaseOfSum e ((tag, id, e1):exps) -> undefined -- TODO
+        Syntax.CaseOf e ((tag, id, e1):exps) -> undefined -- TODO
+        UnrestrictedAbs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "->" <+> ppr (p+1) e
+        UnrestrictedAbs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "->" <+> ppr (p+1) e
 
 
 

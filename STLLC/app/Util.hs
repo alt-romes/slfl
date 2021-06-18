@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Util where
 
+import Text.PrettyPrint
 import qualified Data.Map as Map
 import Control.Monad
 import qualified Data.Either as Either
@@ -37,4 +38,23 @@ mparens s = "(" ++ s ++ ")"
 
 count :: Eq a => a -> [a] -> Int
 count x = length . filter (== x)
+
+
+
+
+
+-------------------------------------------------------------------------------
+-- Pretty
+-------------------------------------------------------------------------------
+
+class Pretty p where
+    ppr :: Int -> p -> Doc
+
+    pp :: p -> Doc
+    pp = ppr 0
+
+
+parensIf :: Bool -> Doc -> Doc
+parensIf True = parens
+parensIf False = id
 

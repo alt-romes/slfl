@@ -5,6 +5,7 @@ module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     Predicate(..), trivialIntRefinement, isInt, isADTBool, transformTypeM,
     transformType, isFunction) where 
 
+import Prelude hiding (Bool, (<>))
 import Control.Monad
 import Control.Monad.State
 import Data.Maybe
@@ -13,6 +14,7 @@ import Control.Applicative
 import GHC.Generics (Generic)
 import Control.DeepSeq
 import Data.Bifunctor
+import Text.PrettyPrint
 import Data.Functor.Identity
 
 
@@ -29,7 +31,7 @@ type Name = String
 data CoreBinding = CoreBinding Name CoreExpr
 
 
-data TypeBinding = TypeBinding String Scheme deriving (Eq)
+data TypeBinding = TypeBinding Name Scheme deriving (Eq)
 
 
 data CoreExpr
@@ -37,8 +39,8 @@ data CoreExpr
     = Lit Literal
     | BLVar Int             -- bound linear/restricted var
     | BUVar Int             -- bound unrestricted var
-    | FLVar String          -- free linear/restricted var
-    | FUVar String          -- free unrestricted var
+    | FLVar Name          -- free linear/restricted var
+    | FUVar Name          -- free unrestricted var
 
     -- A -o B
     | Abs (Maybe Type) CoreExpr     -- \x:T -> M . with Bruijn indices
@@ -73,10 +75,10 @@ data CoreExpr
     | Mark Int (Maybe Name) ([Maybe Var], [(String, Scheme)]) (Maybe Scheme) (Int, [Name], Int) -- TODO: Once again assuming we can't have free linear variables
 
     -- Sum types
-    | SumValue [(String, Maybe Type)] (String, CoreExpr)
-    | CaseOfSum CoreExpr [(String, CoreExpr)]
+    | SumValue [(Name, Maybe Type)] (Name, CoreExpr)
+    | CaseOfSum CoreExpr [(Name, CoreExpr)]
   
-    | CaseOf CoreExpr [(String, CoreExpr)]
+    | CaseOf CoreExpr [(Name, CoreExpr)]
 
     | ADTVal Name (Maybe CoreExpr)
     
@@ -114,7 +116,7 @@ data Type
     | ADT Name [Type]
 
     | RefinementType Name Type [Type] (Maybe Predicate)
-    
+
     deriving (Eq, Ord, Generic, NFData)
 
 data TyLiteral = TyInt deriving (Eq, Ord, Generic, NFData)
@@ -151,19 +153,12 @@ instance (Show CoreExpr) where
 
 
 instance (Show Type) where 
-    show (TyLit l) = show l
-    show (Fun t1 t2) = "(" ++ show t1 ++ " -o " ++ show t2 ++ ")"
-    show (Tensor t1 t2) = "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
-    show Unit = "1"
-    show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"
-    show (Plus t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
-    show (Bang t1) = "!" ++ show t1
-    show (TypeVar x) = getName x
-    show (ExistentialTypeVar x) = "?" ++ getName x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
     show (ADT n ts) = n ++ concatMap ((" " ++) . (\case t@ADT {} -> "(" ++ show t ++ ")"; t -> show t)) ts
     show (RefinementType n t _ Nothing) = n ++ " { " ++ show t ++ " }"
     show (RefinementType n t l (Just p)) = n ++ " { " ++ show t ++ " | " ++ foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> show p' ++ " => "}) ++)) "" l ++ show p ++ " }"
+    -- TODO: Rest of Pretty instance
+    show = render . ppr 0
 
 
 instance (Show Scheme) where
@@ -209,6 +204,24 @@ instance Hashable Type where
 
 instance Hashable TyLiteral where
     hashWithSalt a TyInt = hashWithSalt (a+10) "TyInt"
+
+instance Pretty Type where
+    ppr p t = case t of
+        TyLit l -> text $ show l
+        Fun t1 t2 -> parens (pp t1 <+> text "-o" <+> pp t2)
+        Tensor t1 t2 -> parens (pp t1 <+> char '*' <+> pp t2)
+        Unit -> char '1'
+        With t1 t2 -> parens (pp t1 <+> char '&' <+> pp t2)
+        Plus t1 t2 -> parens (pp t1 <+> char '+' <+> pp t2)
+        Bang t -> parens (char '!' <+> pp t)
+        TypeVar x -> text $ letters !! x
+        ExistentialTypeVar x -> char '?' <> text (letters !! x)
+        Sum ts -> undefined -- TODO
+        ADT t -> text t
+
+
+instance Pretty Literal where
+    ppr p (Nat i) = integer i
 
 
 
