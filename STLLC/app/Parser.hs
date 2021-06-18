@@ -329,25 +329,34 @@ argument = do
     return (argname, argtype)
 
 
-letdecl :: Parser Binding
+letdecl :: Parser (Either TypeBinding Binding)
 letdecl = do
-    reserved "let" <|> reserved "var"
     name <- identifier
     args <- many argument
     reservedOp "="
     body <- expr
-    return $ Binding name $ foldr (uncurry Syntax.Abs) body args
+    return $ Right $ Binding name $ foldr (uncurry Syntax.Abs) body args
 
 
-typeannot :: Parser TypeBinding
+typeannot :: Parser (Either TypeBinding Binding)
 typeannot = do
-    reserved "annot"
     name <- identifier
     reserved "::"
-    TypeBinding name . trivialScheme <$> ty
+    Left . TypeBinding name . trivialScheme <$> ty
 
 
-synthrec :: Parser Binding
+letsynth :: Parser (Either TypeBinding Binding)
+letsynth = do
+    reserved "synth"
+    name <- identifier
+    reserved "::"
+    t <- ty
+    i <- getState
+    putState $ i+1
+    return $ Right $ Binding name $ Syntax.Mark i Nothing ([], []) (Just t)
+
+
+synthrec :: Parser (Either TypeBinding Binding)
 synthrec = do
     reserved "synth"
     reserved "rec"
@@ -356,7 +365,7 @@ synthrec = do
     t <- ty
     i <- getState
     putState $ i+1
-    return $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just t)
+    return $ Right $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just t)
 
 
 datacon :: Parser (Name, Type)
@@ -373,27 +382,25 @@ datatype = do
     reservedOp "="
     con <- datacon
     cons <- many (do {reservedOp "|"; datacon})
-    optional (reservedOp ";")
+    optional (reservedOp ";") -- !TODO: Necessário porque se não as linhas a seguir podem falhar.
     return $ ADTD name (con:cons)
 
 
-val :: Parser Binding
-val = Binding "main" <$> expr
+val :: Parser (Either TypeBinding Binding)
+val = Right . Binding "main" <$> expr
 
 
-top :: Parser Binding
+top :: Parser (Either TypeBinding Binding)
 top = do
-  x <- letdecl <|> synthrec <|> val
-  optional (reservedOp ";") -- TODO : se não meter a ";" não funciona!!!, é tudo menos optional, menos na ultima linha :P
-  return x
-
+    x <- try synthrec <|> try letsynth <|> try typeannot <|> try letdecl <|> try val
+    optional (reservedOp ";") -- !TODO: Necessário para saber onde uma função termina. Sem o ponto e vírgula não há distinção sobre o que é um identificador de função e o que é uma top level declaration..
+    return x
 
 modl :: Parser Program
 modl = do
     adts <- many datatype
-    ts <- many typeannot
     bs <- many top
-    return $ Program adts bs ts []
+    return $ Program adts (rights bs) (lefts bs) []
 
 
 
