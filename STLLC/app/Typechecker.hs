@@ -409,29 +409,33 @@ typeinferModule (Program adts bs ts cbs) =
         typeinferModule' corebindings knownts i subst = -- Corebindings to process, knownts = known type bindings, i = next var nº to use in inference, subst = substitution to compose with when solving next constraints
             case corebindings of
               [] -> ([], knownts, subst)
-              b@(CoreBinding n ce):corebindings' ->
+              (CoreBinding n ce):corebindings' ->
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition for this function name
                     Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked
-                        case typeinfer ((n, Forall [] (TypeVar i)):tbs_pairs) (i+1) ce of -- Use new generic type annotation in inference for recursion and solve it after -- TODO: Queremos assim com a' ou queremos Fun a' b' ? É que se for o segundo depois não podiamos ter coisas como variáveis
-                          Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
-                          Just (btype, bexpr, subst', i') ->
-                              case solveconstraints subst' [Constraint (TypeVar i) btype] of -- Solve recursive type annotation with actual type
-                                Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type when typing: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
-                                Just subst'' ->
-                                  let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
-                                  (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $
-                                      typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) i' subst''
+                        inferWithRecName corebindings' knownts n ((n, Forall [] (TypeVar i)):tbs_pairs) (i+1) ce (Constraint (TypeVar i))
                     Just (Forall schnames schty) ->                             -- Function name is already typed, and already in the context, so no need to add again
-                        case typeinfer tbs_pairs i ce of -- Use type annotation in inference, and solve it after
-                          Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
-                          Just (btype, bexpr, subst', i') -> 
-                              case solveconstraints subst' [Constraint schty btype] of -- Solve type annotation with actual type
-                                Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type when typing: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
-                                Just subst'' ->
-                                  let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
-                                  (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $
-                                      typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) i' subst''
+                        inferWithRecName corebindings' knownts n tbs_pairs i ce (Constraint schty)
+
+
+        inferWithRecName :: [CoreBinding]
+                            -> [TypeBinding]
+                            -> Name
+                            -> FreeCtxt
+                            -> Int
+                            -> CoreExpr
+                            -> (Type -> Constraint)
+                            -> ([CoreBinding], [TypeBinding], Subst)
+        inferWithRecName corebindings' knownts n tbs_pairs i ce constraint = 
+            case typeinfer tbs_pairs i ce of -- Use type annotation in inference, and solve it after
+              Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+              Just (btype, bexpr, subst', i') -> 
+                  case solveconstraints subst' [constraint btype] of -- Solve type annotation with actual type
+                    Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type when typing: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+                    Just subst'' ->
+                      let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
+                        (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $
+                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) i' subst''
 
 
         cleanLetters :: Type -> Type
