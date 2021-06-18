@@ -397,7 +397,7 @@ typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] 0 e)
 
 
--- TODO: Refactor this function
+-- !!!!TODO: Refactor this function
 -- !TODO: Rever como estou a fazer as type annotations com o prof
 typeinferModule :: Program -> Program -- typecheck and use inferred types
 typeinferModule (Program adts bs ts cbs) =
@@ -413,21 +413,25 @@ typeinferModule (Program adts bs ts cbs) =
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition for this function name
                     Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked
-                        case typeinfer ((n, Forall [] (TypeVar i)):tbs_pairs) (i+1) ce of -- TODO: Queremos assim com a' ou queremos Fun a' b' ? É que se for o segundo depois não podiamos ter coisas como variáveis
+                        case typeinfer ((n, Forall [] (TypeVar i)):tbs_pairs) (i+1) ce of -- Use new generic type annotation in inference for recursion and solve it after -- TODO: Queremos assim com a' ou queremos Fun a' b' ? É que se for o segundo depois não podiamos ter coisas como variáveis
                           Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                           Just (btype, bexpr, subst', i') ->
-                              case solveconstraints subst' [Constraint (TypeVar i) btype] of -- Solve type annotation with actual type
+                              case solveconstraints subst' [Constraint (TypeVar i) btype] of -- Solve recursive type annotation with actual type
                                 Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type when typing: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                                 Just subst'' ->
                                   let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
                                   (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $
                                       typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) i' subst''
                     Just (Forall schnames schty) ->                             -- Function name is already typed, and already in the context, so no need to add again
-                        case typeinfer tbs_pairs i ce of
+                        case typeinfer tbs_pairs i ce of -- Use type annotation in inference, and solve it after
                           Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                           Just (btype, bexpr, subst', i') -> 
-                              (\(c', tb', s') -> (CoreBinding n bexpr :c', tb', s')) $ -- Add this corebinding to the result
-                                  typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype):knownts) i' subst' -- Recursive call and add new typebinding to known type bindings
+                              case solveconstraints subst' [Constraint schty btype] of -- Solve type annotation with actual type
+                                Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type when typing: " ++ show b ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+                                Just subst'' ->
+                                  let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
+                                  (\(c', tb', s') -> (CoreBinding n bexpr' :c', tb', s')) $
+                                      typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) i' subst''
 
 
         cleanLetters :: Type -> Type
@@ -441,9 +445,4 @@ typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck
 -- pre : Program must have been previously type inferred
 typecheckModule :: Program -> [TypeBinding]
 typecheckModule = reverse . _tbinds
-    -- if and $ zipWith (\ (CoreBinding n1 _) (TypeBinding n2 _) -> n1 == n2) (_cbinds p) (_tbinds p)
-    --    then -- all core bindings already have type bindings
-    --         reverse $ _tbinds p
-    --    else -- not all core bindings have type bindings yet
-    --         reverse $ _tbinds $ typeinferModule p
 
