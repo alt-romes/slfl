@@ -190,24 +190,24 @@ synth (g, d, (n, Sum tys):o) t = do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, (n, ADT tyn):o) t = trace ("3 deconstruct type " ++ show (n, ADT tyn) ++ " to get " ++ show t ++ " with ctx " ++ show (g, d, o)) $ do
+synth (g, d, (n, ADT tyn):o) t = do
     adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
         case vtype of
           Unit -> do
-            (exp, d') <- trace ("4 synthing just " ++ show t) $ synth (g, d, o) t
-            trace ("5 synthed to " ++ show exp) $ return (name, "", exp, d')
+            (exp, d') <- synth (g, d, o) t
+            return (name, "", exp, d')
           argty -> do
             varid <- fresh
-            (exp, d') <- trace ("6 synth " ++ show t ++ " with ctx " ++ show (g, d, o)) $ synth (g, (varid, argty):d, o) t
-            trace "7" $ return (name, varid, exp, d')
+            (exp, d') <- synth (g, (varid, argty):d, o) t
+            return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
     guard (length ls == length adtds) -- make sure all constructors were decomposed
     let (n1, varid1, e1, d1') = head ls
-    trace "fail 1" $ guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
-    trace "fail 2" $ guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
-    trace "pass 3" $ return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+    guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
+    guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
+    return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
 
 
 ---- !L
@@ -245,20 +245,20 @@ focus c goal =
                 then empty
                 else do
                     assertADTHasCons goal >>= guard     -- to decide right, goal cannot be an ADT that has no constructors
-                    trace ("8 focus right on " ++ show goal) $ focus' Nothing c goal
+                    focus' Nothing c goal
 
 
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> trace ("9 focus left on " ++ show x ++ " with " ++ show (g, din) ++ " to get " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
 
 
         decideLeftBang (g, din) goal = do
             case g of
               []   -> empty
               _ -> foldr ((<|>) . (\case {
-                                        (n, Right x) -> trace ("10 focus left bang on " ++ show x ++ " with " ++ show (g, din) ++ " to get " ++ show goal) $ focus' (Just (n, x)) (g, din) goal;
+                                        (n, Right x) -> focus' (Just (n, x)) (g, din) goal;
                                         (n, Left sch) -> focusSch (n, sch) (g, din) goal})) empty g
 
         
@@ -325,15 +325,15 @@ focus c goal =
             cons <- getadtcons tyn
             foldr (interleave . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
                    case argty of
-                     Unit -> trace ("11 synthing cons " ++ tag ++ " wout/ argtype") $ return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
+                     Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype ->
                        if case argtype of
                              ADT tyn' -> tyn == tyn' -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left.
                              _ -> False
                           then empty
                           else do
-                              (arge, d') <- trace ("11 trying synth cons " ++ tag ++ " w type " ++ show argtype) $ synth (g, d, []) argtype;
-                              trace "return from 11 !!" $ return (App (Var tag) arge, d')
+                              (arge, d') <- synth (g, d, []) argtype;
+                              return (App (Var tag) arge, d')
                 )) empty cons
 
         ---- !R
@@ -462,10 +462,8 @@ synthMarks ex adts = transform transformfunc ex
                     let t' = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t in
                     case name of
                       Nothing    -> -- Non-recursive Mark
-                        trace ("Synth mark " ++ show t' ++ " with ctx " ++ show c) $
                         synthCtxType c 0 adts t'
                       Just name' -> -- Recursive Mark
-                        trace ("Synth mark with ctx " ++ show ((name', Left $ generalize ([], []) t'):fc, (name', t'):bc)) $
                         case t' of
                           Fun (ADT tyn) t2 ->
                               let adtcons = concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adts in
