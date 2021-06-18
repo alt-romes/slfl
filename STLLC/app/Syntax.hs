@@ -167,8 +167,10 @@ instance Pretty Expr where
         Syntax.UnitValue -> text "<>"
         Syntax.LetUnit e1 e2 -> text "let" <+> char '_' <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
         Syntax.WithValue e1 e2 -> char '<' <+> ppr p e1 <+> char '&' <+> ppr p e2 <+> char '>'
-        Syntax.Fst e -> parensIf (p>0) $ text "fst" <+> ppr (p+1) e
-        Syntax.Snd e -> parensIf (p>0) $ text "snd" <+> ppr (p+1) e
+        Syntax.Fst e@App(_ _) -> text "fst" <+> parens ppr (p+1) e
+        Syntax.Snd e@App(_ _) -> text "snd" <+> parens ppr (p+1) e
+        Syntax.Fst e -> text "fst" <+> ppr (p+1) e
+        Syntax.Snd e -> text "snd" <+> ppr (p+1) e
         Syntax.InjL Nothing e -> text "inl" <+> ppr (p+1) e
         Syntax.InjL (Just t) e -> text "inl" <+> ppr (p+1) e <+> char ':' <+> pp t
         Syntax.InjR Nothing e -> text "inr" <+> ppr (p+1) e
