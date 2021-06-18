@@ -199,15 +199,15 @@ synth (g, d, (n, ADT tyn):o) t = trace ("3 deconstruct type " ++ show (n, ADT ty
             trace ("5 synthed to " ++ show exp) $ return (name, "", exp, d')
           argty -> do
             varid <- fresh
-            (exp, d') <- trace ("6 synth " ++ show t ++ " with ctx " ++ show (g,d, (varid, argty):o)) $ synth (g, d, (varid, argty):o) t
+            (exp, d') <- trace ("6 synth " ++ show t ++ " with ctx " ++ show (g, d, o)) $ synth (g, (varid, argty):d, o) t
             trace "7" $ return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
     guard (length ls == length adtds) -- make sure all constructors were decomposed
     let (n1, varid1, e1, d1') = head ls
-    guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
-    guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
-    return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+    trace "fail 1" $ guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
+    trace "fail 2" $ guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
+    trace "pass 3" $ return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
 
 
 ---- !L
@@ -325,10 +325,15 @@ focus c goal =
             cons <- getadtcons tyn
             foldr (interleave . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
                    case argty of
-                     Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
-                     argtype -> do
-                       (arge, d') <- synth (g, d, []) argtype;
-                       return (App (Var tag) arge, d')
+                     Unit -> trace ("11 synthing cons " ++ tag ++ " wout/ argtype") $ return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
+                     argtype ->
+                       if case argtype of
+                             ADT tyn' -> tyn == tyn' -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left.
+                             _ -> False
+                          then empty
+                          else do
+                              (arge, d') <- trace ("11 trying synth cons " ++ tag ++ " w type " ++ show argtype) $ synth (g, d, []) argtype;
+                              trace "return from 11 !!" $ return (App (Var tag) arge, d')
                 )) empty cons
 
         ---- !R
@@ -373,6 +378,18 @@ focus c goal =
 
 
         ---- * Proposition no longer synchronous * --------
+
+        -- adtLFocus
+        -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- else recursive types would loop infinitely
+        focus' f@(Just (n, ADT tyn)) (g, d) goal =
+            if case goal of
+              ADT tyn' -> tyn' == tyn
+              _ -> False
+              then return (Var n, d)
+              else
+                focus' f (g, d) goal
+
+
 
         ---- left focus is either atomic or not.
         ---- if it is atomic, it'll either be the goal and instanciate it, or fail
