@@ -106,7 +106,7 @@ main = do
     case action of
       "synth" -> print $ mainsynth arg
       "all" -> print $ mainsynthAll arg
-      "complete" -> mainsynthMarksModule arg >>= print . _binds
+      "complete" -> mainsynthMarksModule arg >>= print . frontend
       "fdesugar" -> print $ maindesugar arg
       "desugar" -> maindesugarModule arg >>= print . _cbinds
       "ftype" -> print $ maintypecheck arg

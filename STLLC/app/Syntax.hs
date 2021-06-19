@@ -80,7 +80,7 @@ data Pattern
 -------------------------------------------------------------------------------
 
 instance (Show Binding) where
-    show (Binding s e) = "let " ++ s ++ " =\n" ++ show e ++ ";\n"
+    show (Binding s e) = "let " ++ s ++ " = " ++ show e ++ ";\n"
 
 
 instance (Show Expr) where
