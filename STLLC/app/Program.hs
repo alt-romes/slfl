@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Program (Program(..), ADTD(..), trivialProgram, completeFrontendMarksCtx, frontend) where
+module Program (Program(..), ADTD(..), trivialProgram, completeFrontendMarksCtx) where
 
 import qualified Data.Map as Map
 
@@ -33,7 +33,12 @@ data ADTD = ADTD Name [(Name, Type)]    -- Algebraic Data Type Definition
 -------------------------------------------------------------------------------
 
 instance Show Program where
-    show (Program adts bs ts cs) = "\n" ++ unlines (map show adts) ++ "\n\n" ++ unlines (map show bs) ++ unlines (map show ts) ++ unlines (map show cs)
+    show (Program adts bs ts cs) = unlines (map show adts) ++ "\n\n" ++ displayBindingsWithTypes bs ts -- unlines (map show bs) ++ unlines (map show ts)
+        where
+            displayBindingsWithTypes bs ts = unlines $ map (\b@(Binding n e) -> showbity n ts ++ show b) bs
+            showbity n ts = case lookup n $ map (\(TypeBinding n t) -> (n, t)) ts of
+                              Nothing -> ""
+                              Just ty -> show (TypeBinding n ty)
 
 
 instance Show ADTD where
@@ -51,11 +56,6 @@ instance Show ADTD where
 
 trivialProgram :: Program
 trivialProgram = Program [] [] [] []
-
-
-frontend :: Program -> Program
-frontend (Program adts bs _ _) = Program adts bs [] []
-
 
 type MarksTypes = Map.Map Int (([(String, Either Scheme Type)], [(String, Type)]), Maybe Type)
 

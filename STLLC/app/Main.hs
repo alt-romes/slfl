@@ -68,10 +68,8 @@ maindesugarModule fname = do
    return $ typeinferModule cbindings
 
 
-maintypecheckModule :: String -> IO [TypeBinding]
-maintypecheckModule fname = do
-    cbindings <- maindesugarModule fname
-    return $ typecheckModule cbindings
+maintypecheckModule :: String -> IO Program
+maintypecheckModule = maindesugarModule
 
 
 mainevalModule :: String -> IO CoreExpr
@@ -106,11 +104,11 @@ main = do
     case action of
       "synth" -> print $ mainsynth arg
       "all" -> print $ mainsynthAll arg
-      "complete" -> mainsynthMarksModule arg >>= print . frontend
+      "complete" -> mainsynthMarksModule arg >>= print
       "fdesugar" -> print $ maindesugar arg
       "desugar" -> maindesugarModule arg >>= print . _cbinds
       "ftype" -> print $ maintypecheck arg
-      "type" -> maintypecheckModule arg >>= mapM_ print
+      "type" -> maintypecheckModule arg >>= print
       "feval" -> print $ maineval arg
       "eval" -> mainevalModule arg >>= print
       "fparse" -> print $ mainparse arg

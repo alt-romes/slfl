@@ -80,7 +80,7 @@ data Pattern
 -------------------------------------------------------------------------------
 
 instance (Show Binding) where
-    show (Binding s e) = "let " ++ s ++ " = " ++ show e ++ ";\n"
+    show (Binding s e) = s ++ " = " ++ show e ++ ";\n"
 
 
 instance (Show Expr) where
@@ -111,7 +111,8 @@ instance (Show Expr) where
             showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
             showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-            showexpr' d (Mark _ _ _ t) = "{{ " ++ show t ++ " }}"
+            showexpr' d (Mark _ _ _ Nothing) = "{{ ... }}"
+            showexpr' d (Mark _ _ _ (Just t)) = "{{ " ++ show t ++ " }}"
             showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
                 foldl (\p (s, mt) -> p ++ indent (d+2) ++ s ++ maybe "" (\t -> " : " ++ show t) mt ++ ";") "" mts
                 ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"

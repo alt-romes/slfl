@@ -119,11 +119,11 @@ data TyLiteral = Natural deriving (Eq, Show)
 ---- * Show * ----
 
 instance (Show CoreBinding) where
-    show (CoreBinding s e) = s ++ ":\n" ++ show e ++ "\n"
+    show (CoreBinding s e) = s ++ ":\n" ++ show e ++ ";\n"
 
 
 instance (Show TypeBinding) where
-    show (TypeBinding s sch) = s ++ ":\n    " ++ show sch ++ "\n"
+    show (TypeBinding s sch) = s ++ " :: " ++ show sch ++ ";\n"
 
 
 instance (Show CoreExpr) where
@@ -145,7 +145,7 @@ instance (Show Type) where
 
 
 instance (Show Scheme) where
-    show (Forall ns t) = (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ ". ") ++ show t
+    show (Forall ns t) = (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ " . ") ++ show t
 
 
 

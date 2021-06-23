@@ -273,10 +273,12 @@ tylit :: Parser Type
 tylit =     sumty
         <|> (reservedOp "1" >> return Unit)
         <|> (reserved "Nat" >> return (TyLit Natural))
-        <|> (reservedOp "a" >> return (TypeVar 0)) -- TODO: fazer parse de type variables ?? :)
+        <|> (reservedOp "a" >> return (TypeVar 0)) -- !TODO: fazer parse de lowercase identifiers as type variables :)
         <|> (reservedOp "b" >> return (TypeVar 1))
         <|> (reservedOp "c" >> return (TypeVar 2))
         <|> (reservedOp "d" >> return (TypeVar 3))
+        <|> (reservedOp "e" >> return (TypeVar 4))
+        <|> (reservedOp "f" >> return (TypeVar 5))
         <|> adty -- TODO: can't write ADTs starting by any of those letters above ^:) e não consegui resolver com o try (fazer "starts with uppercase" e assim)
 
 
@@ -342,7 +344,12 @@ typeannot :: Parser (Either TypeBinding Binding)
 typeannot = do
     name <- identifier
     reserved "::"
-    Left . TypeBinding name . trivialScheme <$> ty
+    tyvarnames <- option [] (do
+        reserved "forall"
+        tvn <- many1 (choice [reservedOp "a" >> return 0, reservedOp "b" >> return 1, reservedOp "c" >> return 2, reservedOp "d" >> return 3, reservedOp "e" >> return 4, reservedOp "f" >> return 5]) -- TODO: anything would be better :p
+        dot
+        return tvn)
+    Left . TypeBinding name . Forall tyvarnames <$> ty
 
 
 letsynth :: Parser (Either TypeBinding Binding)

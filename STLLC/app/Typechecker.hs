@@ -1,4 +1,4 @@
-module Typechecker (typeinferExpr, typeinferModule, typecheckExpr, typecheckModule, TypeBinding(..)) where
+module Typechecker (typeinferExpr, typeinferModule, typecheckExpr, TypeBinding(..)) where
 
 import Debug.Trace
 import Data.List
@@ -390,6 +390,7 @@ generalizetbs :: [TypeBinding] -> [TypeBinding]
 generalizetbs [] = []
 generalizetbs ((TypeBinding n (Forall [] ty)):xs) = TypeBinding n (generalize ([],[]) ty):generalizetbs xs  -- TypeBindings from the parser come generalized with trivial schemes
                                                                                                             -- TODO: Should probably be done in the parser instead of this
+generalizetbs (tb@(TypeBinding n sch):xs) = tb:generalizetbs xs
 
 deletetb :: Name -> [TypeBinding] -> [TypeBinding]
 deletetb _ [] = []
@@ -456,9 +457,3 @@ typeinferModule (Program adts bs ts cbs) =
 
 typecheckExpr :: CoreExpr -> Scheme
 typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _, _) -> t) (typeinfer [] 0 e) -- TODO: porque é que o prof não queria que isto devolvesse Scheme?
-
-
--- pre : Program must have been previously type inferred
-typecheckModule :: Program -> [TypeBinding]
-typecheckModule = reverse . _tbinds
-

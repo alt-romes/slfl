@@ -35,6 +35,9 @@ natural = Tok.natural lexer
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
 
+dot :: Parser String
+dot = Tok.dot lexer
+
 contents :: Parser a -> Parser a
 contents p = do
   Tok.whiteSpace lexer
