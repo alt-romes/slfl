@@ -386,6 +386,18 @@ instantiateFrom i (Forall ns t) = do
     apply s t
 
 
+generalizetbs :: [TypeBinding] -> [TypeBinding]
+generalizetbs [] = []
+generalizetbs ((TypeBinding n (Forall [] ty)):xs) = TypeBinding n (generalize ([],[]) ty):generalizetbs xs  -- TypeBindings from the parser come generalized with trivial schemes
+                                                                                                            -- TODO: Should probably be done in the parser instead of this
+
+deletetb :: Name -> [TypeBinding] -> [TypeBinding]
+deletetb _ [] = []
+deletetb n (t@(TypeBinding z ty):ls)
+  | n == z = deletetb n ls
+  | otherwise = t:deletetb n ls
+
+
 
 
 
@@ -401,7 +413,7 @@ typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, 
 -- !TODO: Rever como estou a fazer as type annotations com o prof
 typeinferModule :: Program -> Program -- typecheck and use inferred types
 typeinferModule (Program adts bs ts cbs) =
-    let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts ++ ts) 0 Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+    let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts ++ generalizetbs ts) 0 Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
         let finalcbs' = apply finalsubst finalcbs in
             Program adts bs finalts finalcbs'
     where
@@ -414,8 +426,8 @@ typeinferModule (Program adts bs ts cbs) =
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition for this function name
                     Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked
                         inferWithRecName corebindings' knownts n ((n, Forall [] (TypeVar i)):tbs_pairs) (i+1) ce (Constraint (TypeVar i))
-                    Just (Forall schnames schty) ->                             -- Function name is already typed, and already in the context, so no need to add again
-                        inferWithRecName corebindings' knownts n tbs_pairs i ce (Constraint schty)
+                    Just (Forall schnames schty) ->                             -- Function name is already typed, and already in the context, so no need to add it again
+                        inferWithRecName corebindings' (deletetb n knownts) n tbs_pairs i ce (Constraint schty) -- delete from knownts the type because it will be inferred and re-added after
 
 
         inferWithRecName :: [CoreBinding]

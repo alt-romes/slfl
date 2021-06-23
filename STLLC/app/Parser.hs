@@ -170,7 +170,7 @@ sum = do
     cls2 <- many (try sumtypebranch)
     reservedOp "}"
     return $ Syntax.SumValue (cls1 ++ cls2) (tag, e)
-    
+
 
 casebranch :: Parser (String, String, Expr)
 casebranch = do

@@ -1,6 +1,4 @@
 5) escrever bons testes com polimorfismo
-6.5) type annotations
 7) Conseguir escrever no relatório as regras de forma a que o algoritmo seja recriável
 8) refactor caseof (sum, plus, adt)
-9) allow ADTs starting with A, B... (fix ADT parsing)
-10) consigo refactorizar unify e unifyExistencial no módulo Constraints? talvez com traversables...
+11) fix type annotations (see t2.hs)
