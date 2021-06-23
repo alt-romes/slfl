@@ -486,6 +486,5 @@ synthMarks ex adts = transform transformfunc ex
 
 -- pre: program has been type inferred
 synthMarksModule :: Program -> Program
-synthMarksModule p = let (Program adts bs ts cs) = completeFrontendMarksCtx p in
-                         Program adts (map (\(Binding n e) -> Binding n $ synthMarks e adts) bs) ts cs
+synthMarksModule (Program adts bs ts cs) = Program adts (map (\(Binding n e) -> Binding n $ synthMarks e adts) bs) ts cs
 
