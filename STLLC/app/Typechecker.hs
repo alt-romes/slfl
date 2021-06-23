@@ -413,6 +413,7 @@ typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, 
 -- por favor perdoa-me por esta função
 -- !TODO?: Refactor this function
 -- !TODO: Rever como estou a fazer as type annotations com o prof
+-- TODO: Var ids are overshot sometimes to avoid collisions. Isn't clean but it works
 typeinferModule :: Program -> Program -- typecheck and use inferred types
 typeinferModule (Program adts bs ts cbs) =
     let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts ++ generalizetbs ts) 0 Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
@@ -427,8 +428,8 @@ typeinferModule (Program adts bs ts cbs) =
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition (annotation) for this function name
                     Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked
-                        let selftype = Forall [] (TypeVar i) in 
-                        inferWithRecName corebindings' knownts n ((n, selftype):tbs_pairs) i ce selftype
+                        let selftype = Forall [i] (TypeVar i) in 
+                        inferWithRecName corebindings' knownts n ((n, selftype):tbs_pairs) (i+1) ce selftype
                     Just sch ->                                                 -- Function name is already typed, and already in the context, so no need to add it again
                         inferWithRecName corebindings' (deletetb n knownts) n tbs_pairs i ce sch -- delete from knownts (accumulator for typebindings) the type because it will be inferred, solved with the annotation, and re-added after
 
@@ -445,13 +446,13 @@ typeinferModule (Program adts bs ts cbs) =
             case typeinfer tbs_pairs i ce of -- Use type annotation in inference, and solve it after by adding a constraint manually
               Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
               Just (btype, bexpr, subst', i') -> 
-                  -- trace ("i' after infer :" ++ show i' ++ "SUBST " ++ show subst' ++ " with " ++ show (Constraint btype (instantiateFrom i' selftype))) $ 
-                  case solveconstraints subst' [Constraint btype $ instantiateFrom i' selftype] of -- Solve type annotation with actual type
+                  let i'' = i' + length (ftv btype) in
+                  case solveconstraints subst' [Constraint btype $ instantiateFrom i'' selftype] of -- Solve type annotation with actual type
                     Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type " ++ show btype ++ " when typing: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                     Just subst'' ->
                       let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
                         (\(c', tb', s') -> (CoreBinding n bexpr':c', tb', s')) $
-                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) (i' + length stvs) subst''
+                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) (i'' + length stvs) subst''
 
 
         cleanLetters :: Type -> Type

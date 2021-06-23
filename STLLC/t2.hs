@@ -1,7 +1,5 @@
 
-curry :: (((a * b) -o c) -o a -o b -o c);
-curry = {{ ... }};
+synth curry :: (((a * b) -o c) -o a -o b -o c);
 
 
-uncurry :: ((a -o b -o c) -o (a * b) -o c);
-uncurry = {{ ... }};
+synth uncurry :: ((a -o b -o c) -o (a * b) -o c);
