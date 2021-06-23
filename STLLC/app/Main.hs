@@ -102,7 +102,7 @@ main = do
                         else "llcprogs/main.llc"
                (argx:_) -> argx)
     case action of
-      "synth" -> print $ mainsynth arg
+      "synth" -> print . Binding "main" $ mainsynth arg
       "all" -> print $ mainsynthAll arg
       "complete" -> mainsynthMarksModule arg >>= print
       "fdesugar" -> print $ maindesugar arg
@@ -113,5 +113,5 @@ main = do
       "eval" -> mainevalModule arg >>= print
       "fparse" -> print $ mainparse arg
       "parse" -> mainparseModule arg >>= print
-      _ -> print $ mainsynth action
+      _ -> print . Binding "main" $ mainsynth action
 

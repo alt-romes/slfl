@@ -1,31 +1,29 @@
-(λa : (a -o (b -o c)) -o 
-    (λb : (a * b) -o 
-        let c*d = b in a c d))
-(λa : ((a * b) -o c) -o 
-    (λb : a -o 
-        (λc : b -o a < b * c >)))
-(λa : (a -o (b & c)) -o < 
-    (λb : a -o fst (a b)) & 
-    (λe : a -o snd (a e)) >)
-(λa : ((a -o b) & (a -o c)) -o 
-    (λb : a -o < (fst a) b & (snd a) b >))
-(λa : ((a + b) -o c) -o < 
-    (λb : a -o a inl b : b) & 
-    (λd : b -o a inr a : d) >)
-(λa : ((a -o c) & (b -o c)) -o 
-    (λb : (a + b) -o 
-        case b of 
-              inl c => (fst a) c
-            | inr d => (snd a) d))
-(λa : (! (a & b)) -o 
-    let !b = a in < ! (fst b) * ! (snd b) >)
-(λa : ((! a) * (! b)) -o 
-    let b*c = a in 
-        let !d = c in 
-            let !e = b in ! < e & d >)
-(λa : (a * 1) -o 
-    let b*c = a in 
-        let _ = c in b)
-(λa : a -o < a * <> >)
-(λa : (a & a) -o (fst a))
-(λa : a -o < a & a >)
+main a b = let c*d = b in a c d;
+
+main a b c = a ( b , c );
+
+main a = ( (λb -o fst (a b)) | (λe -o snd (a e)) );
+
+main a b = ( (fst a) b | (snd a) b );
+
+main a = ( (λb -o a inl b) | (λd -o a inr d) );
+
+main a b = case b of 
+      inl c -> (fst a) c
+    | inr d -> (snd a) d;
+
+main a = let !b = a in ( ! (fst b) , ! (snd b) );
+
+main a = let b*c = a in 
+    let !d = c in 
+        let !e = b in ! ( e | d );
+
+main a = let b*c = a in 
+    let _ = c in b;
+
+main a = ( a , () );
+
+main a = (fst a);
+
+main a = ( a | a );
+

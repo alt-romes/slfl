@@ -3,29 +3,29 @@ a = (λa : (A -o (B -o C)) -o
         let c*d = b in a c d));
 b = (λa : ((A * B) -o C) -o
     (λb : A -o
-        (λc : B -o a < b * c >)));
-c = (λa : (A -o (B & C)) -o <
-    (λb : A -o fst (a b)) &
-    (λe : A -o snd (a e)) >);
+        (λc : B -o a ( b , c ))));
+c = (λa : (A -o (B & C)) -o (
+    (λb : A -o fst (a b)) |
+    (λe : A -o snd (a e)) ));
 d = (λa : ((A -o B) & (A -o C)) -o
-    (λb : A -o < (fst a) b & (snd a) b >));
-e = (λa : ((A + B) -o C) -o <
-    (λb : A -o a inl b : B) &
-    (λd : B -o a inr A : d) >);
+    (λb : A -o ( (fst a) b | (snd a) b )));
+e = (λa : ((A + B) -o C) -o (
+    (λb : A -o a inl b : B) |
+    (λd : B -o a inr A : d) ));
 f = (λa : ((A -o C) & (B -o C)) -o
     (λb : (A + B) -o
         case b of
-              inl c => (fst a) c
-            | inr d => (snd a) d));
+              inl c -> (fst a) c
+            | inr d -> (snd a) d));
 g = (λa : (! (A & B)) -o
-    let !b = a in < ! fst b * ! snd b >);
+    let !b = a in ( ! fst b , ! snd b ));
 h = (λa : ((! A) * (! B)) -o
     let b*c = a in
         let !d = c in
-            let !e = b in ! < e & d >);
+            let !e = b in ! ( e | d ));
 i = (λa : (A * 1) -o
     let b*c = a in
         let _ = c in b);
-j = (λa : A -o < a * <> >);
+j = (λa : A -o ( a , () ));
 k = (λa : (A & A) -o fst a);
-l = (λa : A -o < a & a >);
+l = (λa : A -o ( a | a ));

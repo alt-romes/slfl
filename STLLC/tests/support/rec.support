@@ -2,6 +2,6 @@
 data ABC = A | B | C;
 
 rectest x = case x of
-                      A => <>
-                    | B => rectest A
-                    | C => rectest B;
+              A -> ()
+            | B -> rectest A
+            | C -> rectest B;

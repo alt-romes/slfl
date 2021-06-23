@@ -35,11 +35,11 @@ lambda = do
 -- A (*) B
 tensor :: Parser Expr
 tensor = do
-    reservedOp "<"
+    reservedOp "("
     e1 <- expr
-    reservedOp "*"
+    reservedOp ","
     e2 <- expr
-    reservedOp ">"
+    reservedOp ")"
     return $ Syntax.TensorValue e1 e2 
 
 
@@ -52,7 +52,7 @@ lettensorpattern = do
 
 -- 1
 unit :: Parser Expr 
-unit = reserved "<>" >> return Syntax.UnitValue -- TODO : <<><*><>> breaks...
+unit = reserved "()" >> return Syntax.UnitValue -- TODO : <<><*><>> breaks...
 
 
 letunitpattern :: Parser Pattern
@@ -64,11 +64,11 @@ letunitpattern = do
 -- A & B
 with :: Parser Expr 
 with = do 
-    reservedOp "<"
+    reservedOp "("
     e1 <- expr 
-    reservedOp "&"
+    reservedOp "|"
     e2 <- expr
-    reservedOp ">"
+    reservedOp ")"
     return $ Syntax.WithValue e1 e2
 
 
@@ -105,12 +105,12 @@ caseplus = do
     reserved "of"
     reserved "inl"
     i1 <- identifier
-    reservedOp "=>"
+    reservedOp "->"
     e2 <- expr
     reservedOp "|"
     reserved "inr"
     i2 <- identifier
-    reservedOp "=>"
+    reservedOp "->"
     Syntax.CaseOfPlus e1 i1 e2 i2 <$> expr
 
 
@@ -176,7 +176,7 @@ casebranch :: Parser (String, String, Expr)
 casebranch = do
     tag <- identifier
     id <- option "" identifier -- TODO: shouldn't be possible for sum types, but sum types should be generalized to adts?
-    reservedOp "=>"
+    reservedOp "->"
     e <- expr
     return (tag, id, e)
 
@@ -219,10 +219,11 @@ num = do
 
 
 aexp :: Parser Expr 
-aexp =   parens expr 
+aexp =   
+         pairepxr
+     <|> try unit -- not correctly parsing <<>*<>>
+     <|> parens expr 
      <|> lambda 
-     <|> pairepxr
-     <|> unit -- not correctly parsing <<>*<>>
      <|> proj
      <|> plus
      <|> sum
