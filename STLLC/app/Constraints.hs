@@ -111,6 +111,7 @@ instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
 
 unify :: Type -> Type -> Maybe Subst 
 unify Unit Unit = Just Map.empty
+unify (TyLit x) (TyLit y) = if x == y then Just Map.empty else Nothing
 unify (ADT x) (ADT y) = if x == y then Just Map.empty else Nothing
 unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (TypeVar y)
 unify (TypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing

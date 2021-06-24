@@ -1,6 +1,5 @@
 5) escrever bons testes com polimorfismo
 7) Conseguir escrever no relatório as regras de forma a que o algoritmo seja recriável
 8) refactor caseof (sum, plus, adt)
-11) fix type annotations (see t2.hs)
 12) case sum of not working
-13) Natural type annotation not working
+14) print function application correctly

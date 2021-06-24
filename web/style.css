@@ -16,7 +16,6 @@ body {
 
 #main {
     z-index: 1;
-    overflow: hidden;
 
     position: relative;
 
@@ -81,4 +80,3 @@ body {
     top: 0;
     left: 0;
 }
-

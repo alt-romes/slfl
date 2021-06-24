@@ -4,7 +4,7 @@ let editor = document.getElementById("editing")
 
 update_code = (text) => {
 
-    highlighting_content.innerText = text
+    highlighting_content.innerHTML = text.replace(new RegExp("&", "g"), "&").replace(new RegExp("<", "g"), "<");
     Prism.highlightElement(highlighting_content)
 
 }
@@ -70,16 +70,8 @@ check_tab = (elem, event) => {
 
 
 
-let simple_typing = `# Syntax!
-
-# -- Press the button "type" to generate type annotations
-
-# -- example Algebraic Data Type (ADT)
-data Num = Zero | Succ Num;
-
-# -- example ADT with a constructor that takes 2 parameters
-data NatList = Nil | Cons (Nat * NatList);
-
+let simple_typing = `# Basics
+# -- Press the button "type" to generate type annotations!
 
 
 # -- natural number
@@ -137,10 +129,27 @@ letfour a = let c = 4 in a c;
 getId = {{ (a -o a) }};
 
 # -- sum value
-semaph = union { red : Num; green : Num; yellow Zero; };
+# semaph = union { red : Num; green : Num; yellow Zero; };
 
 # -- case of sum
 # casesem sem = case sum sem of
-#                red x -> x
-#                | green y -> y;
+#                 red x -> x
+#                 | green y -> y;
+
+`
+
+let simple_synth = `data Bool = True | False;
+
+data Num = Zero | Succ Num;
+
+
+synth predecessor :: (Num -o Num);
+
+synth rec recToZero :: (Num -o Num);
+
+main :: (Num -o (Bool -o Num));
+main num cond = case cond of
+      True -> predecessor num
+    | False -> recToZero num;
+
 `
