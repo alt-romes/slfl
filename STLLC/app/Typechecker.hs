@@ -283,6 +283,8 @@ typeconstraint (Mark i n _ t) = do
     tv <- fresh
     c@(bc, fc) <- get
     let t' = fromMaybe tv t
+    vari <- lift $ lift get
+    lift $ lift $ put (vari + length (ftv t'))
     return (t', Mark i n (bc, fc) (Just t'))
 
 --- Sum --------------------
@@ -349,9 +351,9 @@ typeconstraint (CaseOf e exps) = do
                         Just (Forall [] (ADT adtname)) -> adtname -- Constructor does not take an argument
 
 
-typeinfer :: FreeCtxt -> Int -> CoreExpr -> Maybe (Type, CoreExpr, Subst, Int)
-typeinfer fc i e = do
-    ((((ctype, cexp), constraints), (bc, _)), i') <- runinfer fc i e
+typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst, Int)
+typeinfer fc e = do
+    ((((ctype, cexp), constraints), (bc, _)), i') <- runinfer fc 0 e
     -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
@@ -407,7 +409,7 @@ deletetb n (t@(TypeBinding z ty):ls)
 -------------------------------------------------------------------------------
 
 typeinferExpr :: CoreExpr -> CoreExpr
-typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] 0 e)
+typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] e)
 
 
 -- por favor perdoa-me por esta função
@@ -416,44 +418,40 @@ typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, 
 -- TODO: Var ids are overshot sometimes to avoid collisions. Isn't clean but it works
 typeinferModule :: Program -> Program -- typecheck and use inferred types
 typeinferModule (Program adts bs ts cbs) =
-    let (finalcbs, finalts, finalsubst) = typeinferModule' cbs (processadts adts ++ generalizetbs ts) 0 Map.empty in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
-        let finalcbs' = apply finalsubst finalcbs in
-            completeFrontendMarksCtx $ Program adts bs finalts finalcbs'
+    let (finalcbs, finalts) = typeinferModule' cbs (processadts adts ++ generalizetbs ts) in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+            completeFrontendMarksCtx $ Program adts bs finalts finalcbs
     where
-        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> Int -> Subst -> ([CoreBinding], [TypeBinding], Subst)
-        typeinferModule' corebindings knownts i subst = -- Corebindings to process, knownts = known type bindings, i = next var nº to use in inference, subst = substitution to compose with when solving next constraints
+        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> ([CoreBinding], [TypeBinding])
+        typeinferModule' corebindings knownts = -- Corebindings to process, knownts = known type bindings, i = next var nº to use in inference, subst = substitution to compose with when solving next constraints
             case corebindings of
-              [] -> ([], knownts, subst)
+              [] -> ([], knownts)
               (CoreBinding n ce):corebindings' ->
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition (annotation) for this function name
                     Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked
-                        let selftype = Forall [i] (TypeVar i) in 
-                        inferWithRecName corebindings' knownts n ((n, selftype):tbs_pairs) (i+1) ce selftype
+                        let selftype = Forall [0] (TypeVar 0) in 
+                        inferWithRecName corebindings' knownts n ((n, selftype):tbs_pairs) ce selftype
                     Just sch ->                                                 -- Function name is already typed, and already in the context, so no need to add it again
-                        inferWithRecName corebindings' (deletetb n knownts) n tbs_pairs i ce sch -- delete from knownts (accumulator for typebindings) the type because it will be inferred, solved with the annotation, and re-added after
+                        inferWithRecName corebindings' (deletetb n knownts) n tbs_pairs ce sch -- delete from knownts (accumulator for typebindings) the type because it will be inferred, solved with the annotation, and re-added after
 
 
         inferWithRecName :: [CoreBinding]
                             -> [TypeBinding]
                             -> Name
                             -> FreeCtxt
-                            -> Int
                             -> CoreExpr
                             -> Scheme
-                            -> ([CoreBinding], [TypeBinding], Subst)
-        inferWithRecName corebindings' knownts n tbs_pairs i ce selftype@(Forall stvs _) = 
-            case typeinfer tbs_pairs i ce of -- Use type annotation in inference, and solve it after by adding a constraint manually
+                            -> ([CoreBinding], [TypeBinding])
+        inferWithRecName corebindings' knownts n tbs_pairs ce selftype@(Forall stvs _) = 
+            case typeinfer tbs_pairs ce of -- Use type annotation in inference, and solve it after by adding a constraint manually
               Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
               Just (btype, bexpr, subst', i') -> 
-                  let i'' = i' + length (ftv btype) in
-                  case solveconstraints subst' [Constraint btype $ instantiateFrom i'' selftype] of -- Solve type annotation with actual type
-                    Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation with actual type " ++ show btype ++ " when typing: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+                  case solveconstraints subst' [Constraint btype $ instantiateFrom i' selftype] of -- Solve type annotation with actual type
+                    Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation \"" ++ show (instantiateFrom i' selftype) ++ "\" with actual type \"" ++ show btype ++ "\" when typing: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                     Just subst'' ->
                       let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
-                        (\(c', tb', s') -> (CoreBinding n bexpr':c', tb', s')) $
-                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype'):knownts) (i'' + length stvs) subst''
-                                --TODO: find some way to utilize clean letters without messing up the inference: `(TypeBinding n (generalize ([], []) $ cleanLetters btype')`
+                          first (CoreBinding n bexpr':) $
+                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) -- subst''
 
 
         cleanLetters :: Type -> Type
@@ -461,5 +459,5 @@ typeinferModule (Program adts bs ts cbs) =
 
 
 typecheckExpr :: CoreExpr -> Scheme
-typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _, _) -> t) (typeinfer [] 0 e) -- TODO: porque é que o prof não queria que isto devolvesse Scheme?
+typecheckExpr e = generalize ([],[]) $ maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(t, _, _, _) -> t) (typeinfer [] e) -- TODO: porque é que o prof não queria que isto devolvesse Scheme?
 
