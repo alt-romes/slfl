@@ -33,7 +33,7 @@ data ADTD = ADTD Name [(Name, Type)]    -- Algebraic Data Type Definition
 -------------------------------------------------------------------------------
 
 instance Show Program where
-    show (Program adts bs ts cs) = unlines (map show adts) ++ "\n\n" ++ displayBindingsWithTypes bs ts -- unlines (map show bs) ++ unlines (map show ts)
+    show (Program adts bs ts cs) = unlines (map show adts) ++ (if not $ null adts then "\n" else "") ++ displayBindingsWithTypes bs ts -- unlines (map show bs) ++ unlines (map show ts)
         where
             displayBindingsWithTypes bs ts = unlines $ map (\b@(Binding n e) -> showbity n ts ++ show b) bs
             showbity n ts = case lookup n $ map (\(TypeBinding n t) -> (n, t)) ts of
@@ -42,7 +42,7 @@ instance Show Program where
 
 
 instance Show ADTD where
-    show (ADTD n ((c, t):cs)) = "data " ++ n ++ " = " ++ c ++ showType t ++ foldl (\p (c', t') -> p ++ " | " ++ c' ++ showType t') "" cs
+    show (ADTD n ((c, t):cs)) = "data " ++ n ++ " = " ++ c ++ showType t ++ foldl (\p (c', t') -> p ++ " | " ++ c' ++ showType t') "" cs ++ ";\n"
         where
             showType t = if t == Unit then "" else " " ++ show t
 

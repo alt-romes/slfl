@@ -10,20 +10,29 @@ tmp.setGracefulCleanup();
 
 const server = http.createServer(function (req, res) {
 
-    if (req.method == "GET")
-        fs.readFile(__dirname + "/index.html", (err, data) => {
+    if (req.method == "GET") {
 
-            if (err) {
-                res.writeHead(500);
-                res.end(err);
-                return;
-            }
+        console.log("GET " + req.url)
+        // Return the requested resource
+        if (req.url == "/" || req.url == "/index.html")
+            returnFile("/index.html", "text/html", res)
 
-            res.setHeader("Content-Type", "text/html");
-            res.writeHead(200);
-            res.end(data);
-        });
+        else if (req.url == "/style.css")
+            returnFile("/style.css", "text/css", res)
+
+        else if (req.url == "/main.js")
+            returnFile("/main.js", "application/javascript", res)
+
+    }
     else if (req.method == "POST") {
+
+        console.log("POST " + req.url)
+        
+        let type = "error"
+        if (req.url == "/synth")
+            type = "complete"
+        if (req.url == "/type")
+            type = "type"
 
         res.setHeader("Content-Type", "application/json");
 
@@ -44,7 +53,7 @@ const server = http.createServer(function (req, res) {
             
             var pout;
             try {
-                pout = "" + execSync("/usr/bin/env STLLC complete " + tmpf.name);
+                pout = "" + execSync("/usr/bin/env STLLC " + type + " " + tmpf.name);
             }
             catch (err) {
                 
@@ -66,3 +75,21 @@ const server = http.createServer(function (req, res) {
     }
 
 }).listen(port);
+
+
+returnFile = (name, content_type, res) => {
+
+    fs.readFile(__dirname + name, (err, data) => {
+
+        if (err) {
+            res.writeHead(500);
+            res.end(err);
+            return;
+        }
+
+        res.setHeader("Content-Type", content_type);
+        res.writeHead(200);
+        res.end(data);
+    });
+
+}

@@ -6,86 +6,28 @@
         <title>romes</title>
         
     </head>
-    <style type="text/css" media="all">
-
-        html {
-            margin: 0;
-            padding: 0;
-            border: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        body {
-            height: 100%;
-            margin: 0 auto;
-            max-width: 50em;
-            line-height: 1.5;
-            padding: 1em;
-            font-family: 'Garamond', serif;
-        }
-
-        h2 {
-            margin-top: 1em;
-            padding-top: 1em;
-        }
-
-        .editor {
-            display: block;
-            border: 1px solid black;
-            margin: auto;
-            width: 100%;
-            font-size: 1em;
-        }
-
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism-tomorrow.min.css" integrity="sha512-vswe+cgvic/XBoF1OcM/TeJ2FW0OofqAVdCZiEYkd6dwGXthvkSFWOoGGJgS2CW70VK5dQM5Oh+7ne47s74VTg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="style.css" />
     <body>
-        <h2>Synthesis of Linear Functional Programs</h2>
-        <p>Use <em>{{ ... }}</em> as a placeholder for a term that should be <em>synthetized</em>.</p>
 
-        <textarea name="editor" class="editor" id="editor" rows="24"># sum should join two given pairs
-
-let sum = {{ ((Bool * 1) -o (Bool * Bool) -o (Bool * Bool * 1 * Bool)) }};
-
-let main = sum {{ ... }} < false * {{ ... }} ></textarea>
-
-        <div style="text-align: center">
+        <div id="main">
+            <h2>Synthesis of Linear Functional Programs</h2>
+            <p>Use <em>{{ ... }}</em> as a placeholder for a term that should be <em>synthetized</em>.</p>
+            
             <br>
-            <button type="synth" onclick="synth()">synth terms</button>
+            <button type="type" onclick="synth('type')">type</button>
+            <button type="synth" onclick="synth('synth')">synth</button>
             <p hidden="true" id="error" style="color: red"></p>
         </div>
 
-        <script>
-            synth = () => {
-                var editor = document.getElementById("editor");
-                var prog = editor.value;
-                fetch("", {
-                                method: "POST",
-                                body: prog,
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                                    console.log(data); 
-                                    if (data.result == null)
-                                        displayErr(data.error);
-                                    else
-                                        editor.value = data.result})
-                    //.catch(err => console.log("The error is " + err));
-                console.log(prog);
-            }
+        <div id="editor">
+            <textarea onkeydown="check_tab(this, event);" onscroll="sync_scroll(this)" spellcheck="false" name="editing" id="editing" oninput="update_code(this.value); sync_scroll(this)"></textarea>
+            <pre id="highlighting" aria-hidden="true"><code class="language-haskell" id="highlighting-content"></code></pre>
+        </div>
 
-            displayErr = err => {
-                
-                let errdom = document.getElementById("error");
-                errdom.innerHTML = err;
-                errdom.hidden = false;
-                
-                setTimeout(() => {errdom.hidden = true}, 12000)
 
-            }
-        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/prism.min.js" integrity="sha512-YBk7HhgDZvBxmtOfUdvX0z8IH2d10Hp3aEygaMNhtF8fSOvBZ16D/1bXZTJV6ndk/L/DlXxYStP8jrF77v2MIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/components/prism-haskell.min.js" integrity="sha512-08jf4ViPRlP9+OEtEilh+yWPpiomRBozFEuHeq03qgRSP41lcHzY+YnqZ4TS8TCkjF8abbZD4m7SQMBUyP4reQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="main.js"></script>
     </body>
 </html>
