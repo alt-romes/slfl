@@ -12,12 +12,16 @@
 
         <div id="main">
             <h2>Synthesis of Linear Functional Programs</h2>
-            <p>Use <em>{{ ... }}</em> as a placeholder for a term that should be <em>synthetized</em>.</p>
+            <p>
+            Use <em>{{ ... }}</em> as a placeholder for a term that should be <em>synthetized</em>.
+            <span hidden="true" id="error" style="color: red"></span>
+            </p>
             
             <br>
+            <button type="instructions" onclick="instructions(simple_typing)">typing example</button>
             <button type="type" onclick="synth('type')">type</button>
             <button type="synth" onclick="synth('synth')">synth</button>
-            <p hidden="true" id="error" style="color: red"></p>
+            <!-- <p hidden="true" id="error" style="color: red"></p> -->
         </div>
 
         <div id="editor">

@@ -224,9 +224,9 @@ aexp =
      <|> try unit -- not correctly parsing <<>*<>>
      <|> parens expr 
      <|> lambda 
+     <|> sum
      <|> proj
      <|> plus
-     <|> sum
      <|> caseof
      <|> bang
      <|> letexp
@@ -273,7 +273,7 @@ ty = tylit <|> parens type'
 tylit :: Parser Type 
 tylit =     sumty
         <|> (reservedOp "1" >> return Unit)
-        <|> (reserved "Nat" >> return (TyLit Natural))
+        <|> (reserved "Natural" >> return (TyLit Natural))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- !TODO: fazer parse de lowercase identifiers as type variables :)
         <|> (reservedOp "b" >> return (TypeVar 1))
         <|> (reservedOp "c" >> return (TypeVar 2))
@@ -356,9 +356,7 @@ typeannot = do
 letsynth :: Parser (Either TypeBinding Binding)
 letsynth = do
     reserved "synth"
-    name <- identifier
-    reserved "::"
-    t <- ty
+    (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
     i <- getState
     putState $ i+1
     return $ Right $ Binding name $ Syntax.Mark i Nothing ([], []) (Just t)
@@ -368,9 +366,7 @@ synthrec :: Parser (Either TypeBinding Binding)
 synthrec = do
     reserved "synth"
     reserved "rec"
-    name <- identifier
-    reserved "::"
-    t <- ty
+    (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
     i <- getState
     putState $ i+1
     return $ Right $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just t)

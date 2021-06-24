@@ -452,7 +452,8 @@ typeinferModule (Program adts bs ts cbs) =
                     Just subst'' ->
                       let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
                         (\(c', tb', s') -> (CoreBinding n bexpr':c', tb', s')) $
-                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) (i'' + length stvs) subst''
+                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) btype'):knownts) (i'' + length stvs) subst''
+                                --TODO: find some way to utilize clean letters without messing up the inference: `(TypeBinding n (generalize ([], []) $ cleanLetters btype')`
 
 
         cleanLetters :: Type -> Type

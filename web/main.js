@@ -42,6 +42,12 @@ displayErr = err => {
 
 }
 
+instructions = (instructions_val) => {
+
+    editor.value = instructions_val
+    update_code(instructions_val)
+}
+
 sync_scroll = elem => { highlighting.scrollTop = elem.scrollTop }
 
 check_tab = (elem, event) => {
@@ -53,6 +59,7 @@ check_tab = (elem, event) => {
         let after_tab = code.slice(elem.selectionEnd, elem.value.length) // Text after tab
         let cursor_pos = elem.selectionEnd + 4; // Cursor moves 4 spaces
         elem.value = before_tab + "    " + after_tab // Add tab between content
+        update_code(elem.value)
 
         // Move cursor
         elem.selectionStart = cursor_pos
@@ -61,3 +68,79 @@ check_tab = (elem, event) => {
 
 }
 
+
+
+let simple_typing = `# Syntax!
+
+# -- Press the button "type" to generate type annotations
+
+# -- example Algebraic Data Type (ADT)
+data Num = Zero | Succ Num;
+
+# -- example ADT with a constructor that takes 2 parameters
+data NatList = Nil | Cons (Nat * NatList);
+
+
+
+# -- natural number
+n = 42;
+
+# -- variable
+identity x = x;
+
+# -- lambda
+lambdaId = (\\x -o x);
+
+# -- function application
+superId x = identity lambdaId x;
+
+# -- tensor value
+tensor x y = (x, y);
+
+# -- let tensor value
+tensorId tensor = let x*y = tensor in (x, y);
+
+# -- unit value
+unit = ();
+
+# -- let unit
+seqc unit next = let _ = unit in next;
+
+# -- with value
+with a = (a | a);
+
+# -- deconstruct with
+first with = fst with;
+second with = snd with;
+
+# -- plus value
+inleft a = inl a;
+inright a = inr a;
+
+# -- case of plus
+caseofplus x =
+    case x of
+        inl a -> a
+      | inr b -> b;
+
+# -- bang value
+bang = ! 8;
+
+# -- use unrestricted banged value
+usebang bangValue expr = let !value = bangValue in expr value;
+
+# -- let in
+letfour a = let c = 4 in a c;
+
+
+# -- marks are used to indicate we want the expression to be synthed from the type
+getId = {{ (a -o a) }};
+
+# -- sum value
+semaph = union { red : Num; green : Num; yellow Zero; };
+
+# -- case of sum
+# casesem sem = case sum sem of
+#                red x -> x
+#                | green y -> y;
+`

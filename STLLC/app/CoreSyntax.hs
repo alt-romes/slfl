@@ -73,7 +73,7 @@ data CoreExpr
     deriving (Eq)
 
 
-newtype Literal = Nat Integer deriving (Eq, Show)
+newtype Literal = Nat Integer deriving (Eq)
 
 
 
@@ -146,6 +146,10 @@ instance (Show Type) where
 
 instance (Show Scheme) where
     show (Forall ns t) = (if null ns then "" else foldl (\p n -> p ++ " " ++ (letters !! n)) "forall" ns ++ " . ") ++ show t
+
+
+instance (Show Literal) where
+    show (Nat x) = show x
 
 
 
