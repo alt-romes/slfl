@@ -1,4 +1,4 @@
-data ABC = A | B | C
+data ABC = A | B | C;
 
 
 rectest :: (ABC -o 1);

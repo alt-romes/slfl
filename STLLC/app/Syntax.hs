@@ -98,6 +98,7 @@ instance (Show Expr) where
             showexpr' d (Var x) = x
             -- showexpr' d (Abs x (Just t) e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -o " ++ showexpr' (d+1) e ++ ")"
             showexpr' d (Abs x _ e) = indent d ++ "(λ" ++ x ++ " -o " ++ showexpr' (d+1) e ++ ")"
+            showexpr' d (App e1 e2@(App _ _)) = showexpr' d e1 ++ " (" ++ showexpr' d e2 ++ ")"
             showexpr' d (App e1 e2) = showexpr' d e1 ++ " " ++ showexpr' d e2
             showexpr' d (TensorValue e1 e2) = "( " ++ showexpr' d e1 ++ " , " ++ showexpr' d e2 ++ " )"
             showexpr' d (LetTensor u v e1 e2) = indent d ++ "let " ++ u ++ "*" ++ v ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2

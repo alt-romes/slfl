@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Typechecker (typeinferExpr, typeinferModule, typecheckExpr, TypeBinding(..)) where
 
 import Debug.Trace
@@ -450,12 +451,23 @@ typeinferModule (Program adts bs ts cbs) =
                     Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation \"" ++ show (instantiateFrom i' selftype) ++ "\" with actual type \"" ++ show btype ++ "\" when typing: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
                     Just subst'' ->
                       let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
-                          first (CoreBinding n bexpr':) $
-                            typeinferModule' corebindings' (TypeBinding n (generalize ([], []) $ cleanLetters btype'):knownts) -- subst''
+                          let bsch = (generalize ([], []) $ cleanLetters btype') in
+                              let bexpr'' = substSelfTypeMarks n bsch bexpr' in
+                                  first (CoreBinding n bexpr'':) $
+                                    typeinferModule' corebindings' (TypeBinding n bsch:knownts)
 
 
         cleanLetters :: Type -> Type
         cleanLetters t = instantiateFrom 0 $ generalize ([], []) t
+
+        substSelfTypeMarks :: Name -> Scheme -> CoreExpr -> CoreExpr
+        substSelfTypeMarks n btype bexpr' =
+            transform (\case
+                (Mark i mn (bc, fc) t) ->
+                    let fc' = (n, btype):deleteBy (\ (s, _) (s', _) -> s == s') (n, undefined) fc in -- Remove possibly incorrect self type from mark context and re-add one correctly
+                        Mark i mn (bc, fc') t;
+                 x -> x) bexpr'
+
 
 
 typecheckExpr :: CoreExpr -> Scheme

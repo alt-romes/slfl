@@ -1,5 +1,3 @@
-
-
 a :: ((A -o (B -o C)) -o ((A * B) -o C));
 a a b = let c*d = b in a c d;
 

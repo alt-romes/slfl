@@ -31,14 +31,22 @@ type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 -- Synth "Monad"
 -------------------------------------------------------------------------------
 
-type Synth a = LogicT (StateT SynthState (Reader [ADTD])) a 
+type Synth a = LogicT (StateT SynthState (Reader SynthReaderState)) a 
 
 
-type SynthState = ([Constraint], Int)  -- (list of constraints added by the process, next index to instance a variable)
+type SynthState = ([Constraint], Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
+
+
+type SynthReaderState = (Restrictions, [ADTD]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
+type Restriction = Type -> Bool
+type Restrictions = ([Restriction], [Restriction], [Restriction])
+
+
+data TypeTag = SynthGoal | RightFocus | LeftFocus
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
-runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st)
+runSynth (g, d) t st adtds = runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st) $ initSynthReaderState adtds
     where
         synthComplete (g, d, o) t = do
             (e, d') <- synth (g, d, o) t
@@ -49,6 +57,9 @@ runSynth (g, d) t st = runReader (evalStateT (observeAllT $ synthComplete (g, d,
 initSynthState :: Int -> SynthState
 initSynthState i = ([], i)
 
+
+initSynthReaderState :: [ADTD] -> SynthReaderState
+initSynthReaderState a = (([], [], []), a)
 
 
 
@@ -61,9 +72,28 @@ addconstraint :: Constraint -> Synth ()
 addconstraint c = lift $ modify (first (c :))
 
 
+addrestriction :: TypeTag -> Restriction -> Synth a -> Synth a
+addrestriction tag r = local (\ ((a, b, c), adtds) ->
+    case tag of
+      SynthGoal -> ((r:a, b, c), adtds)
+      RightFocus -> ((a, r:b, c), adtds)
+      LeftFocus -> ((a, b, r:c), adtds)
+    )
+
+
+getrestrictions :: TypeTag -> Synth [Restriction]
+getrestrictions tag = do
+    (sgoal, rfocus, lfocus) <- fst <$> lift (lift ask)
+    case tag of
+      SynthGoal -> return sgoal
+      RightFocus -> return rfocus
+      LeftFocus -> return lfocus
+
+
+
 getadtcons :: Name -> Synth [(Name, Type)]
 getadtcons tyn = do
-    adtds <- lift $ lift ask
+    adtds <- snd <$> lift (lift ask)
     return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
 
 
@@ -190,7 +220,7 @@ synth (g, d, (n, Sum tys):o) t = do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, (n, ADT tyn):o) t = do
+synth (g, d, (n, ADT tyn):o) t = trace ("1 deconstruct ADT " ++ tyn ++ " to synth " ++ show t ++ " with context " ++ show (g, d, o))$ do
     adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
         case vtype of
@@ -199,8 +229,12 @@ synth (g, d, (n, ADT tyn):o) t = do
             return (name, "", exp, d')
           argty -> do
             varid <- fresh
-            (exp, d') <- synth (g, (varid, argty):d, o) t
-            return (name, varid, exp, d')
+            (exp, d') <- trace ("2 Synth from branch type " ++ show t ++ " with new contxt " ++ show (g, (varid, argty):d, o)) $
+                (if argty == ADT tyn
+                   then addrestriction LeftFocus (/= ADT tyn) -- recursive type shouldn't focus left on itself again and again
+                   else id) $ 
+                    synth (g, (varid, argty):d, o) t
+            trace "3" $ return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
     guard (length ls == length adtds) -- make sure all constructors were decomposed
@@ -240,7 +274,7 @@ focus c goal =
     where
         decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
 
-        decideRight c goal = do
+        decideRight c goal = trace ("Focus right on " ++ show goal) $ do
             if isAtomic goal                            -- to decide right, goal cannot be atomic
                 then empty
                 else do
@@ -251,15 +285,15 @@ focus c goal =
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> trace ("Focus left on " ++ show x ++ " to " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
 
 
         decideLeftBang (g, din) goal = do
             case g of
               []   -> empty
               _ -> foldr ((<|>) . (\case {
-                                        (n, Right x) -> focus' (Just (n, x)) (g, din) goal;
-                                        (n, Left sch) -> focusSch (n, sch) (g, din) goal})) empty g
+                                        (n, Right x) -> trace ("Focus left bang on " ++ show x ++ " to " ++ show goal) $ focus' (Just (n, x)) (g, din) goal;
+                                        (n, Left sch) -> trace ("Focus left bang scheme on " ++ show sch ++ " to " ++ show goal) $ focusSch (n, sch) (g, din) goal})) empty g
 
         
             
@@ -332,7 +366,11 @@ focus c goal =
                              _ -> False
                           then empty
                           else do
-                              (arge, d') <- synth (g, d, []) argtype;
+                              res <- getrestrictions RightFocus
+                              guard $ all (\f -> f argtype) res -- this might be terribly wrong, or at least hiding a lot of potential solutions ...
+                              (arge, d') <- trace ("try to synth " ++ show argtype ++ " to use in the constructor") $
+                                  addrestriction RightFocus (/= argtype) $
+                                      synth (g, d, []) argtype;
                               return (App (Var tag) arge, d')
                 )) empty cons
 
@@ -381,13 +419,15 @@ focus c goal =
 
         -- adtLFocus
         -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- else recursive types would loop infinitely
-        focus' f@(Just (n, ADT tyn)) (g, d) goal =
+        focus' (Just nh@(n, ADT tyn)) (g, d) goal =
             if case goal of
               ADT tyn' -> tyn' == tyn
               _ -> False
               then return (Var n, d)
-              else
-                focus' f (g, d) goal
+              else do
+                res <- getrestrictions LeftFocus
+                trace "Testing constraints" $ guard $ all (\f -> f (ADT tyn)) res
+                trace "passed constraints" $ synth (g, d, [nh]) goal
 
 
 

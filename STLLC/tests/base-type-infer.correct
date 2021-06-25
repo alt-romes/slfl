@@ -1,5 +1,3 @@
-
-
 a :: forall a b c . ((a -o (b -o c)) -o ((a * b) -o c));
 a a b = let c*d = b in a c d;
 
