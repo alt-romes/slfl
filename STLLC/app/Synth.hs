@@ -13,7 +13,7 @@ import Data.Bifunctor
 import Debug.Trace
 
 
-import CoreSyntax (Name, Type(..), Scheme(..))
+import CoreSyntax (Name, Type(..), Scheme(..), isInType)
 import Syntax
 import Program
 import Util
@@ -39,10 +39,10 @@ type SynthState = ([Constraint], Int)  -- (list of constraints added by the proc
 
 type SynthReaderState = (Restrictions, [ADTD]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
 type Restriction = Type -> Bool
-type Restrictions = ([Restriction], [Restriction], [Restriction])
+type Restrictions = ([Restriction], [Restriction], [Restriction], [Restriction])
 
 
-data TypeTag = SynthGoal | RightFocus | LeftFocus
+data TypeTag = SynthGoal | RightFocus | LeftFocus | LeftInvert
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
@@ -59,7 +59,7 @@ initSynthState i = ([], i)
 
 
 initSynthReaderState :: [ADTD] -> SynthReaderState
-initSynthReaderState a = (([], [], []), a)
+initSynthReaderState a = (([], [], [], []), a)
 
 
 
@@ -73,21 +73,33 @@ addconstraint c = lift $ modify (first (c :))
 
 
 addrestriction :: TypeTag -> Restriction -> Synth a -> Synth a
-addrestriction tag r = local (\ ((a, b, c), adtds) ->
+addrestriction tag r = local (\ ((a, b, c, d), adtds) ->
     case tag of
-      SynthGoal -> ((r:a, b, c), adtds)
-      RightFocus -> ((a, r:b, c), adtds)
-      LeftFocus -> ((a, b, r:c), adtds)
+      SynthGoal -> ((r:a, b, c, d), adtds)
+      RightFocus -> ((a, r:b, c, d), adtds)
+      LeftFocus -> ((a, b, r:c, d), adtds)
+      LeftInvert -> ((a, b, c, r:d), adtds)
     )
 
 
 getrestrictions :: TypeTag -> Synth [Restriction]
 getrestrictions tag = do
-    (sgoal, rfocus, lfocus) <- fst <$> lift (lift ask)
+    (sgoal, rfocus, lfocus, linvert) <- fst <$> lift (lift ask)
     case tag of
       SynthGoal -> return sgoal
       RightFocus -> return rfocus
       LeftFocus -> return lfocus
+      LeftInvert -> return linvert
+
+
+removeRestrictions :: TypeTag -> Synth a -> Synth a
+removeRestrictions tt = local (\((a,b,c,d),e) ->
+    case tt of
+      SynthGoal -> (([],b,c,d), e)
+      RightFocus -> ((a,[],c,d), e)
+      LeftFocus -> ((a,b,[],d), e)
+      LeftInvert -> ((a,b,c,[]), e)
+      )
 
 
 
@@ -119,6 +131,10 @@ assertADTHasCons t =
            return $ not $ null cons
        _        ->
            return True
+
+
+findType :: Type -> Delta -> Bool
+findType t d = t `elem` map snd d
 
 
 isAtomic :: Type -> Bool
@@ -156,6 +172,8 @@ generalize ctxt t = Forall ns t
 
 
 
+
+
 -------------------------------------------------------------------------------
 -- Main Logic
 -------------------------------------------------------------------------------
@@ -188,9 +206,9 @@ synth c (With a b) = do
 synth (g, d, (n, Tensor a b):o) t = do
     n1 <- fresh
     n2 <- fresh
-    (expt, d') <- synth (g, d, (n2, b):(n1, a):o) t
-    guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
-    return (LetTensor n1 n2 (Var n) expt, d')
+    (expt, d') <- trace ("show me 5 after this bc im trying to synth " ++ show t ++ " with " ++ show ((n2,b):[(n1,a)])) synth (g, d, (n2, b):(n1, a):o) t
+    trace ("5 guard " ++ show b ++ " and " ++ show a ++ " are not in context") $ guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
+    trace "6 passed" $ return (LetTensor n1 n2 (Var n) expt, d')
 
 ---- 1L
 synth (g, d, (n, Unit):o) t = do
@@ -220,8 +238,10 @@ synth (g, d, (n, Sum tys):o) t = do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, (n, ADT tyn):o) t = do
-    adtds <- getadtcons tyn
+synth (g, d, p@(n, ADT tyn):o) t = trace ("1 deconstruct ADT " ++ tyn ++ " to synth " ++ show t ++ " with context " ++ show (g, d, o))$ do
+    res <- getrestrictions LeftInvert
+    trace "14 Testing constraints" $ guard $ all (\f -> f (ADT tyn)) res
+    adtds <- trace "14 passed" $ getadtcons tyn
     ls <- mapM (\(name, vtype) ->
         case vtype of
           Unit -> do
@@ -229,19 +249,20 @@ synth (g, d, (n, ADT tyn):o) t = do
             return (name, "", exp, d')
           argty -> do
             varid <- fresh
-            (exp, d') <-
-                (if argty == ADT tyn    -- !TODO PROF: Validar este raciocínio. A ideia é:
-                                        -- Se estivermos a sintetizar uma função por exemplo Expr -> Nat, mas em que Expr tem um constructor recursivo,
+            (exp, d') <- trace ("2 Synth from branch " ++ show (name, argty) ++ " with new contxt " ++ show (g, (varid, argty):d, o)) $
+                (if trace ("Is " ++ show (ADT tyn) ++ " inside " ++ show argty ++ " ? : " ++ show (ADT tyn `isInType` argty))$ ADT tyn `isInType` argty
+                                        -- !TODO PROF: Validar este raciocínio. A ideia é:
+                                        -- Se estivermos a sintetizar uma função por exemplo Expr -> Nat, mas em que Expr tem um constructor recursivo (ou seja, o tipo final aparece como argumento (debaixo de um número arbitrario de camadas) no construtor),
                                         -- para esse garantimos que nao nos focamos à esquerda e tentamos descontruir Expr outra vez para ter Nat,
                                         -- e para garantir que nunca tentamos construir Expr para usar como param da função Expr -> Nat que esperames usar (e.g. um construtor que possivelmente precise de Nat causará um loop infinito)
                                         -- (basicamente, para forçar a utilização de uma função Expr -> Nat com o argumento Expr que veio do tipo recursivo)
-                                        -- A restrição LeftFocus por agora apenas é verificada na tentativa de desconstrução de um ADT que não seja o próprio ( ou seja, focus : Expr w/ goal : Expr funcionará)
-                                        -- A restrição RightFocus é verificada ...
-                   then addrestriction LeftFocus (/= ADT tyn) .
-                        addrestriction RightFocus (/= ADT tyn)
+                                        -- A restrição LeftInvert apenas é verificada diretamente antes da tentativa de desconstrução (async) de um ADT
+                                        -- A restrição RightFocus é verificada diretamente antes da tentativa de construção (sync) de um ADT
+                   then addrestriction LeftInvert (/= ADT tyn)
+                        -- . addrestriction RightFocus (/= ADT tyn)
                    else id) $ 
                     synth (g, (varid, argty):d, o) t
-            return (name, varid, exp, d')
+            trace ("successful synth of type " ++ show t ++ " with " ++ show argty ++ ": " ++ show exp) $ return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
     guard (length ls == length adtds) -- make sure all constructors were decomposed
@@ -249,7 +270,11 @@ synth (g, d, (n, ADT tyn):o) t = do
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
-
+    -- <|>
+    -- do
+    -- res <- getrestrictions LeftInvert
+    -- trace "checking a second time" $ guard $ not $ all (\f -> f (ADT tyn)) res  -- If we failed above because a restriction didn't allow us to invert this ADT
+    -- trace "passed cseond time" synth (g, p:d, o) t                                                         -- try using it the proposition in the linear context
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
@@ -281,7 +306,7 @@ focus c goal =
     where
         decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
 
-        decideRight c goal = do
+        decideRight c goal = trace ("Focus right on " ++ show goal) $ do
             if isAtomic goal                            -- to decide right, goal cannot be atomic
                 then empty
                 else do
@@ -292,15 +317,15 @@ focus c goal =
         decideLeft (g, din) goal = do
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\x -> trace ("Focus left on " ++ show x ++ " to " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
 
 
         decideLeftBang (g, din) goal = do
             case g of
               []   -> empty
               _ -> foldr ((<|>) . (\case {
-                                        (n, Right x) -> focus' (Just (n, x)) (g, din) goal;
-                                        (n, Left sch) -> focusSch (n, sch) (g, din) goal})) empty g
+                                        (n, Right x) -> trace ("Focus left bang on " ++ show x ++ " to " ++ show goal) $ focus' (Just (n, x)) (g, din) goal;
+                                        (n, Left sch) -> trace ("Focus left bang scheme on " ++ show sch ++ " to " ++ show goal) $ focusSch (n, sch) (g, din) goal})) empty g
 
         
             
@@ -362,22 +387,24 @@ focus c goal =
                 })) empty sts
 
         ---- adtR
-        focus' Nothing (g, d) (ADT tyn) = do
-            res <- getrestrictions RightFocus
-            guard $ all (\f -> f (ADT tyn)) res -- TODO: Ver explicação na destrução do ADT
-            cons <- getadtcons tyn
-            foldr (interleave . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
-                   case argty of
-                     Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
-                     argtype ->
-                       if case argtype of
-                             ADT tyn' -> tyn == tyn' -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left.
-                             _ -> False
-                          then empty
-                          else do
-                              (arge, d') <- synth (g, d, []) argtype;
-                              return (App (Var tag) arge, d')
-                )) empty cons
+        focus' Nothing (g, d) (ADT tyn) =
+            if findType (ADT tyn) d then empty -- Preemptively check for this ADT type in the linear context, and fail the right focus to try instanciating it as a variable first --- TODO : very wrong ?
+            else do
+                -- res <- getrestrictions RightFocus
+                -- guard $ all (\f -> f (ADT tyn)) res -- TODO: Ver explicação na destrução do ADT
+                cons <- getadtcons tyn
+                foldr (interleave . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
+                       case argty of
+                         Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
+                         argtype ->
+                           if case argtype of
+                                 ADT tyn' -> tyn == tyn' -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left.
+                                 _ -> False
+                              then empty
+                              else do
+                                  (arge, d') <- synth (g, d, []) argtype;
+                                  return (App (Var tag) arge, d')
+                    )) empty cons
 
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
@@ -429,10 +456,7 @@ focus c goal =
               ADT tyn' -> tyn' == tyn
               _ -> False
               then return (Var n, d)
-              else do
-                res <- getrestrictions LeftFocus
-                guard $ all (\f -> f (ADT tyn)) res
-                synth (g, d, [nh]) goal
+              else synth (g, d, [nh]) goal
 
 
 

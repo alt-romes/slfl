@@ -1,9 +1,10 @@
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
-    TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme, Literal(..), getLitType, TyLiteral(..)) where 
+    TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
+    Literal(..), getLitType, TyLiteral(..), isInType) where 
 
-import Prelude hiding (Bool)
 import Control.Monad
 import Data.Maybe
+import Control.Applicative
 import Data.Bifunctor
 import Data.Functor.Identity
 
@@ -149,7 +150,7 @@ instance (Show Scheme) where
 
 
 instance (Show Literal) where
-    show (Nat x) = show x
+    show (Nat x) = "NATURAL LITERAL: " ++ show x
 
 
 
@@ -204,6 +205,17 @@ trivialScheme = Forall []
 
 getLitType :: Literal -> Type
 getLitType (Nat x) = TyLit Natural
+
+
+isInType :: Type -> Type -> Bool
+isInType t1 t2 =
+    case t2 of
+      Fun t1' t2' -> isInType t1 t1' || isInType t1 t2'
+      Tensor t1' t2' -> isInType t1 t1' || isInType t1 t2'
+      With t1' t2' -> isInType t1 t1' || isInType t1 t2'
+      Plus t1' t2' -> isInType t1 t1' || isInType t1 t2'
+      Bang t' -> isInType t1 t'
+      _ -> t1 == t2
 
 
 
