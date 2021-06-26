@@ -270,11 +270,12 @@ synth (g, d, p@(n, ADT tyn):o) t = trace ("1 deconstruct ADT " ++ tyn ++ " to sy
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
     guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
-    -- <|>
-    -- do
-    -- res <- getrestrictions LeftInvert
-    -- trace "checking a second time" $ guard $ not $ all (\f -> f (ADT tyn)) res  -- If we failed above because a restriction didn't allow us to invert this ADT
-    -- trace "passed cseond time" synth (g, p:d, o) t                                                         -- try using it the proposition in the linear context
+    <|>
+    do
+    res <- getrestrictions LeftInvert
+    guard $ ADT tyn == t                                                        -- ADT -> ADT with a restriction on deconstruction might still be satisfied by instantiating it while focused
+    trace "checking a second time" $ guard $ not $ all (\f -> f (ADT tyn)) res  -- So if we failed above because a restriction didn't allow us to invert this ADT
+    trace "passed cseond time" synth (g, p:d, o) t                              -- Try using the hypothesis in the linear context
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
@@ -301,12 +302,12 @@ synth (g, d, []) t = focus (g, d) t
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
 focus c goal =
-    decideRight c goal <|> decideLeft c goal <|> decideLeftBang c goal
+    decideLeft c goal <|> decideRight c goal <|> decideLeftBang c goal -- deciding left before right will be correct more often than not (at least based on recent attempts...) -- !TODO: Deciding Right before Left can lead to infinite loops!! (Ex: Expr = Var Nat | Lam Expr)
 
     where
         decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
 
-        decideRight c goal = trace ("Focus right on " ++ show goal) $ do
+        decideRight c goal = trace ("Focus right on " ++ show goal) $
             if isAtomic goal                            -- to decide right, goal cannot be atomic
                 then empty
                 else do
@@ -314,13 +315,13 @@ focus c goal =
                     focus' Nothing c goal
 
 
-        decideLeft (g, din) goal = do
+        decideLeft (g, din) goal =
             case din of
               []     -> empty
               _ -> foldr ((<|>) . (\x -> trace ("Focus left on " ++ show x ++ " to " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
 
 
-        decideLeftBang (g, din) goal = do
+        decideLeftBang (g, din) goal =
             case g of
               []   -> empty
               _ -> foldr ((<|>) . (\case {
@@ -387,9 +388,9 @@ focus c goal =
                 })) empty sts
 
         ---- adtR
-        focus' Nothing (g, d) (ADT tyn) =
-            if findType (ADT tyn) d then empty -- Preemptively check for this ADT type in the linear context, and fail the right focus to try instanciating it as a variable first --- TODO : very wrong ?
-            else do
+        focus' Nothing (g, d) (ADT tyn) = do
+            -- if findType (ADT tyn) d then trace "avoided creation of ADT!" empty -- Preemptively check for this ADT type in the linear context, and fail the right focus to try instanciating it as a variable first --- TODO : very wrong ?
+            -- else do
                 -- res <- getrestrictions RightFocus
                 -- guard $ all (\f -> f (ADT tyn)) res -- TODO: Ver explicação na destrução do ADT
                 cons <- getadtcons tyn
@@ -398,11 +399,11 @@ focus c goal =
                          Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                          argtype ->
                            if case argtype of
-                                 ADT tyn' -> tyn == tyn' -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left.
+                                 ADT tyn' -> tyn == tyn' -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable? 
                                  _ -> False
-                              then empty
+                              then trace "failed constructor because type was the recursive" empty
                               else do
-                                  (arge, d') <- synth (g, d, []) argtype;
+                                  (arge, d') <- trace ("24 synth for construction: " ++ show tag ++ " > " ++ show argtype) synth (g, d, []) argtype;
                                   return (App (Var tag) arge, d')
                     )) empty cons
 
@@ -450,7 +451,7 @@ focus c goal =
         ---- * Proposition no longer synchronous * --------
 
         -- adtLFocus
-        -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- else recursive types would loop infinitely
+        -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types earlier
         focus' (Just nh@(n, ADT tyn)) (g, d) goal =
             if case goal of
               ADT tyn' -> tyn' == tyn

@@ -1,5 +1,3 @@
-data Expr = Var Natural | Lambda Expr;
+data Expr = Var Bool | Lambda Expr | App (Expr * Expr);
 
-# App (Expr * Expr)
-
-synth red :: (Expr -o Natural);
+synth red :: (Expr -o Bool);

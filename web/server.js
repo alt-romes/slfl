@@ -53,7 +53,7 @@ const server = http.createServer(function (req, res) {
             
             var pout;
             try {
-                pout = "" + execSync("/usr/bin/env timeout 10s STLLC " + type + " " + tmpf.name);
+                pout = "" + execSync("/usr/bin/env timeout 3s STLLC " + type + " " + tmpf.name);
             }
             catch (err) {
                 
