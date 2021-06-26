@@ -153,3 +153,9 @@ main num cond = case cond of
     | False -> recToZero num;
 
 `
+
+let lambda_synth = `data Expr = Var Natural | Lambda (Natural * Expr) | App (Expr * Expr);
+
+
+synth value :: (Expr -o Natural);
+`

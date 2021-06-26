@@ -206,9 +206,9 @@ synth c (With a b) = do
 synth (g, d, (n, Tensor a b):o) t = do
     n1 <- fresh
     n2 <- fresh
-    (expt, d') <- trace ("show me 5 after this bc im trying to synth " ++ show t ++ " with " ++ show ((n2,b):[(n1,a)])) synth (g, d, (n2, b):(n1, a):o) t
-    trace ("5 guard " ++ show b ++ " and " ++ show a ++ " are not in context") $ guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
-    trace "6 passed" $ return (LetTensor n1 n2 (Var n) expt, d')
+    (expt, d') <- synth (g, d, (n2, b):(n1, a):o) t
+    guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
+    return (LetTensor n1 n2 (Var n) expt, d')
 
 ---- 1L
 synth (g, d, (n, Unit):o) t = do
@@ -238,10 +238,10 @@ synth (g, d, (n, Sum tys):o) t = do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, p@(n, ADT tyn):o) t = trace ("1 deconstruct ADT " ++ tyn ++ " to synth " ++ show t ++ " with context " ++ show (g, d, o))$ do
+synth (g, d, p@(n, ADT tyn):o) t = do
     res <- getrestrictions LeftInvert
-    trace "14 Testing constraints" $ guard $ all (\f -> f (ADT tyn)) res
-    adtds <- trace "14 passed" $ getadtcons tyn
+    guard $ all (\f -> f (ADT tyn)) res
+    adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
         case vtype of
           Unit -> do
@@ -249,20 +249,19 @@ synth (g, d, p@(n, ADT tyn):o) t = trace ("1 deconstruct ADT " ++ tyn ++ " to sy
             return (name, "", exp, d')
           argty -> do
             varid <- fresh
-            (exp, d') <- trace ("2 Synth from branch " ++ show (name, argty) ++ " with new contxt " ++ show (g, (varid, argty):d, o)) $
-                (if trace ("Is " ++ show (ADT tyn) ++ " inside " ++ show argty ++ " ? : " ++ show (ADT tyn `isInType` argty))$ ADT tyn `isInType` argty
+            (exp, d') <-
+                (if ADT tyn `isInType` argty
                                         -- !TODO PROF: Validar este raciocínio. A ideia é:
                                         -- Se estivermos a sintetizar uma função por exemplo Expr -> Nat, mas em que Expr tem um constructor recursivo (ou seja, o tipo final aparece como argumento (debaixo de um número arbitrario de camadas) no construtor),
                                         -- para esse garantimos que nao nos focamos à esquerda e tentamos descontruir Expr outra vez para ter Nat,
-                                        -- e para garantir que nunca tentamos construir Expr para usar como param da função Expr -> Nat que esperames usar (e.g. um construtor que possivelmente precise de Nat causará um loop infinito)
                                         -- (basicamente, para forçar a utilização de uma função Expr -> Nat com o argumento Expr que veio do tipo recursivo)
                                         -- A restrição LeftInvert apenas é verificada diretamente antes da tentativa de desconstrução (async) de um ADT
-                                        -- A restrição RightFocus é verificada diretamente antes da tentativa de construção (sync) de um ADT
+                                        -- E ver comentário abaixo para quando podemos ainda querer instanciar esta hipotese como uma variável
                    then addrestriction LeftInvert (/= ADT tyn)
-                        -- . addrestriction RightFocus (/= ADT tyn)
+                        -- . addrestriction RightFocus (/= ADT tyn) -- TODO: arranjar forma de não utilizar o construtor (porque gera funções recursivas que não terminam)
                    else id) $ 
                     synth (g, (varid, argty):d, o) t
-            trace ("successful synth of type " ++ show t ++ " with " ++ show argty ++ ": " ++ show exp) $ return (name, varid, exp, d')
+            return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
     guard (length ls == length adtds) -- make sure all constructors were decomposed
@@ -273,9 +272,9 @@ synth (g, d, p@(n, ADT tyn):o) t = trace ("1 deconstruct ADT " ++ tyn ++ " to sy
     <|>
     do
     res <- getrestrictions LeftInvert
-    guard $ ADT tyn == t                                                        -- ADT -> ADT with a restriction on deconstruction might still be satisfied by instantiating it while focused
-    trace "checking a second time" $ guard $ not $ all (\f -> f (ADT tyn)) res  -- So if we failed above because a restriction didn't allow us to invert this ADT
-    trace "passed cseond time" synth (g, p:d, o) t                              -- Try using the hypothesis in the linear context
+    guard $ ADT tyn == t                            -- ADT -> ADT with a restriction on deconstruction might still be satisfied by instantiating it while focused
+    guard $ not $ all (\f -> f (ADT tyn)) res       -- So if we failed above because a restriction didn't allow us to invert this ADT
+    synth (g, p:d, o) t                             -- Try using the hypothesis in the linear context
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
@@ -340,12 +339,10 @@ focus c goal =
             -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
             -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
             -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
-            -- TODO: Do i need this verification everytime I add a constraint? Kind of makes sense, to detect issues right away
-            -- TODO: Será que posso ter em vez disto uma substituição "solved" à qual sempre que quero adicionar uma constraint a resolve logo com as outras, falhando logo em vez de capturar constraints e juntar depois?
-            (et, etvars) <- existencialInstantiate sch                                     -- tipo com existenciais
-            (se, d') <- focus' (Just (n, et)) ctxt goal   -- fail ou success c restrições
+            (et, etvars) <- existencialInstantiate sch                                          -- tipo com existenciais
+            (se, d') <- focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições
             (constrs, _) <- lift get
-            let unify = solveconstraintsExistential Map.empty constrs                                      -- resolve ou falha -- por conflito ou falta informação
+            let unify = solveconstraintsExistential Map.empty constrs                           -- resolve ou falha -- por conflito ou falta informação
             guard (isJust unify)                                                                -- por conflicto
             guard (Set.disjoint (Set.fromList etvars) (ftv $ apply (fromJust unify) et))        -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
             return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
@@ -389,23 +386,19 @@ focus c goal =
 
         ---- adtR
         focus' Nothing (g, d) (ADT tyn) = do
-            -- if findType (ADT tyn) d then trace "avoided creation of ADT!" empty -- Preemptively check for this ADT type in the linear context, and fail the right focus to try instanciating it as a variable first --- TODO : very wrong ?
-            -- else do
-                -- res <- getrestrictions RightFocus
-                -- guard $ all (\f -> f (ADT tyn)) res -- TODO: Ver explicação na destrução do ADT
-                cons <- getadtcons tyn
-                foldr (interleave . (\(tag, argty) -> --- (Green, Unit), (Red, Unit), (Yellow, Bool)
-                       case argty of
-                         Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
-                         argtype ->
-                           if case argtype of
-                                 ADT tyn' -> tyn == tyn' -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable? 
-                                 _ -> False
-                              then trace "failed constructor because type was the recursive" empty
-                              else do
-                                  (arge, d') <- trace ("24 synth for construction: " ++ show tag ++ " > " ++ show argtype) synth (g, d, []) argtype;
-                                  return (App (Var tag) arge, d')
-                    )) empty cons
+            cons <- getadtcons tyn
+            foldr (interleave . (\(tag, argty) ->
+                   case argty of
+                     Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
+                     argtype ->
+                       if case argtype of
+                             ADT tyn' -> tyn == tyn'    -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable? 
+                             _ -> False
+                          then empty
+                          else do
+                              (arge, d') <- synth (g, d, []) argtype;
+                              return (App (Var tag) arge, d')
+                )) empty cons
 
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = do
@@ -442,7 +435,7 @@ focus c goal =
               (ExistentialTypeVar y) ->
                   if x == y then return (Var n, d)          -- ?a |- ?a succeeds
                             else empty                      -- ?a |- ?b fails
-              _ -> do                                       -- ?a |-  t succeeds with constraint
+              _ -> do                                       -- ?a |- t  succeeds with constraint
                   addconstraint $ Constraint (ExistentialTypeVar x) goal
                   return (Var n, d)
 

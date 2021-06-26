@@ -2,4 +2,6 @@
 7) Conseguir escrever no relatório as regras de forma a que o algoritmo seja recriável
 8) refactor caseof (sum, plus, adt)
 12) case sum of not working
-14) print function application correctly
+15) discutir com o professor a ideia de adicionar restrições à construção do tipo recursivo, ou seja, não permitir a construção se ela depender da função que estamos a escrever para gerar um argumento, porque isso cria um loop
+16) adicionar keyword "using" para forçar o uso de certas funções
+17) sbv
