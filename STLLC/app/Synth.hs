@@ -37,12 +37,12 @@ type Synth a = LogicT (StateT SynthState (Reader SynthReaderState)) a
 type SynthState = ([Constraint], Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
 
 
-type SynthReaderState = (Restrictions, [ADTD]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
+type SynthReaderState = (Restrictions, [ADTD], Int) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
 type Restriction = Type -> Bool
-type Restrictions = ([Restriction], [Restriction], [Restriction], [Restriction])
+type Restrictions = ([Restriction], [Restriction])
 
 
-data TypeTag = SynthGoal | RightFocus | LeftFocus | LeftInvert
+data RestrictTag = ConstructADT | DeconstructADT
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
@@ -59,7 +59,8 @@ initSynthState i = ([], i)
 
 
 initSynthReaderState :: [ADTD] -> SynthReaderState
-initSynthReaderState a = (([], [], [], []), a)
+initSynthReaderState a = (([], []), a, 0)
+
 
 
 
@@ -72,40 +73,33 @@ addconstraint :: Constraint -> Synth ()
 addconstraint c = lift $ modify (first (c :))
 
 
-addrestriction :: TypeTag -> Restriction -> Synth a -> Synth a
-addrestriction tag r = local (\ ((a, b, c, d), adtds) ->
+addrestriction :: RestrictTag -> Restriction -> Synth a -> Synth a
+addrestriction tag r = local (\ ((a, b), adtds, d) ->
     case tag of
-      SynthGoal -> ((r:a, b, c, d), adtds)
-      RightFocus -> ((a, r:b, c, d), adtds)
-      LeftFocus -> ((a, b, r:c, d), adtds)
-      LeftInvert -> ((a, b, c, r:d), adtds)
+      ConstructADT   -> ((r:a, b), adtds, d)
+      DeconstructADT -> ((a, r:b), adtds, d)
     )
 
 
-getrestrictions :: TypeTag -> Synth [Restriction]
+adddepth :: Synth a -> Synth a
+adddepth = local (\(a,b,c) -> (a,b,c+1))
+
+
+getdepth :: Synth Int
+getdepth = lift (lift ask) >>= \(a,b,c) -> return c
+
+
+getrestrictions :: RestrictTag -> Synth [Restriction]
 getrestrictions tag = do
-    (sgoal, rfocus, lfocus, linvert) <- fst <$> lift (lift ask)
+    (conadt, deconadt) <- lift (lift ask) >>= \(a,b,c) -> return a
     case tag of
-      SynthGoal -> return sgoal
-      RightFocus -> return rfocus
-      LeftFocus -> return lfocus
-      LeftInvert -> return linvert
-
-
-removeRestrictions :: TypeTag -> Synth a -> Synth a
-removeRestrictions tt = local (\((a,b,c,d),e) ->
-    case tt of
-      SynthGoal -> (([],b,c,d), e)
-      RightFocus -> ((a,[],c,d), e)
-      LeftFocus -> ((a,b,[],d), e)
-      LeftInvert -> ((a,b,c,[]), e)
-      )
-
+      ConstructADT   -> return conadt
+      DeconstructADT -> return deconadt
 
 
 getadtcons :: Name -> Synth [(Name, Type)]
 getadtcons tyn = do
-    adtds <- snd <$> lift (lift ask)
+    adtds <- lift (lift ask) >>= \(a,b,c) -> return b
     return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
 
 
@@ -206,9 +200,9 @@ synth c (With a b) = do
 synth (g, d, (n, Tensor a b):o) t = do
     n1 <- fresh
     n2 <- fresh
-    (expt, d') <- synth (g, d, (n2, b):(n1, a):o) t
-    guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
-    return (LetTensor n1 n2 (Var n) expt, d')
+    (expt, d') <- trace ("split tensor " ++ show (Tensor a b) ++ " with goal " ++ show t) $ synth (g, d, (n2, b):(n1, a):o) t
+    trace "tensor guard" (guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d')))
+    trace "tensor guard passed" (return (LetTensor n1 n2 (Var n) expt, d'))
 
 ---- 1L
 synth (g, d, (n, Unit):o) t = do
@@ -239,42 +233,41 @@ synth (g, d, (n, Sum tys):o) t = do
 
 ---- adtL
 synth (g, d, p@(n, ADT tyn):o) t = do
-    res <- getrestrictions LeftInvert
+    res <- getrestrictions DeconstructADT
     guard $ all (\f -> f (ADT tyn)) res
     adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
-        case vtype of
+        adddepth $ case vtype of
           Unit -> do
             (exp, d') <- synth (g, d, o) t
             return (name, "", exp, d')
           argty -> do
-            varid <- fresh
+            varid <- trace ("going to synth " ++ show t ++ " with branch from " ++ show (ADT tyn) ++ " : " ++ show (name, argty)) fresh
             (exp, d') <-
-                (if ADT tyn `isInType` argty
+                (if trace ("IS " ++ show (ADT tyn) ++ " IN TYPE " ++ show argty ++ " ?? " ++ show (ADT tyn `isInType` argty)) $ ADT tyn `isInType` argty
                                         -- !TODO PROF: Validar este raciocínio. A ideia é:
                                         -- Se estivermos a sintetizar uma função por exemplo Expr -> Nat, mas em que Expr tem um constructor recursivo (ou seja, o tipo final aparece como argumento (debaixo de um número arbitrario de camadas) no construtor),
                                         -- para esse garantimos que nao nos focamos à esquerda e tentamos descontruir Expr outra vez para ter Nat,
                                         -- (basicamente, para forçar a utilização de uma função Expr -> Nat com o argumento Expr que veio do tipo recursivo)
-                                        -- A restrição LeftInvert apenas é verificada diretamente antes da tentativa de desconstrução (async) de um ADT
-                                        -- E ver comentário abaixo para quando podemos ainda querer instanciar esta hipotese como uma variável
-                   then addrestriction LeftInvert (/= ADT tyn)
-                        -- . addrestriction RightFocus (/= ADT tyn) -- TODO: arranjar forma de não utilizar o construtor (porque gera funções recursivas que não terminam)
+                                        -- A restrição Deconstr apenas é verificada diretamente antes da tentativa de desconstrução (async) de um ADT
+                                        --
+                   then trace "ADD RESTRICTION DECONS" $ addrestriction DeconstructADT (/= ADT tyn) . -- For recursive types, restrict deconstruction of this type in further computations
+                        (if t /= ADT tyn then trace "ADD RESTRICTION CONS" $ addrestriction ConstructADT (/= ADT tyn) else id) -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
                    else id) $ 
-                    synth (g, (varid, argty):d, o) t
-            return (name, varid, exp, d')
+                    trace "synth of ADT" $ synth (g, (varid, argty):d, o) t
+            trace "success synth of ADT" $ return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
-    guard (length ls == length adtds) -- make sure all constructors were decomposed
     let (n1, varid1, e1, d1') = head ls
-    guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
-    guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
-    return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+    trace "adt guard 2" $ guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
+    trace "adt guard 3" $ guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls -- all of the created names were used in the context
+    trace "pass adt guard 1 2 3" $ return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
     <|>
     do
-    res <- getrestrictions LeftInvert
-    guard $ ADT tyn == t                            -- ADT -> ADT with a restriction on deconstruction might still be satisfied by instantiating it while focused
-    guard $ not $ all (\f -> f (ADT tyn)) res       -- So if we failed above because a restriction didn't allow us to invert this ADT
-    synth (g, p:d, o) t                             -- Try using the hypothesis in the linear context
+    res <- getrestrictions DeconstructADT
+    trace "gu1" $ guard $ ADT tyn == t                            -- ADT -> ADT with a restriction on deconstruction might still be satisfied by instantiating it while focused
+    trace "gu2" $ guard $ not $ all (\f -> f (ADT tyn)) res       -- So if we failed above because a restriction didn't allow us to invert this ADT
+    trace "pass12" $ synth (g, p:d, o) t                             -- Try using the hypothesis in the linear context
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = do
@@ -296,7 +289,11 @@ synth (g, d, p:o) t =
 
 -- no more asynchronous propositions, focus
 
-synth (g, d, []) t = focus (g, d) t
+synth (g, d, []) t = do
+    cs <- getrestrictions ConstructADT
+    ds <- getrestrictions DeconstructADT
+    depth <- getdepth
+    trace ("FOCUS AND DECIDE AT DEPTH " ++ show depth ++ " ON " ++ show t ++ " with cons restrictions " ++ show (length cs) ++ " and decons " ++ show (length ds)) $ focus (g, d) t
 
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
@@ -317,14 +314,14 @@ focus c goal =
         decideLeft (g, din) goal =
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\x -> trace ("Focus left on " ++ show x ++ " to " ++ show goal) $ focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr (interleave . (\x -> trace ("Focus left on " ++ show x ++ " to " ++ show goal ++ " with context " ++show (g, delete x din)) $ focus' (Just x) (g, delete x din) goal)) empty din
 
 
         decideLeftBang (g, din) goal =
             case g of
               []   -> empty
-              _ -> foldr ((<|>) . (\case {
-                                        (n, Right x) -> trace ("Focus left bang on " ++ show x ++ " to " ++ show goal) $ focus' (Just (n, x)) (g, din) goal;
+              _ -> foldr (interleave . (\case {
+                                        (n, Right x) -> trace ("Focus left bang on " ++ show x ++ " to " ++ show goal ++ " with context " ++show (g, din)) $ focus' (Just (n, x)) (g, din) goal;
                                         (n, Left sch) -> trace ("Focus left bang scheme on " ++ show sch ++ " to " ++ show goal) $ focusSch (n, sch) (g, din) goal})) empty g
 
         
@@ -386,6 +383,8 @@ focus c goal =
 
         ---- adtR
         focus' Nothing (g, d) (ADT tyn) = do
+            res <- getrestrictions ConstructADT
+            guard $ all (\f -> f (ADT tyn)) res
             cons <- getadtcons tyn
             foldr (interleave . (\(tag, argty) ->
                    case argty of
@@ -413,8 +412,8 @@ focus c goal =
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = do
             nname <- fresh
-            (expb, d')  <- focus' (Just (nname, b)) c goal
-            (expa, d'') <- synth (g, d', []) a
+            (expb, d') <- trace ("From " ++ show (Fun a b) ++ ", focusing on " ++ show b ++ " to get " ++ show goal) focus' (Just (nname, b)) c goal
+            (expa, d'') <- trace ("From " ++ show (Fun a b) ++ ", synthing " ++ show a ++ " to use in function and get " ++ show goal) synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
@@ -485,9 +484,16 @@ focus c goal =
 -- Functions
 -------------------------------------------------------------------------------
 
+removeadtcons :: [ADTD] -> (Gamma, Delta) -> (Gamma, Delta)
+removeadtcons adts (fc, bc) = case adts of -- During the synth process, constructors should only be used when focused right on the ADT -- so remove them from the unrestricted context
+    [] -> (fc, bc)
+    (ADTD _ cons):xs -> removeadtcons xs (filter (\(n, _) -> isNothing $ lookup n cons) fc, bc)
+
+
 synthCtxAllType :: (Gamma, Delta) -> Int -> [ADTD] -> Type -> [Expr]
 synthCtxAllType c i adts t =
-    let res = runSynth c t (initSynthState i) adts in
+    let c' = removeadtcons adts c in
+    let res = runSynth c' t (initSynthState i) adts in
                   if null res
                      then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
                      else map fst res
@@ -542,7 +548,7 @@ synthMarks ex adts = transform transformfunc ex
                                             (name, getName i, synthCtxType ((name', Left $ generalize ([], []) t'):fc, (getName i, argty):(name', t'):bc) (i+1) adts t2) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
                                       ) adtcons
                           _ ->
-                              error "[Synth Mark] Recursive mark must be of type a -> b"
+                              error "[Synth Mark] Recursive mark must be of type ADT a -> b"
                 x -> x
                            
 

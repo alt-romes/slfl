@@ -395,6 +395,7 @@ generalizetbs ((TypeBinding n (Forall [] ty)):xs) = TypeBinding n (generalize ([
                                                                                                             -- TODO: Should probably be done in the parser instead of this
 generalizetbs (tb@(TypeBinding n sch):xs) = tb:generalizetbs xs
 
+
 deletetb :: Name -> [TypeBinding] -> [TypeBinding]
 deletetb _ [] = []
 deletetb n (t@(TypeBinding z ty):ls)
@@ -413,8 +414,6 @@ typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] e)
 
 
--- por favor perdoa-me por esta função
--- !TODO?: Refactor this function
 -- !TODO: Rever como estou a fazer as type annotations com o prof
 -- TODO: Var ids are overshot sometimes to avoid collisions. Isn't clean but it works
 typeinferModule :: Program -> Program -- typecheck and use inferred types
@@ -437,12 +436,12 @@ typeinferModule (Program adts bs ts cbs) =
 
 
         inferWithRecName :: [CoreBinding]
-                            -> [TypeBinding]
-                            -> Name
-                            -> FreeCtxt
-                            -> CoreExpr
-                            -> Scheme
-                            -> ([CoreBinding], [TypeBinding])
+                         -> [TypeBinding]
+                         -> Name
+                         -> FreeCtxt
+                         -> CoreExpr
+                         -> Scheme
+                         -> ([CoreBinding], [TypeBinding])
         inferWithRecName corebindings' knownts n tbs_pairs ce selftype@(Forall stvs _) = 
             case typeinfer tbs_pairs ce of -- Use type annotation in inference, and solve it after by adding a constraint manually
               Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
