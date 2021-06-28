@@ -1,4 +1,4 @@
-data Expr = Var Natural | Lamb Expr | App (Expr * Expr);
+data Expr = Var Natural | Lamb (Expr * Natural) | App (Expr * Expr);
 
 sum :: (Natural -o (Natural -o Natural))
 sum a b = sum b a;
