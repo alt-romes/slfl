@@ -37,12 +37,14 @@ type Synth a = LogicT (StateT SynthState (Reader SynthReaderState)) a
 type SynthState = ([Constraint], Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
 
 
-type SynthReaderState = (Restrictions, [ADTD], Int) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
+type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
 type Restriction = Type -> Bool
 type Restrictions = ([Restriction], [Restriction])
 
 
 data RestrictTag = ConstructADT | DeconstructADT
+
+data TraceTag = RightFun | RightWith | LeftTensor | LeftUnit | LeftPlus | LeftSum | LeftADT | LeftBang | MoveToDelta | Focus | DecideLeft | DecideRight | DecideLeftBang | FocusLeftScheme | RightTensor | RightUnit | RightPlus | RightSum | RightADT | RightBang | LeftFun | LeftWith | LeftExistentialTV | FocusLeftADT | DefaultFocusLeft | DefaultFocusRight deriving (Show)
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
@@ -59,7 +61,7 @@ initSynthState i = ([], i)
 
 
 initSynthReaderState :: [ADTD] -> SynthReaderState
-initSynthReaderState a = (([], []), a, 0)
+initSynthReaderState a = (([], []), a, 0, [])
 
 
 
@@ -74,24 +76,28 @@ addconstraint c = lift $ modify (first (c :))
 
 
 addrestriction :: RestrictTag -> Restriction -> Synth a -> Synth a
-addrestriction tag r = local (\ ((a, b), adtds, d) ->
+addrestriction tag r = local (\ ((a, b), adtds, d, t) ->
     case tag of
-      ConstructADT   -> ((r:a, b), adtds, d)
-      DeconstructADT -> ((a, r:b), adtds, d)
+      ConstructADT   -> ((r:a, b), adtds, d, t)
+      DeconstructADT -> ((a, r:b), adtds, d, t)
     )
 
 
-adddepth :: Synth a -> Synth a
-adddepth = local (\(a,b,c) -> (a,b,c+1))
+addtrace :: TraceTag -> Synth a -> Synth a
+addtrace t = local (\(a,b,c,d) -> (a,b,c+1,t:d))
+
+
+gettracestack :: Synth ([TraceTag], Int)
+gettracestack = lift (lift ask) >>= \(a,b,c,d) -> return (d,c)
 
 
 getdepth :: Synth Int
-getdepth = lift (lift ask) >>= \(a,b,c) -> return c
+getdepth = lift (lift ask) >>= \(a,b,c,d) -> return c
 
 
 getrestrictions :: RestrictTag -> Synth [Restriction]
 getrestrictions tag = do
-    (conadt, deconadt) <- lift (lift ask) >>= \(a,b,c) -> return a
+    (conadt, deconadt) <- lift (lift ask) >>= \(a,b,c,d) -> return a
     case tag of
       ConstructADT   -> return conadt
       DeconstructADT -> return deconadt
@@ -99,7 +105,7 @@ getrestrictions tag = do
 
 getadtcons :: Name -> Synth [(Name, Type)]
 getadtcons tyn = do
-    adtds <- lift (lift ask) >>= \(a,b,c) -> return b
+    adtds <- lift (lift ask) >>= \(a,b,c,d) -> return b
     return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
 
 
@@ -177,14 +183,14 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 ---- * Right asynchronous rules * -----------------
 
 ---- -oR
-synth (г, d, o) (Fun a b) = do
+synth (г, d, o) (Fun a b) = addtrace RightFun $ do
     name <- fresh
     (exp, d') <- synth (г, d, (name, a):o) b
     guard (name `notElem` map fst d')
     return (Abs name (Just a) exp, d')
 
 ---- &R
-synth c (With a b) = do
+synth c (With a b) = addtrace RightWith $ do
     (expa, d') <- synth c a
     (expb, d'') <- synth c b
     guard (d' == d'')
@@ -197,7 +203,7 @@ synth c (With a b) = do
 ---- * Left asynchronous rules * ------------------
 
 ---- *L
-synth (g, d, (n, Tensor a b):o) t = do
+synth (g, d, (n, Tensor a b):o) t = addtrace LeftTensor $ do
     n1 <- fresh
     n2 <- fresh
     (expt, d') <- trace ("split tensor " ++ show (Tensor a b) ++ " with goal " ++ show t) $ synth (g, d, (n2, b):(n1, a):o) t
@@ -205,12 +211,12 @@ synth (g, d, (n, Tensor a b):o) t = do
     trace "tensor guard passed" (return (LetTensor n1 n2 (Var n) expt, d'))
 
 ---- 1L
-synth (g, d, (n, Unit):o) t = do
+synth (g, d, (n, Unit):o) t = addtrace LeftUnit $ do
     (expt, d') <- synth (g, d, o) t
     return (LetUnit (Var n) expt, d')
 
 ---- +L
-synth (g, d, (n, Plus a b):o) t = do
+synth (g, d, (n, Plus a b):o) t = addtrace LeftPlus $ do
     n1 <- fresh
     n2 <- fresh
     (expa, d') <- synth (g, d, (n1, a):o) t
@@ -220,7 +226,7 @@ synth (g, d, (n, Plus a b):o) t = do
     return (CaseOfPlus (Var n) n1 expa n2 expb, d')
 
 ---- sumL
-synth (g, d, (n, Sum tys):o) t = do
+synth (g, d, (n, Sum tys):o) t = addtrace LeftSum $ do
     ls <- mapM (\(name, ct) -> do
         varid <- fresh
         (exp, d') <- synth (g, d, (varid, ct):o) t
@@ -232,12 +238,12 @@ synth (g, d, (n, Sum tys):o) t = do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, p@(n, ADT tyn):o) t = do
+synth (g, d, p@(n, ADT tyn):o) t = addtrace LeftADT $ do
     res <- getrestrictions DeconstructADT
-    guard $ all (\f -> f (ADT tyn)) res
+    guard $ all (\f -> f (ADT tyn)) res -- Assert destruction of this type isn't restricted
     adtds <- getadtcons tyn
     ls <- mapM (\(name, vtype) ->
-        adddepth $ case vtype of
+        case vtype of
           Unit -> do
             (exp, d') <- synth (g, d, o) t
             return (name, "", exp, d')
@@ -270,7 +276,7 @@ synth (g, d, p@(n, ADT tyn):o) t = do
     trace "pass12" $ synth (g, p:d, o) t                             -- Try using the hypothesis in the linear context
 
 ---- !L
-synth (g, d, (n, Bang a):o) t = do
+synth (g, d, (n, Bang a):o) t = addtrace LeftBang $ do
     nname <- fresh
     (exp, d') <- synth ((nname, Right a):g, d, o) t
     guard (nname `notElem` map fst d')
@@ -281,7 +287,7 @@ synth (g, d, (n, Bang a):o) t = do
 ---- * Synchronous left propositions to Δ * -------
 
 synth (g, d, p:o) t =
-    synth (g, p:d, o) t
+    addtrace MoveToDelta $ synth (g, p:d, o) t
 
 
 
@@ -289,11 +295,11 @@ synth (g, d, p:o) t =
 
 -- no more asynchronous propositions, focus
 
-synth (g, d, []) t = do
+synth (g, d, []) t = addtrace Focus $ do
     cs <- getrestrictions ConstructADT
     ds <- getrestrictions DeconstructADT
-    depth <- getdepth
-    trace ("FOCUS AND DECIDE AT DEPTH " ++ show depth ++ " ON " ++ show t ++ " with cons restrictions " ++ show (length cs) ++ " and decons " ++ show (length ds)) $ focus (g, d) t
+    (ts, depth) <- gettracestack
+    trace ("GET TRACE STACK: " ++ show ts) $ trace ("FOCUS AND DECIDE AT DEPTH " ++ show depth ++ " ON " ++ show t ++ " with cons restrictions " ++ show (length cs) ++ " and decons " ++ show (length ds)) $ focus (g, d) t
 
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
@@ -303,7 +309,7 @@ focus c goal =
     where
         decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
 
-        decideRight c goal = trace ("Focus right on " ++ show goal) $
+        decideRight c goal = addtrace DecideRight $ trace ("Focus right on " ++ show goal) $
             if isAtomic goal                            -- to decide right, goal cannot be atomic
                 then empty
                 else do
@@ -311,13 +317,13 @@ focus c goal =
                     focus' Nothing c goal
 
 
-        decideLeft (g, din) goal =
+        decideLeft (g, din) goal = addtrace DecideLeft $
             case din of
               []     -> empty
               _ -> foldr (interleave . (\x -> trace ("Focus left on " ++ show x ++ " to " ++ show goal ++ " with context " ++show (g, delete x din)) $ focus' (Just x) (g, delete x din) goal)) empty din
 
 
-        decideLeftBang (g, din) goal =
+        decideLeftBang (g, din) goal = addtrace DecideLeftBang $
             case g of
               []   -> empty
               _ -> foldr (interleave . (\case {
@@ -330,8 +336,7 @@ focus c goal =
         focusSch :: (String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta)
 
         ---- VL
-        focusSch (n, sch@(Forall ns t)) ctxt goal = do
-
+        focusSch (n, sch@(Forall ns t)) ctxt goal = addtrace FocusLeftScheme $ do
             -- can only try scheme if current constraints are still safe
             -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
             -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
@@ -355,17 +360,17 @@ focus c goal =
         ---- * Right synchronous rules * ------------------
 
         ---- *R
-        focus' Nothing c@(g, d) (Tensor a b) = do
+        focus' Nothing c@(g, d) (Tensor a b) = addtrace RightTensor $ do
             (expa, d') <- focus' Nothing c a
             (expb, d'') <- focus' Nothing (g, d') b
             return (TensorValue expa expb, d'')
 
         ---- 1R
-        focus' Nothing c@(g, d) Unit = do
+        focus' Nothing c@(g, d) Unit = addtrace RightUnit $
             return (UnitValue, d)
             
         ---- +R
-        focus' Nothing c (Plus a b) = do
+        focus' Nothing c (Plus a b) = addtrace RightPlus $ do
             (il, d') <- focus' Nothing c a
             return (InjL (Just b) il, d')
             `interleave` do
@@ -373,7 +378,7 @@ focus c goal =
             return (InjR (Just a) ir, d')
 
         ---- sumR
-        focus' Nothing c (Sum sts) =
+        focus' Nothing c (Sum sts) = addtrace RightSum $
             foldr (interleave . (\(tag, goalt) ->
                 do {
                    (e, d') <- focus' Nothing c goalt;
@@ -382,7 +387,7 @@ focus c goal =
                 })) empty sts
 
         ---- adtR
-        focus' Nothing (g, d) (ADT tyn) = do
+        focus' Nothing (g, d) (ADT tyn) = addtrace RightADT $ do
             res <- getrestrictions ConstructADT
             guard $ all (\f -> f (ADT tyn)) res
             cons <- getadtcons tyn
@@ -400,7 +405,7 @@ focus c goal =
                 )) empty cons
 
         ---- !R
-        focus' Nothing c@(g, d) (Bang a) = do
+        focus' Nothing c@(g, d) (Bang a) = addtrace RightBang $ do
             (expa, d') <- synth (g, d, []) a
             guard (d == d')
             return (BangValue expa, d')
@@ -410,14 +415,14 @@ focus c goal =
         ---- * Left synchronous rules * -------------------
 
         ---- -oL
-        focus' (Just (n, Fun a b)) c@(g, d) goal = do
+        focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace LeftFun $ do
             nname <- fresh
             (expb, d') <- trace ("From " ++ show (Fun a b) ++ ", focusing on " ++ show b ++ " to get " ++ show goal) focus' (Just (nname, b)) c goal
             (expa, d'') <- trace ("From " ++ show (Fun a b) ++ ", synthing " ++ show a ++ " to use in function and get " ++ show goal) synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
         ---- &L
-        focus' (Just (n, With a b)) c goal =
+        focus' (Just (n, With a b)) c goal = addtrace LeftWith $
             do
                 nname <- fresh
                 (lf, d') <- focus' (Just (nname, a)) c goal
@@ -429,7 +434,7 @@ focus c goal =
                 return (substitute nname (Snd (Var n)) rt, d')
 
         ---- ∃L (?)
-        focus' (Just (n, ExistentialTypeVar x)) (g, d) goal =
+        focus' (Just (n, ExistentialTypeVar x)) (g, d) goal = addtrace LeftExistentialTV $
             case goal of
               (ExistentialTypeVar y) ->
                   if x == y then return (Var n, d)          -- ?a |- ?a succeeds
@@ -444,7 +449,7 @@ focus c goal =
 
         -- adtLFocus
         -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types earlier
-        focus' (Just nh@(n, ADT tyn)) (g, d) goal =
+        focus' (Just nh@(n, ADT tyn)) (g, d) goal = addtrace FocusLeftADT $
             if case goal of
               ADT tyn' -> tyn' == tyn
               _ -> False
@@ -459,20 +464,21 @@ focus c goal =
 
         focus' (Just nh@(n, h)) (g, d) goal
           | isAtomic h                      -- left focus is atomic
-          = do case goal of
+          = addtrace DefaultFocusLeft $
+          do case goal of
                  (ExistentialTypeVar x)     -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
                    -> do addconstraint $ Constraint (ExistentialTypeVar x) h
                          return (Var n, d)
                  _ -> do guard (h == goal)  -- if is atomic and not the goal, fail
                          return (Var n, d)  -- else, instantiate it
           | otherwise
-          = synth (g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
+          = addtrace DefaultFocusLeft $ synth (g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
 
 
 
         ---- right focus is not synchronous, unfocus. if it is atomic we fail
 
-        focus' Nothing (g, d) goal = do
+        focus' Nothing (g, d) goal = addtrace DefaultFocusRight $ do
             (e, d') <- synth (g, d, []) goal
             return (e, d')
 
