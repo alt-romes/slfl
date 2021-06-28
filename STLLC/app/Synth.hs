@@ -44,7 +44,7 @@ type Restrictions = ([Restriction], [Restriction])
 
 data RestrictTag = ConstructADT | DeconstructADT
 
-data TraceTag = RightFun | RightWith | LeftTensor | LeftUnit | LeftPlus | LeftSum | LeftADT | LeftBang | MoveToDelta | Focus | DecideLeft | DecideRight | DecideLeftBang | FocusLeftScheme | RightTensor | RightUnit | RightPlus | RightSum | RightADT | RightBang | LeftFun | LeftWith | LeftExistentialTV | FocusLeftADT | DefaultFocusLeft | DefaultFocusRight deriving (Show)
+data TraceTag = RightFun Type | RightWith | LeftTensor | LeftUnit | LeftPlus | LeftSum | LeftADT | LeftBang | MoveToDelta | Focus | DecideLeft | DecideRight | DecideLeftBang | FocusLeftScheme | RightTensor | RightUnit | RightPlus | RightSum | RightADT | RightBang | LeftFun | LeftWith | LeftExistentialTV | FocusLeftADT | DefaultFocusLeft | DefaultFocusRight deriving (Show)
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
@@ -84,7 +84,9 @@ addrestriction tag r = local (\ ((a, b), adtds, d, t) ->
 
 
 addtrace :: TraceTag -> Synth a -> Synth a
-addtrace t = local (\(a,b,c,d) -> (a,b,c+1,t:d))
+addtrace t s = do
+    (tstck, depth) <- gettracestack
+    trace ("Entering " ++ show t ++ " at depth " ++ show depth ++ " & before did " ++ show tstck) $ local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -169,6 +171,10 @@ generalize ctxt t = Forall ns t
     where ns = Set.toList $ Set.difference (ftv t) (ftvctx ctxt)
 
 
+isRecursiveType :: Type -> Synth Bool
+isRecursiveType (ADT tyn) = do
+    adtds <- getadtcons tyn
+    return $ any (\(_, ty) -> ADT tyn `isInType` ty) adtds
 
 
 
@@ -183,7 +189,7 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 ---- * Right asynchronous rules * -----------------
 
 ---- -oR
-synth (г, d, o) (Fun a b) = addtrace RightFun $ do
+synth (г, d, o) (Fun a b) = addtrace (RightFun (Fun a b)) $ do
     name <- fresh
     (exp, d') <- synth (г, d, (name, a):o) b
     guard (name `notElem` map fst d')
@@ -238,30 +244,25 @@ synth (g, d, (n, Sum tys):o) t = addtrace LeftSum $ do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth (g, d, p@(n, ADT tyn):o) t = addtrace LeftADT $ do
+synth (g, d, p@(n, ADT tyn):o) t = addtrace LeftADT (do
     res <- getrestrictions DeconstructADT
     guard $ all (\f -> f (ADT tyn)) res -- Assert destruction of this type isn't restricted
     adtds <- getadtcons tyn
-    ls <- mapM (\(name, vtype) ->
-        case vtype of
-          Unit -> do
-            (exp, d') <- synth (g, d, o) t
-            return (name, "", exp, d')
-          argty -> do
-            varid <- trace ("going to synth " ++ show t ++ " with branch from " ++ show (ADT tyn) ++ " : " ++ show (name, argty)) fresh
-            (exp, d') <-
-                (if trace ("IS " ++ show (ADT tyn) ++ " IN TYPE " ++ show argty ++ " ?? " ++ show (ADT tyn `isInType` argty)) $ ADT tyn `isInType` argty
-                                        -- !TODO PROF: Validar este raciocínio. A ideia é:
-                                        -- Se estivermos a sintetizar uma função por exemplo Expr -> Nat, mas em que Expr tem um constructor recursivo (ou seja, o tipo final aparece como argumento (debaixo de um número arbitrario de camadas) no construtor),
-                                        -- para esse garantimos que nao nos focamos à esquerda e tentamos descontruir Expr outra vez para ter Nat,
-                                        -- (basicamente, para forçar a utilização de uma função Expr -> Nat com o argumento Expr que veio do tipo recursivo)
-                                        -- A restrição Deconstr apenas é verificada diretamente antes da tentativa de desconstrução (async) de um ADT
-                                        --
-                   then trace "ADD RESTRICTION DECONS" $ addrestriction DeconstructADT (/= ADT tyn) . -- For recursive types, restrict deconstruction of this type in further computations
-                        (if t /= ADT tyn then trace "ADD RESTRICTION CONS" $ addrestriction ConstructADT (/= ADT tyn) else id) -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
-                   else id) $ 
-                    trace "synth of ADT" $ synth (g, (varid, argty):d, o) t
-            trace "success synth of ADT" $ return (name, varid, exp, d')
+    isrectype <- isRecursiveType (ADT tyn)
+    ls <- mapM (\(name, vtype) -> do
+        (if isrectype
+           then addrestriction DeconstructADT (/= ADT tyn) .        -- For recursive types, restrict deconstruction of this type in further computations
+                (if t /= ADT tyn
+                    then addrestriction ConstructADT (/= ADT tyn)   -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
+                    else id) else id) $
+            case vtype of
+              Unit -> do
+                (exp, d') <- synth (g, d, o) t
+                return (name, "", exp, d')
+              argty -> do
+                varid <- fresh
+                (exp, d') <- synth (g, (varid, argty):d, o) t
+                return (name, varid, exp, d')
           -- TODO: polymorphic ADT
         ) adtds
     let (n1, varid1, e1, d1') = head ls
@@ -273,7 +274,7 @@ synth (g, d, p@(n, ADT tyn):o) t = addtrace LeftADT $ do
     res <- getrestrictions DeconstructADT
     trace "gu1" $ guard $ ADT tyn == t                            -- ADT -> ADT with a restriction on deconstruction might still be satisfied by instantiating it while focused
     trace "gu2" $ guard $ not $ all (\f -> f (ADT tyn)) res       -- So if we failed above because a restriction didn't allow us to invert this ADT
-    trace "pass12" $ synth (g, p:d, o) t                             -- Try using the hypothesis in the linear context
+    trace "pass12" $ synth (g, p:d, o) t)                             -- Try using the hypothesis in the linear context
 
 ---- !L
 synth (g, d, (n, Bang a):o) t = addtrace LeftBang $ do

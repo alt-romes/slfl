@@ -150,7 +150,7 @@ instance (Show Scheme) where
 
 
 instance (Show Literal) where
-    show (Nat x) = "NATURAL LITERAL: " ++ show x
+    show (Nat x) = show x
 
 
 
