@@ -246,6 +246,7 @@ synth (g, d, p@(n, ADT tyn):o) t = addtrace (LeftADT (ADT tyn) t) (do
     res <- getrestrictions DeconstructADT
     guard $ all (\f -> f (ADT tyn)) res -- Assert destruction of this type isn't restricted
     adtds <- getadtcons tyn
+    guard $ not $ null adtds
     isrectype <- isRecursiveType (ADT tyn)
     ls <- mapM (\(name, vtype) -> do
         (if isrectype
@@ -264,9 +265,9 @@ synth (g, d, p@(n, ADT tyn):o) t = addtrace (LeftADT (ADT tyn) t) (do
           -- TODO: polymorphic ADT
         ) adtds
     let (n1, varid1, e1, d1') = head ls
-    guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
-    guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls -- all of the created names were used in the context
-    return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+    trace "1" $ guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
+    trace "2" $ guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls -- all of the created names were used in the context
+    trace "3" $ return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
     <|>
     do
     res <- getrestrictions DeconstructADT                       -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)

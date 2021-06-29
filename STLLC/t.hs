@@ -1,3 +1,5 @@
-data Expr = Var Natural | Lamb (Expr * Natural);
+data ListBool = List Bool
 
-synth id :: (Expr -o Expr);
+data ListNat = List Bool;
+
+synth map :: (ListBool -o ListNat);
