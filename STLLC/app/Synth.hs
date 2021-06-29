@@ -44,7 +44,7 @@ type Restrictions = [(RestrictTag, Restriction)]
 
 data RestrictTag = ConstructADT | DeconstructADT deriving (Eq)
 
-data TraceTag = RightFun Type | RightWith Type | LeftTensor Type Type | LeftUnit Type | LeftPlus Type Type | LeftSum Type Type | LeftADT Type Type | LeftBang Type Type | MoveToDelta (Name, Type) Type | Focus Type | DecideLeft | DecideRight | DecideLeftBang | FocusLeftScheme | RightTensor Type | RightUnit | RightPlus Type | RightSum Type | RightADT Type | RightBang Type | LeftFun Type Type | LeftWith Type Type | LeftExistentialTV | FocusLeftADT Type Type | DefaultFocusLeft (Name, Type) Type | DefaultFocusRight Type deriving (Show)
+data TraceTag = RightFun Type | RightWith Type | LeftTensor Type Type | LeftUnit Type | LeftPlus Type Type | LeftSum Type Type | LeftADT Type Type | LeftBang Type Type | MoveToDelta (Name, Type) Type | Focus Type | DecideLeft Type Type | DecideRight | DecideLeftBang Type Type | DecideLeftBangSch Scheme Type | FocusLeftScheme | RightTensor Type | RightUnit | RightPlus Type | RightSum Type | RightADT Type | RightBang Type | LeftFun Type Type | LeftWith Type Type | LeftExistentialTV | FocusLeftADT Type Type | DefaultFocusLeft (Name, Type) Type | DefaultFocusRight Type deriving (Show)
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
@@ -234,11 +234,11 @@ synth (g, d, (n, Sum tys):o) t = addtrace (LeftSum (Sum tys) t) $ do
     ls <- mapM (\(name, ct) -> do
         varid <- fresh
         (exp, d') <- synth (g, d, (varid, ct):o) t
+        guard $ varid `notElem` map fst d'
         return (name, varid, exp, d')
         ) tys
     let (n1, varid1, e1, d1') = head ls
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
-    guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
@@ -246,28 +246,30 @@ synth (g, d, p@(n, ADT tyn):o) t = addtrace (LeftADT (ADT tyn) t) (do
     res <- getrestrictions DeconstructADT
     guard $ all (\f -> f (ADT tyn)) res -- Assert destruction of this type isn't restricted
     adtds <- getadtcons tyn
-    guard $ not $ null adtds
-    isrectype <- isRecursiveType (ADT tyn)
-    ls <- mapM (\(name, vtype) -> do
-        (if isrectype
-           then addrestriction DeconstructADT (/= ADT tyn) .        -- For recursive types, restrict deconstruction of this type in further computations
-                (if t /= ADT tyn
-                    then addrestriction ConstructADT (/= ADT tyn)   -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
-                    else id) else id) $
-            case vtype of
-              Unit -> do
-                (exp, d') <- synth (g, d, o) t
-                return (name, "", exp, d')
-              argty -> do
-                varid <- fresh
-                (exp, d') <- synth (g, (varid, argty):d, o) t
-                return (name, varid, exp, d')
-          -- TODO: polymorphic ADT
-        ) adtds
-    let (n1, varid1, e1, d1') = head ls
-    trace "1" $ guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
-    trace "2" $ guard $ all ((`notElem` map fst d1') . (\(n,_,_,_) -> n)) ls -- all of the created names were used in the context
-    trace "3" $ return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+    if null adtds
+       then addrestriction DeconstructADT (/= ADT tyn) $ synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
+       else do
+            isrectype <- isRecursiveType (ADT tyn)
+            ls <- mapM (\(name, vtype) -> do
+                (if isrectype
+                   then addrestriction DeconstructADT (/= ADT tyn) .        -- For recursive types, restrict deconstruction of this type in further computations
+                        (if t /= ADT tyn
+                            then addrestriction ConstructADT (/= ADT tyn)   -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
+                            else id) else id) $
+                    case vtype of
+                      Unit -> do
+                        (exp, d') <- synth (g, d, o) t
+                        return (name, "", exp, d')
+                      argty -> do
+                        varid <- fresh
+                        (exp, d') <- synth (g, (varid, argty):d, o) t
+                        guard $ varid `notElem` map fst d'
+                        return (name, varid, exp, d')
+                  -- TODO: polymorphic ADT
+                ) adtds
+            let (n1, varid1, e1, d1') = head ls
+            guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
+            return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
     <|>
     do
     res <- getrestrictions DeconstructADT                       -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)
@@ -313,18 +315,18 @@ focus c goal =
                     focus' Nothing c goal
 
 
-        decideLeft (g, din) goal = addtrace DecideLeft $
+        decideLeft (g, din) goal =
             case din of
               []     -> empty
-              _ -> foldr (interleave . (\x -> focus' (Just x) (g, delete x din) goal)) empty din
+              _ -> foldr ((<|>) . (\nx@(n,x) -> addtrace (DecideLeft x goal) $ focus' (Just nx) (g, delete nx din) goal)) empty din
 
 
-        decideLeftBang (g, din) goal = addtrace DecideLeftBang $
+        decideLeftBang (g, din) goal =
             case g of
               []   -> empty
-              _ -> foldr (interleave . (\case {
-                                        (n, Right x) -> focus' (Just (n, x)) (g, din) goal;
-                                        (n, Left sch) -> focusSch (n, sch) (g, din) goal})) empty g
+              _ -> foldr ((<|>) . (\case {
+                                        (n, Right x) -> addtrace (DecideLeftBang x goal) $ focus' (Just (n, x)) (g, din) goal;
+                                        (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $ focusSch (n, sch) (g, din) goal})) empty g
 
         
             
@@ -420,6 +422,7 @@ focus c goal =
         focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace (LeftFun (Fun a b) goal) $ do
             nname <- fresh
             (expb, d') <- focus' (Just (nname, b)) c goal
+            guard (nname `notElem` map fst d')
             (expa, d'') <- synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
@@ -428,11 +431,13 @@ focus c goal =
             do
                 nname <- fresh
                 (lf, d') <- focus' (Just (nname, a)) c goal
+                guard (nname `notElem` map fst d')
                 return (substitute nname (Fst (Var n)) lf, d')
             <|>
             do
                 nname <- fresh
                 (rt, d') <- focus' (Just (nname, b)) c goal
+                guard (nname `notElem` map fst d')
                 return (substitute nname (Snd (Var n)) rt, d')
 
         ---- ∃L (?)

@@ -1,5 +1,5 @@
-data ListBool = List Bool
+data ListBool = Nil | Cons (Bool * ListBool);
 
-data ListNat = List Bool;
+data ListNat = Nil | Cons (Nat * ListNat);
 
-synth map :: (ListBool -o ListNat);
+synth map :: (((Bool -o Nat)) -o ListBool -o ListNat);
