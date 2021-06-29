@@ -42,7 +42,7 @@ type Restriction = Type -> Bool
 type Restrictions = [(RestrictTag, Restriction)]
 
 
-data RestrictTag = ConstructADT | DeconstructADT | UseADT deriving (Eq)
+data RestrictTag = ConstructADT | DeconstructADT | TryDecisionADT deriving (Eq)
 
 data TraceTag = RightFun Type | RightWith Type | LeftTensor Type Type | LeftUnit Type | LeftPlus Type Type | LeftSum Type Type | LeftADT Type Type | LeftBang Type Type | MoveToDelta (Name, Type) Type | Focus Type | DecideLeft | DecideRight | DecideLeftBang | FocusLeftScheme | RightTensor Type | RightUnit | RightPlus Type | RightSum Type | RightADT Type | RightBang Type | LeftFun Type Type | LeftWith Type Type | LeftExistentialTV | FocusLeftADT Type Type | DefaultFocusLeft (Name, Type) Type | DefaultFocusRight Type deriving (Show)
 
@@ -103,6 +103,14 @@ getadtcons :: Name -> Synth [(Name, Type)]
 getadtcons tyn = do
     adtds <- lift (lift ask) >>= \(a,b,c,d) -> return b
     return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
+
+
+clearrestrictions :: RestrictTag -> Synth a -> Synth a
+clearrestrictions tag = local (\(rs,b,c,d) -> (filter (\(n,_) -> n /= tag) rs, b, c, d))
+
+
+settrydecisionres :: Type -> Synth a -> Synth a
+settrydecisionres t = trace ("ADDED TRY DECS RES TO " ++ show t) $ addrestriction TryDecisionADT (== t) . clearrestrictions TryDecisionADT
 
 
 fresh :: Synth String
@@ -352,8 +360,8 @@ focus c goal =
 
         ---- *R
         focus' Nothing c@(g, d) (Tensor a b) = addtrace (RightTensor (Tensor a b)) $ do
-            (expa, d') <- focus' Nothing c a
-            (expb, d'') <- focus' Nothing (g, d') b
+            (expa, d') <- settrydecisionres a $ focus' Nothing c a
+            (expb, d'') <- settrydecisionres b $ focus' Nothing (g, d') b
             return (TensorValue expa expb, d'')
 
         ---- 1R
@@ -362,23 +370,23 @@ focus c goal =
             
         ---- +R
         focus' Nothing c (Plus a b) = addtrace (RightPlus (Plus a b)) $ do
-            (il, d') <- focus' Nothing c a
+            (il, d') <- settrydecisionres a $ focus' Nothing c a
             return (InjL (Just b) il, d')
             `interleave` do
-            (ir, d') <- focus' Nothing c b
+            (ir, d') <- settrydecisionres b $ focus' Nothing c b
             return (InjR (Just a) ir, d')
 
         ---- sumR
         focus' Nothing c (Sum sts) = addtrace (RightSum (Sum sts)) $
             foldr (interleave . (\(tag, goalt) ->
                 do {
-                   (e, d') <- focus' Nothing c goalt;
+                   (e, d') <- settrydecisionres goalt $ focus' Nothing c goalt;
                    let smts = map (second Just) $ delete (tag, goalt) sts in
                    return (SumValue smts (tag, e), d')
                 })) empty sts
 
         ---- adtR
-        focus' Nothing (g, d) (ADT tyn) = addtrace (RightADT (ADT tyn)) $ do
+        focus' Nothing (g, d) (ADT tyn) = addtrace (RightADT (ADT tyn)) (do
             res <- getrestrictions ConstructADT
             guard $ all (\f -> f (ADT tyn)) res
             cons <- getadtcons tyn
@@ -391,13 +399,26 @@ focus c goal =
                              _ -> False
                           then empty
                           else do
-                              (arge, d') <- synth (g, d, []) argtype;
+                              (arge, d') <- clearrestrictions TryDecisionADT $ synth (g, d, []) argtype;
                               return (App (Var tag) arge, d')
                 )) empty cons
+            `interleave` -- When we're right focused, we might continue right focused as we construct the proof (e.g. RightTensor),
+                -- However, where other propositions would loop back to asynch mode, and back again to the decision point
+                -- Allowing for a left decision and an eventual instantiation of the goal,
+                -- A restricted ADT might fail right away while being right focused, and never considered the possibility of deciding left to instantiate it
+            do  -- As such, if the RightADT was called from one of these "keep right focused" points, we have this alternative to move the proposition back to asynch mode, as would happen to normal propositions in "DefaultRightFocus"
+                -- All right focus rules should clear that restriction, so at no point should one of those restrictions "escape" and co-exist with other
+            res <- getrestrictions TryDecisionADT
+            trace ("Found res: " ++ show (length res)) $
+                when (length res > 1) (error "Multiple try-decision adt restrictions found -- This should never happen")
+            trace ("Found res: " ++ show (length res)) $
+                guard $ length res == 1 && head res (ADT tyn)
+            clearrestrictions TryDecisionADT $ focus (g, d) goal
+            )
 
         ---- !R
         focus' Nothing c@(g, d) (Bang a) = addtrace (RightBang (Bang a)) $ do
-            (expa, d') <- synth (g, d, []) a
+            (expa, d') <- clearrestrictions TryDecisionADT $ synth (g, d, []) a
             guard (d == d')
             return (BangValue expa, d')
 
@@ -472,9 +493,8 @@ focus c goal =
 
         ---- right focus is not synchronous, unfocus. if it is atomic we fail
 
-        focus' Nothing (g, d) goal = addtrace (DefaultFocusRight goal) $ do
-            (e, d') <- synth (g, d, []) goal
-            return (e, d')
+        focus' Nothing (g, d) goal = addtrace (DefaultFocusRight goal) $
+            clearrestrictions TryDecisionADT $ synth (g, d, []) goal
 
 
 

@@ -1,6 +1,3 @@
-data Expr = Var Natural | Lamb (Expr * Natural) | App (Expr * Expr);
+data Expr = Var Natural | Lamb (Expr * Natural);
 
-sum :: (Natural -o (Natural -o Natural))
-sum a b = sum b a;
-
-synth val :: (Expr -o Natural);
+synth id :: (Expr -o Expr);
