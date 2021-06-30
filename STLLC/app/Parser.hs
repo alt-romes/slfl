@@ -273,7 +273,7 @@ ty = tylit <|> parens type'
 tylit :: Parser Type 
 tylit =     sumty
         <|> (reservedOp "1" >> return Unit)
-        <|> (reserved "Natural" >> return (TyLit Natural))
+        <|> (reserved "Nat" >> return (TyLit TyNat))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- !TODO: fazer parse de lowercase identifiers as type variables :)
         <|> (reservedOp "b" >> return (TypeVar 1))
         <|> (reservedOp "c" >> return (TypeVar 2))

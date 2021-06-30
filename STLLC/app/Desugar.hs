@@ -142,6 +142,25 @@ desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Sy
 
 
 -------------------------------------------------------------------------------
+-- "Prelude"
+-------------------------------------------------------------------------------
+
+pmult :: TypeBinding
+pmult = TypeBinding "multiply" $ trivialScheme (Fun trivialNat (Fun trivialNat trivialNat))
+
+psub :: TypeBinding
+psub = TypeBinding "subtract" $ trivialScheme (Fun trivialNat (Fun trivialNat trivialNat))
+
+psum :: TypeBinding
+psum = TypeBinding "add" $ trivialScheme (Fun trivialNat (Fun trivialNat trivialNat))
+
+addPrelude :: [TypeBinding] -> [TypeBinding]
+addPrelude ts = ts ++ [psum]
+
+
+
+
+-------------------------------------------------------------------------------
 -- Exported Functions
 -------------------------------------------------------------------------------
 
@@ -150,6 +169,6 @@ desugarExpr exp = runReader (desugar exp) []
 
 
 desugarModule :: Program -> Program
-desugarModule (Program adts bindings ts cs) = Program adts bindings ts $ map desugarModule' bindings
+desugarModule (Program adts bindings ts cs) = Program adts bindings (addPrelude ts) $ map desugarModule' bindings
     where desugarModule' (Binding name exp) = CoreBinding name $ runReader (desugar exp) [] 
 

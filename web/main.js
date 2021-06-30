@@ -154,8 +154,8 @@ main num cond = case cond of
 
 `
 
-let lambda_synth = `data Expr = Var Natural | Lambda (Natural * Expr) | App (Expr * Expr);
+let lambda_synth = `data Expr = Var Nat | Lambda (Nat * Expr) | App (Expr * Expr);
 
 
-synth value :: (Expr -o Natural);
+synth value :: (Expr -o Nat);
 `

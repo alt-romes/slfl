@@ -82,8 +82,8 @@ addrestriction tag r = local (\ (rs, adtds, d, t) -> ((tag, r):rs, adtds, d, t))
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    --trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-    local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -392,15 +392,16 @@ focus c goal =
             guard $ all (\f -> f (ADT tyn)) res
             cons <- getadtcons tyn
             foldr (interleave . (\(tag, argty) ->
+                addrestriction ConstructADT (/= ADT tyn) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype ->
                        if case argtype of
-                             ADT tyn' -> tyn == tyn'    -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable? 
+                             ADT tyn' -> tyn == tyn'    -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
                              _ -> False
                           then empty
                           else do
-                              (arge, d') <- synth (g, d, []) argtype;
+                              (arge, d') <- case argtype of { ADT _ -> focus c argtype; _ -> focus' Nothing c argtype }
                               return (App (Var tag) arge, d')
                 )) empty cons
             -- When we're right focused, we might continue right focused as we construct the proof (e.g. RightTensor),

@@ -1,6 +1,6 @@
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
-    Literal(..), getLitType, TyLiteral(..), isInType) where 
+    Literal(..), getLitType, TyLiteral(..), isInType, trivialNat) where 
 
 import Control.Monad
 import Data.Maybe
@@ -107,7 +107,7 @@ data Type
     deriving (Eq)
 
 
-data TyLiteral = Natural deriving (Eq, Show)
+data TyLiteral = TyNat deriving (Eq)
 
 
 
@@ -153,6 +153,8 @@ instance (Show Literal) where
     show (Nat x) = show x
 
 
+instance (Show TyLiteral) where
+    show TyNat = "Nat"
 
 
 
@@ -203,8 +205,12 @@ trivialScheme :: Type -> Scheme
 trivialScheme = Forall []
 
 
+trivialNat :: Type
+trivialNat = TyLit TyNat
+
+
 getLitType :: Literal -> Type
-getLitType (Nat x) = TyLit Natural
+getLitType (Nat x) = TyLit TyNat
 
 
 isInType :: Type -> Type -> Bool
