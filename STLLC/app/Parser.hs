@@ -250,7 +250,7 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i Nothing ([], []) (Just plhty)
+            return $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme plhty)
 
         emptymark = do
             reservedOp "..."
@@ -272,7 +272,7 @@ ty = tylit <|> parens type'
 
 
 tylit :: Parser Type 
-tylit =     sumty
+tylit =      sumty
         <|> (reservedOp "1" >> return Unit)
         <|> (reserved "Nat" >> return (TyLit TyNat))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- !TODO: fazer parse de lowercase identifiers as type variables :)
@@ -286,7 +286,7 @@ tylit =     sumty
 
 sumty :: Parser Type
 sumty = do
-    reservedOp "+"
+    reservedOp "sum"
     reservedOp "{"
     sts <- many1 (do
                     tag <- identifier
@@ -361,7 +361,7 @@ letsynth = do
     (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
     i <- getState
     putState $ i+1
-    return $ Right $ Binding name $ Syntax.Mark i Nothing ([], []) (Just t)
+    return $ Right $ Binding name $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme t)
 
 
 synthrec :: Parser (Either TypeBinding Binding)
@@ -371,7 +371,7 @@ synthrec = do
     (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
     i <- getState
     putState $ i+1
-    return $ Right $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just t)
+    return $ Right $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just $ trivialScheme t)
 
 
 datacon :: Parser (Name, Type)

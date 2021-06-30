@@ -63,7 +63,7 @@ data CoreExpr
 
     | LetIn CoreExpr CoreExpr
 
-    | Mark Int (Maybe Name) ([Maybe Var], [(String, Scheme)]) (Maybe Type) -- TODO: Once again assuming we can't have free linear variables
+    | Mark Int (Maybe Name) ([Maybe Var], [(String, Scheme)]) (Maybe Scheme) -- TODO: Once again assuming we can't have free linear variables
 
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, CoreExpr)

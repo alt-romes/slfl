@@ -51,7 +51,7 @@ data Expr
 
     | LetIn String Expr Expr
 
-    | Mark Int (Maybe Name) ([(String, Either Scheme Type)], [(String, Type)]) (Maybe Type)
+    | Mark Int (Maybe Name) ([(String, Either Scheme Type)], [(String, Type)]) (Maybe Scheme)
 
     -- Sum types
     | SumValue [(String, Maybe Type)] (String, Expr)

@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Typechecker (typeinferExpr, typeinferModule, typecheckExpr, TypeBinding(..)) where
+module Typechecker (typeinferExpr, typeinferModule, typecheckExpr, TypeBinding(..), instantiateFrom) where
 
 import Debug.Trace
 import Data.List
@@ -283,10 +283,13 @@ typeconstraint (LetIn e1 e2) = do
 typeconstraint (Mark i n _ t) = do
     tv <- fresh
     c@(bc, fc) <- get
-    let t' = fromMaybe tv t
-    vari <- lift $ lift get
-    lift $ lift $ put (vari + length (ftv t'))
-    return (t', Mark i n (bc, fc) (Just t'))
+    let t' = fromMaybe (trivialScheme tv) t
+    case t' of
+      Forall [] t'' -> do
+        vari <- lift $ lift get
+        lift $ lift $ put (vari + length (ftv t''))
+        return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t''))
+      _ -> error "Type inference shouldn't have marks with bound polimorfic variables"
 
 --- Sum --------------------
 

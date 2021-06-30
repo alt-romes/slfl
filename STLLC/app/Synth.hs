@@ -18,6 +18,7 @@ import Syntax
 import Program
 import Util
 import Constraints
+import Typechecker (instantiateFrom)
 
 
 
@@ -556,16 +557,16 @@ synthMarks ex adts = transform transformfunc ex
         transformfunc =
             \case
                 (Mark _ name c@(fc, bc) t) -> 
-                    let t' = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t in
+                    let sch@(Forall tvs t') = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t in
                     case name of
                       Nothing    -> -- Non-recursive Mark
-                        synthCtxType c 0 adts t'
+                        synthCtxType c (length tvs) adts $ instantiateFrom 0 sch
                       Just name' -> -- Recursive Mark
                         case t' of
-                          Fun (ADT tyn undefined) t2 ->
+                          Fun (ADT tyn tps) t2 ->
                               let adtcons = concatMap (\(ADTD _ _ cs) -> cs) $ filter (\(ADTD name _ _) -> tyn == name) adts in
-                              let i = 0 in
-                              Abs (getName i) (Just (ADT tyn undefined)) $ CaseOf (Var (getName i)) (synthBranches adtcons (i+1))
+                              let i = length tvs in
+                              Abs (getName i) (Just (ADT tyn tps)) $ CaseOf (Var (getName i)) (synthBranches adtcons (i+1))
                               where
                                   synthBranches :: [(Name, Type)] -> Int -> [(String, String, Expr)]
                                   synthBranches adtcons i = map (\(name, vtype) ->
@@ -573,7 +574,7 @@ synthMarks ex adts = transform transformfunc ex
                                           Unit -> do
                                             (name, "", synthCtxType c i adts t2)
                                           argty -> do
-                                            (name, getName i, synthCtxType ((name', Left $ generalize ([], []) t'):fc, (getName i, argty):(name', t'):bc) (i+1) adts t2) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
+                                            (name, getName i, synthCtxType ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
                                       ) adtcons
                           _ ->
                               error "[Synth Mark] Recursive mark must be of type ADT a -> b"

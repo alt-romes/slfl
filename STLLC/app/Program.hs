@@ -58,7 +58,7 @@ instance Show ADTD where
 trivialProgram :: Program
 trivialProgram = Program [] [] [] []
 
-type MarksTypes = Map.Map Int (([(String, Either Scheme Type)], [(String, Type)]), Maybe Type)
+type MarksTypes = Map.Map Int (([(String, Either Scheme Type)], [(String, Type)]), Maybe Scheme)
 
 -- | Copy the Marks info from the core bindings to the syntax bindings marks by id
 completeFrontendMarksCtx :: Program -> Program
