@@ -55,6 +55,7 @@ instance Substitutable Type where
     apply s t@(TypeVar i) = Map.findWithDefault t i s
     apply s t@(ExistentialTypeVar i) = Map.findWithDefault t (-i) s
     apply s (Sum tl) = Sum $ map (second $ apply s) tl
+    apply s (ADT n tp) = ADT n $ map (apply s) tp
     apply s t = t
 
 
@@ -112,7 +113,13 @@ instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
 unify :: Type -> Type -> Maybe Subst 
 unify Unit Unit = Just Map.empty
 unify (TyLit x) (TyLit y) = if x == y then Just Map.empty else Nothing
-unify (ADT x) (ADT y) = if x == y then Just Map.empty else Nothing
+unify (ADT x ts) (ADT y ts') =
+    if x == y
+       then do
+           guard $ length ts == length ts'
+           let maybesubs = zipWith unify ts ts'
+           foldM (\p n -> compose p <$> n) Map.empty maybesubs
+       else Nothing
 unify (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (TypeVar y)
 unify (TypeVar x) y = if x `notElem` ftv y then Just $ Map.singleton x y else Nothing
 unify x (TypeVar y) = if y `notElem` ftv x then Just $ Map.singleton y x else Nothing
@@ -142,7 +149,13 @@ unify _ _ = Nothing
 
 
 unifyExistential :: Type -> Type -> Maybe Subst 
-unifyExistential (ADT x) (ADT y) = if x == y then Just Map.empty else Nothing
+unifyExistential (ADT x ts) (ADT y ts') =
+    if x == y
+       then do
+           guard $ length ts == length ts'
+           let maybesubs = zipWith unify ts ts'
+           foldM (\p n -> compose p <$> n) Map.empty maybesubs
+       else Nothing
 unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Nothing

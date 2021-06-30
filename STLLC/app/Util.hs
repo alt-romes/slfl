@@ -3,6 +3,7 @@ module Util where
 
 import qualified Data.Map as Map
 import Control.Monad
+import Data.Maybe
 
 
 
@@ -23,3 +24,7 @@ letters = [1..] >>= flip replicateM ['a'..'z']
 
 getName :: Int -> String
 getName i = letters !! i
+
+
+getNumCode :: String -> Int
+getNumCode n = fromJust $ lookup n [("a", 0), ("b", 1), ("c", 2), ("d", 3), ("e", 4), ("f", 5), ("g", 6), ("h", 7), ("i", 8), ("j", 9), ("k", 10)] -- TODO: find way to parse type vars and to get their value

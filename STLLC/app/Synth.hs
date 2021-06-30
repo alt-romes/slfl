@@ -103,7 +103,7 @@ getrestrictions tag = do
 getadtcons :: Name -> Synth [(Name, Type)]
 getadtcons tyn = do
     adtds <- lift (lift ask) >>= \(a,b,c,d) -> return b
-    return $ concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adtds
+    return $ concatMap (\(ADTD _ _ cs) -> cs) $ filter (\(ADTD name _ cs) -> tyn == name) adtds
 
 
 clearrestrictions :: RestrictTag -> Synth a -> Synth a
@@ -127,7 +127,7 @@ freshIndex = do
 assertADTHasCons :: Type -> Synth Bool
 assertADTHasCons t =
     case t of
-       ADT name -> do
+       ADT name _ -> do
            cons <- getadtcons name
            return $ not $ null cons
        _        ->
@@ -171,9 +171,9 @@ generalize ctxt t = Forall ns t
 
 
 isRecursiveType :: Type -> Synth Bool
-isRecursiveType (ADT tyn) = do
+isRecursiveType (ADT tyn tps) = do
     adtds <- getadtcons tyn
-    return $ any (\(_, ty) -> ADT tyn `isInType` ty) adtds
+    return $ any (\(_, ty) -> ADT tyn tps `isInType` ty) adtds
 
 
 
@@ -243,20 +243,20 @@ synth (g, d, (n, Sum tys):o) t = addtrace (LeftSum (Sum tys) t) $ do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth c@(g, d, p@(n, ADT tyn):o) t = addtrace (LeftADT c (ADT tyn) t) (do
+synth c@(g, d, p@(n, ADT tyn undefined):o) t = addtrace (LeftADT c (ADT tyn undefined) t) (do
     res <- getrestrictions DeconstructADT
-    guard $ all (\f -> f (ADT tyn)) res -- Assert destruction of this type isn't restricted
+    guard $ all (\f -> f (ADT tyn undefined)) res -- Assert destruction of this type isn't restricted
     adtds <- getadtcons tyn
     if null adtds
-       then addrestriction DeconstructADT (ADT tyn) $ synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
+       then addrestriction DeconstructADT (ADT tyn undefined) $ synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
        else do
-            isrectype <- isRecursiveType (ADT tyn)
+            isrectype <- isRecursiveType (ADT tyn undefined)
             ls <- mapM (\(name, vtype) ->
                 (if isrectype -- TODO: make restrictions not dependent
-                   then addrestriction DeconstructADT (ADT tyn)           -- For recursive types, restrict deconstruction of this type in further computations
+                   then addrestriction DeconstructADT (ADT tyn undefined)           -- For recursive types, restrict deconstruction of this type in further computations
                    else id) $
-                   (if t /= ADT tyn
-                       then addrestriction ConstructADT (ADT tyn)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
+                   (if t /= ADT tyn undefined
+                       then addrestriction ConstructADT (ADT tyn undefined)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
                        else id) $
                         case vtype of
                           Unit -> do
@@ -275,7 +275,7 @@ synth c@(g, d, p@(n, ADT tyn):o) t = addtrace (LeftADT c (ADT tyn) t) (do
     <|>
     do
     res <- getrestrictions DeconstructADT                       -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)
-    guard $ not $ all (\f -> f (ADT tyn)) res                   -- So if we failed above because a restriction didn't allow us to invert this ADT
+    guard $ not $ all (\f -> f (ADT tyn undefined)) res                   -- So if we failed above because a restriction didn't allow us to invert this ADT
     synth (g, p:d, o) t)                                        -- Try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
 
 ---- !L
@@ -369,8 +369,8 @@ focus c goal =
 
         ---- *R
         focus' Nothing c@(g, d) (Tensor a b) = addtrace (RightTensor c (Tensor a b)) $ do
-            (expa, d') <- case a of { ADT _ -> focus c a; _ -> focus' Nothing c a }
-            (expb, d'') <- case b of { ADT _ -> focus (g, d') b; _ -> focus' Nothing (g, d') b }
+            (expa, d') <- case a of { ADT _ _ -> focus c a; _ -> focus' Nothing c a }
+            (expb, d'') <- case b of { ADT _ _ -> focus (g, d') b; _ -> focus' Nothing (g, d') b }
             return (TensorValue expa expb, d'')
 
         ---- 1R
@@ -379,37 +379,37 @@ focus c goal =
             
         ---- +R
         focus' Nothing c (Plus a b) = addtrace (RightPlus c (Plus a b)) $ do
-            (il, d') <- case a of { ADT _ -> focus c a; _ -> focus' Nothing c a }
+            (il, d') <- case a of { ADT _ _ -> focus c a; _ -> focus' Nothing c a }
             return (InjL (Just b) il, d')
             `interleave` do
-            (ir, d') <- case b of { ADT _ -> focus c b; _ -> focus' Nothing c b }
+            (ir, d') <- case b of { ADT _ _ -> focus c b; _ -> focus' Nothing c b }
             return (InjR (Just a) ir, d')
 
         ---- sumR
         focus' Nothing c (Sum sts) = addtrace (RightSum (Sum sts)) $
             foldr (interleave . (\(tag, goalt) ->
                 do
-                   (e, d') <- case goalt of { ADT _ -> focus c goalt; _ -> focus' Nothing c goalt }
+                   (e, d') <- case goalt of { ADT _ _ -> focus c goalt; _ -> focus' Nothing c goalt }
                    let smts = map (second Just) $ delete (tag, goalt) sts
                    return (SumValue smts (tag, e), d')
                 )) empty sts
 
         ---- adtR
-        focus' Nothing c@(g, d) (ADT tyn) = addtrace (RightADT c (ADT tyn)) $ do
+        focus' Nothing c@(g, d) (ADT tyn undefined) = addtrace (RightADT c (ADT tyn undefined)) $ do
             res <- getrestrictions ConstructADT
-            guard $ all (\f -> f (ADT tyn)) res
+            guard $ all (\f -> f (ADT tyn undefined)) res
             cons <- getadtcons tyn
             foldr (interleave . (\(tag, argty) ->
-                addrestriction ConstructADT (ADT tyn) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
+                addrestriction ConstructADT (ADT tyn undefined) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype ->
                        if case argtype of
-                             ADT tyn' -> tyn == tyn'    -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
+                             ADT tyn' _ -> tyn == tyn'    -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
                              _ -> False
                           then empty
                           else do
-                              (arge, d') <- case argtype of { ADT _ -> focus c argtype; _ -> focus' Nothing c argtype }
+                              (arge, d') <- case argtype of { ADT _ _ -> focus c argtype; _ -> focus' Nothing c argtype }
                               return (App (Var tag) arge, d')
                 )) empty cons
             -- When we're right focused, we might continue right focused as we construct the proof (e.g. RightTensor),
@@ -467,16 +467,16 @@ focus c goal =
 
         -- adtLFocus
         -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
-        focus' (Just nh@(n, ADT tyn)) c@(g, d) goal = addtrace (FocusLeftADT c (ADT tyn) goal) $
+        focus' (Just nh@(n, ADT tyn undefined)) c@(g, d) goal = addtrace (FocusLeftADT c (ADT tyn undefined) goal) $
             if case goal of
-              ADT tyn' -> tyn' == tyn
+              ADT tyn' _ -> tyn' == tyn
               _ -> False
               then return (Var n, d)
               else do
                   adtcns <- getadtcons tyn
                   guard $ not $ null adtcns             -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
                   res <- getrestrictions DeconstructADT
-                  guard $ all (\f -> f (ADT tyn)) res   -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
+                  guard $ all (\f -> f (ADT tyn undefined)) res   -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
                   synth (g, d, [nh]) goal
 
 
@@ -515,7 +515,7 @@ focus c goal =
 removeadtcons :: [ADTD] -> (Gamma, Delta) -> (Gamma, Delta)
 removeadtcons adts (fc, bc) = case adts of -- During the synth process, constructors should only be used when focused right on the ADT -- so remove them from the unrestricted context
     [] -> (fc, bc)
-    (ADTD _ cons):xs -> removeadtcons xs (filter (\(n, _) -> isNothing $ lookup n cons) fc, bc)
+    (ADTD _ _ cons):xs -> removeadtcons xs (filter (\(n, _) -> isNothing $ lookup n cons) fc, bc)
 
 
 synthCtxAllType :: (Gamma, Delta) -> Int -> [ADTD] -> Type -> [Expr]
@@ -562,10 +562,10 @@ synthMarks ex adts = transform transformfunc ex
                         synthCtxType c 0 adts t'
                       Just name' -> -- Recursive Mark
                         case t' of
-                          Fun (ADT tyn) t2 ->
-                              let adtcons = concatMap (\(ADTD _ cs) -> cs) $ filter (\(ADTD name cs) -> tyn == name) adts in
+                          Fun (ADT tyn undefined) t2 ->
+                              let adtcons = concatMap (\(ADTD _ _ cs) -> cs) $ filter (\(ADTD name _ _) -> tyn == name) adts in
                               let i = 0 in
-                              Abs (getName i) (Just (ADT tyn)) $ CaseOf (Var (getName i)) (synthBranches adtcons (i+1))
+                              Abs (getName i) (Just (ADT tyn undefined)) $ CaseOf (Var (getName i)) (synthBranches adtcons (i+1))
                               where
                                   synthBranches :: [(Name, Type)] -> Int -> [(String, String, Expr)]
                                   synthBranches adtcons i = map (\(name, vtype) ->

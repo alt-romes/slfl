@@ -1,2 +1,8 @@
 dist-newstyle/
 node_modules/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.pdf

@@ -102,7 +102,7 @@ data Type
 
     | Sum [(String, Type)]
 
-    | ADT String
+    | ADT String [Type]
     
     deriving (Eq)
 
@@ -142,7 +142,7 @@ instance (Show Type) where
     show (TypeVar x) = letters !! x
     show (ExistentialTypeVar x) = "?" ++ letters !! x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
-    show (ADT t) = t
+    show (ADT n ts) = n ++ concatMap ((" " ++) . show) ts
 
 
 instance (Show Scheme) where

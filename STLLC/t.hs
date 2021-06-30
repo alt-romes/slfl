@@ -1,5 +1,7 @@
-data ListNatNat = Nil | Cons ((Nat * Nat) * ListNatNat);
+data Bool = True | False;
+data List a = Nil | Cons (a * List a);
 
-data ListNat = Nil | Cons (Nat * ListNat);
+right = Cons (1, Cons (2, Cons (3,Nil)));
 
-synth map :: (ListNatNat -o ListNat);
+# delete this
+wrong = Cons (1, Cons (True, Nil));

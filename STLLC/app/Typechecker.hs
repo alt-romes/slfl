@@ -326,14 +326,14 @@ typeconstraint (CaseOf e exps) = do
     inferredexps <- mapM (\(s, ex) -> do
         put currentctx -- reset ctx for every branch
         case lookup s fctx of
-            Just (Forall [] (Fun argtype (ADT _))) -> do -- Constructor takes an argument
-                addtoblinctx $ trivialScheme argtype
+            Just (Forall ns (Fun argtype (ADT _ _))) -> do -- Constructor takes an argument
+                addtoblinctx $ Forall ns argtype
                 lastvi <- getlastvarindex
                 (t', ce) <- typeconstraint ex
                 wasBLVConsumed lastvi >>= guard -- Variable bound in branch must be linearly
                 ctx' <- get
                 return $ Just (t', s, ce, ctx')
-            Just (Forall [] (ADT _)) -> do -- Constructor does not take an argument
+            Just (Forall ns (ADT _ _)) -> do -- Constructor does not take an argument
                 (t', ce) <- typeconstraint ex
                 ctx' <- get
                 return $ Just (t', s, ce, ctx')
@@ -343,26 +343,22 @@ typeconstraint (CaseOf e exps) = do
     let inferredexps' = catMaybes inferredexps
     let (t1', s1, ce1, ctx1') = head inferredexps'
     guard $ all ((== first catMaybes ctx1') . (\(_,_,_,c) -> first catMaybes c)) (tail inferredexps')
-    let adtname = getadtname fctx s1
-    guard $ all ((== adtname) . (\(_,constr,_,_) -> getadtname fctx constr)) (tail inferredexps')
-    writer ((t1', CaseOf ce (map (\(_,s,c,_) -> (s,c)) inferredexps')), Constraint st (ADT adtname):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps'))
+    let (adtname, adttypes) = getadtname fctx s1
+    guard $ all ((== adtname) . (\(_,constr,_,_) -> fst $ getadtname fctx constr)) (tail inferredexps')
+    writer ((t1', CaseOf ce (map (\(_,s,c,_) -> (s,c)) inferredexps')), Constraint st (ADT adtname adttypes):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps'))
         where
             getadtname fctx s = case lookup s fctx of
-                        Just (Forall [] (Fun _ (ADT adtname))) -> adtname -- Constructor takes an argument
-                        Just (Forall [] (ADT adtname)) -> adtname -- Constructor does not take an argument
+                        Just (Forall _ (Fun _ (ADT adtname adttypes))) -> (adtname, adttypes) -- Constructor takes an argument
+                        Just (Forall _ (ADT adtname adttypes)) -> (adtname, adttypes) -- Constructor does not take an argument
 
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst, Int)
 typeinfer fc e = do
     ((((ctype, cexp), constraints), (bc, _)), i') <- runinfer fc 0 e
-    -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity
+    -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity?
     s <- solveconstraints Map.empty constraints
     let (ctype', cexp') = apply s (ctype, cexp)
-    -- TODO: generate new constraint with the inferred type, and apply a new substitution over the core expression to resolve the marks "recursive" context
     return (ctype', cexp', s, i')
-    -- TODO: Maybe factor into another function?
-    -- TODO: Typeinfer should return a scheme? let sch = generalize ([],[]) ctype'
-    -- TODO: Generalize and instantiate from the beginning to get free vars starting from a, b ... ?
 
 
 
@@ -376,10 +372,10 @@ processadts :: [ADTD] -> [TypeBinding]
 processadts = concatMap processadt
     where
         processadt :: ADTD -> [TypeBinding]
-        processadt (ADTD tn cns) = map processcns cns
+        processadt (ADTD tn tps cns) = map processcns cns
             where
-                processcns (cn, Unit) = TypeBinding cn (trivialScheme (ADT tn))
-                processcns (cn, ty) = TypeBinding cn (trivialScheme (Fun ty (ADT tn)))
+                processcns (cn, Unit) = TypeBinding cn (Forall tps (ADT tn $ map TypeVar tps))
+                processcns (cn, ty) = TypeBinding cn (Forall tps (Fun ty (ADT tn $ map TypeVar tps)))
 
 
 instantiateFrom :: Int -> Scheme -> Type

@@ -12,6 +12,7 @@ import Lexer
 import CoreSyntax hiding (Var(..))
 import Syntax
 import Program
+import Util
 
 
 
@@ -300,7 +301,8 @@ sumty = do
 
 adty :: Parser Type
 adty = do
-    ADT <$> identifier -- TODO: identifier must be uppercase
+    name <- identifier -- TODO: identifier must be uppercase
+    ADT name <$> many ty
 
 
 -- ...---...
@@ -383,11 +385,12 @@ datatype :: Parser ADTD
 datatype = do
     reserved "data"
     name <- identifier
+    typeparams <- many identifier
     reservedOp "="
     con <- datacon
     cons <- many (do {reservedOp "|"; datacon})
     optional (reservedOp ";") -- !TODO: Necessário porque se não as linhas a seguir podem falhar.
-    return $ ADTD name (con:cons)
+    return $ ADTD name (map getNumCode typeparams) (con:cons)
 
 
 val :: Parser (Either TypeBinding Binding)
