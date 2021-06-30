@@ -42,7 +42,7 @@ type Restriction = Type -> Bool
 type Restrictions = [(RestrictTag, Restriction)]
 
 
-data RestrictTag = ConstructADT | DeconstructADT deriving (Eq)
+data RestrictTag = ConstructADT | DeconstructADT | DecideLeftBangR deriving (Eq)
 
 data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Type Type | DecideLeftBangSch Scheme Type | FocusLeftScheme | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type deriving (Show)
 
@@ -75,15 +75,15 @@ addconstraint :: Constraint -> Synth ()
 addconstraint c = lift $ modify (first (c :))
 
 
-addrestriction :: RestrictTag -> Restriction -> Synth a -> Synth a
-addrestriction tag r = local (\ (rs, adtds, d, t) -> ((tag, r):rs, adtds, d, t))
+addrestriction :: RestrictTag -> Type -> Synth a -> Synth a
+addrestriction tag ty = local (\ (rs, adtds, d, t) -> ((tag, (/= ty)):rs, adtds, d, t))
 
 
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -248,15 +248,15 @@ synth c@(g, d, p@(n, ADT tyn):o) t = addtrace (LeftADT c (ADT tyn) t) (do
     guard $ all (\f -> f (ADT tyn)) res -- Assert destruction of this type isn't restricted
     adtds <- getadtcons tyn
     if null adtds
-       then addrestriction DeconstructADT (/= ADT tyn) $ synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
+       then addrestriction DeconstructADT (ADT tyn) $ synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
        else do
             isrectype <- isRecursiveType (ADT tyn)
             ls <- mapM (\(name, vtype) ->
                 (if isrectype -- TODO: make restrictions not dependent
-                   then addrestriction DeconstructADT (/= ADT tyn)           -- For recursive types, restrict deconstruction of this type in further computations
+                   then addrestriction DeconstructADT (ADT tyn)           -- For recursive types, restrict deconstruction of this type in further computations
                    else id) $
                    (if t /= ADT tyn
-                       then addrestriction ConstructADT (/= ADT tyn)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
+                       then addrestriction ConstructADT (ADT tyn)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
                        else id) $
                         case vtype of
                           Unit -> do
@@ -326,9 +326,17 @@ focus c goal =
         decideLeftBang (g, din) goal =
             case g of
               []   -> empty
-              _ -> foldr ((<|>) . (\case {
-                                        (n, Right x) -> addtrace (DecideLeftBang x goal) $ focus' (Just (n, x)) (g, din) goal;
-                                        (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $ focusSch (n, sch) (g, din) goal})) empty g
+              _ -> foldr ((<|>) . (\case
+                                    (n, Right x) -> addtrace (DecideLeftBang x goal) $ do
+                                        res <- getrestrictions DecideLeftBangR
+                                        guard $ all (\f -> f x) res
+                                        (if case x of
+                                            Fun a b -> a == goal
+                                            _ -> False
+                                           then addrestriction DecideLeftBangR x
+                                           else id) $
+                                               focus' (Just (n, x)) (g, din) goal;
+                                    (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $ focusSch (n, sch) (g, din) goal)) empty g
 
         
             
@@ -392,7 +400,7 @@ focus c goal =
             guard $ all (\f -> f (ADT tyn)) res
             cons <- getadtcons tyn
             foldr (interleave . (\(tag, argty) ->
-                addrestriction ConstructADT (/= ADT tyn) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
+                addrestriction ConstructADT (ADT tyn) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype ->
