@@ -83,8 +83,8 @@ addrestriction tag ty = local (\ (rs, adtds, d, t) -> ((tag, (/= ty)):rs, adtds,
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -406,18 +406,18 @@ focus c goal =
                 )) empty sts
 
         ---- adtR
-        focus' Nothing c@(g, d) (ADT tyn undefined) = addtrace (RightADT c (ADT tyn undefined)) $ do
+        focus' Nothing c@(g, d) (ADT tyn pts) = addtrace (RightADT c (ADT tyn pts)) $ do
             res <- getrestrictions ConstructADT
-            guard $ all (\f -> f (ADT tyn undefined)) res
-            cons <- getadtcons (ADT tyn undefined)
+            guard $ all (\f -> f (ADT tyn pts)) res
+            cons <- getadtcons (ADT tyn pts)
             foldr (interleave . (\(tag, argty) ->
-                addrestriction ConstructADT (ADT tyn undefined) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
+                addrestriction ConstructADT (ADT tyn pts) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype ->
                        if case argtype of
-                             ADT tyn' _ -> tyn == tyn'    -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
-                             _ -> False
+                            ADT tyn' pts' -> tyn == tyn' && pts == pts'   -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
+                            _ -> False
                           then empty
                           else do
                               (arge, d') <- case argtype of { ADT _ _ -> focus c argtype; _ -> focus' Nothing c argtype }
@@ -478,16 +478,16 @@ focus c goal =
 
         -- adtLFocus
         -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
-        focus' (Just nh@(n, ADT tyn undefined)) c@(g, d) goal = addtrace (FocusLeftADT c (ADT tyn undefined) goal) $
+        focus' (Just nh@(n, ADT tyn tps)) c@(g, d) goal = addtrace (FocusLeftADT c (ADT tyn tps) goal) $
             if case goal of
-              ADT tyn' _ -> tyn' == tyn
-              _ -> False
+                 ADT tyn' tps' -> tyn' == tyn && tps == tps'
+                 _ -> False
               then return (Var n, d)
               else do
-                  adtcns <- getadtcons (ADT tyn undefined) 
+                  adtcns <- getadtcons (ADT tyn tps) 
                   guard $ not $ null adtcns             -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
                   res <- getrestrictions DeconstructADT
-                  guard $ all (\f -> f (ADT tyn undefined)) res   -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
+                  guard $ all (\f -> f (ADT tyn tps)) res   -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
                   synth (g, d, [nh]) goal
 
 
