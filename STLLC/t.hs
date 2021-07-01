@@ -1,7 +1,10 @@
-data Bool = True | False;
 data List a = Nil | Cons (a * List a);
 
 
-synth insertNat :: ((a -o b) -o a -o b);
+# synth insert :: (a -o List a); -- infinite
 
-# synth insert :: (a -o List a);
+# synth map :: ((! (a -o b)) -o List a -o List b) -- wrong
+
+# wrong -- it seems like the "type of the list" isn't being taken into consideration
+synth map :: ((! (Nat -o Bool)) -o List Nat -o List Bool);
+

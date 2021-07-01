@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Synth (synthAllType, synthType, synthScheme, synthMarks, synthMarksModule) where
+module Synth (synthAllType, synthType, synthMarks, synthMarksModule) where
 
 import Data.List
 import qualified Data.Set as Set
@@ -83,8 +83,8 @@ addrestriction tag ty = local (\ (rs, adtds, d, t) -> ((tag, (/= ty)):rs, adtds,
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-    local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -101,10 +101,14 @@ getrestrictions tag = do
     return $ map snd $ filter (\(n,_) -> n == tag) rs
 
 
-getadtcons :: Name -> Synth [(Name, Type)]
-getadtcons tyn = do
+getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
+getadtcons (ADT tyn tps) = do
     adtds <- lift (lift ask) >>= \(a,b,c,d) -> return b
-    return $ concatMap (\(ADTD _ _ cs) -> cs) $ filter (\(ADTD name _ cs) -> tyn == name) adtds
+    case find (\(ADTD name ps _) -> tyn == name && length tps == length ps) adtds of
+      Just (ADTD _ paramvars cons) ->
+          let subst = Map.fromList $ zip paramvars tps in
+          return $ map (apply subst) cons
+      Nothing -> return []
 
 
 clearrestrictions :: RestrictTag -> Synth a -> Synth a
@@ -129,7 +133,7 @@ assertADTHasCons :: Type -> Synth Bool
 assertADTHasCons t =
     case t of
        ADT name _ -> do
-           cons <- getadtcons name
+           cons <- getadtcons t
            return $ not $ null cons
        _        ->
            return True
@@ -173,7 +177,7 @@ generalize ctxt t = Forall ns t
 
 isRecursiveType :: Type -> Synth Bool
 isRecursiveType (ADT tyn tps) = do
-    adtds <- getadtcons tyn
+    adtds <- getadtcons (ADT tyn tps)
     return $ any (\(_, ty) -> ADT tyn tps `isInType` ty) adtds
 
 
@@ -244,20 +248,20 @@ synth (g, d, (n, Sum tys):o) t = addtrace (LeftSum (Sum tys) t) $ do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth c@(g, d, p@(n, ADT tyn undefined):o) t = addtrace (LeftADT c (ADT tyn undefined) t) (do
+synth c@(g, d, p@(n, ADT tyn tps):o) t = addtrace (LeftADT c (ADT tyn tps) t) (do
     res <- getrestrictions DeconstructADT
-    guard $ all (\f -> f (ADT tyn undefined)) res -- Assert destruction of this type isn't restricted
-    adtds <- getadtcons tyn
+    guard $ all (\f -> f (ADT tyn tps)) res -- Assert destruction of this type isn't restricted
+    adtds <- getadtcons (ADT tyn tps)
     if null adtds
-       then addrestriction DeconstructADT (ADT tyn undefined) $ synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
+       then addrestriction DeconstructADT (ADT tyn tps) $ synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
        else do
-            isrectype <- isRecursiveType (ADT tyn undefined)
+            isrectype <- isRecursiveType (ADT tyn tps)
             ls <- mapM (\(name, vtype) ->
                 (if isrectype -- TODO: make restrictions not dependent
-                   then addrestriction DeconstructADT (ADT tyn undefined)           -- For recursive types, restrict deconstruction of this type in further computations
+                   then addrestriction DeconstructADT (ADT tyn tps)           -- For recursive types, restrict deconstruction of this type in further computations
                    else id) $
-                   (if t /= ADT tyn undefined
-                       then addrestriction ConstructADT (ADT tyn undefined)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
+                   (if t /= ADT tyn tps
+                       then addrestriction ConstructADT (ADT tyn tps)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
                        else id) $
                         case vtype of
                           Unit -> do
@@ -276,7 +280,7 @@ synth c@(g, d, p@(n, ADT tyn undefined):o) t = addtrace (LeftADT c (ADT tyn unde
     <|>
     do
     res <- getrestrictions DeconstructADT                       -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)
-    guard $ not $ all (\f -> f (ADT tyn undefined)) res                   -- So if we failed above because a restriction didn't allow us to invert this ADT
+    guard $ not $ all (\f -> f (ADT tyn tps)) res                   -- So if we failed above because a restriction didn't allow us to invert this ADT
     synth (g, p:d, o) t)                                        -- Try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
 
 ---- !L
@@ -328,16 +332,22 @@ focus c goal =
             case g of
               []   -> empty
               _ -> foldr ((<|>) . (\case
-                                    (n, Right x) -> addtrace (DecideLeftBang x goal) $ do
+                                    (n, Right x) -> addtrace (DecideLeftBang x goal) $
+                                        managerestrictions x $
+                                            focus' (Just (n, x)) (g, din) goal;
+                                    (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $
+                                        managerestrictions (instantiateFrom 0 sch) $ -- For perfect correctness it would probably be best to have restrictions just for the schemes, but this will work since this is the only point where a restriction on schemes is checked and set, meaning their "instances from 0" will all be the same
+                                            focusSch (n, sch) (g, din) goal)) empty g
+                                 where
+                                     managerestrictions :: Type -> Synth a -> Synth a
+                                     managerestrictions x s = do
                                         res <- getrestrictions DecideLeftBangR
                                         guard $ all (\f -> f x) res
                                         (if case x of
                                             Fun a b -> a == goal
                                             _ -> False
                                            then addrestriction DecideLeftBangR x
-                                           else id) $
-                                               focus' (Just (n, x)) (g, din) goal;
-                                    (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $ focusSch (n, sch) (g, din) goal)) empty g
+                                           else id) s
 
         
             
@@ -399,7 +409,7 @@ focus c goal =
         focus' Nothing c@(g, d) (ADT tyn undefined) = addtrace (RightADT c (ADT tyn undefined)) $ do
             res <- getrestrictions ConstructADT
             guard $ all (\f -> f (ADT tyn undefined)) res
-            cons <- getadtcons tyn
+            cons <- getadtcons (ADT tyn undefined)
             foldr (interleave . (\(tag, argty) ->
                 addrestriction ConstructADT (ADT tyn undefined) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
                    case argty of
@@ -474,7 +484,7 @@ focus c goal =
               _ -> False
               then return (Var n, d)
               else do
-                  adtcns <- getadtcons tyn
+                  adtcns <- getadtcons (ADT tyn undefined) 
                   guard $ not $ null adtcns             -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
                   res <- getrestrictions DeconstructADT
                   guard $ all (\f -> f (ADT tyn undefined)) res   -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
@@ -544,11 +554,7 @@ synthAllType = synthCtxAllType ([], []) 0 []
 
 
 synthType :: Type -> Expr
-synthType t = head $ synthAllType t -- TODO: instanciate $ generalize t? TODO: i'm assuming this type might contain type variables, and those will be used in the synth process as universal 
-
-
-synthScheme :: Scheme -> Expr
-synthScheme = undefined -- forall a . T (async)  =>   instantiate T   (a' ...) -- TODO: Estou a assumir que se houverem type variables no tipo é como se já tivessem sido "instanciadas", e então começo a síntese sempre com um tipo simples, por isso este passo já não existe correto?
+synthType t = head $ synthAllType $ instantiateFrom 0 $ generalize ([], []) t
 
 
 synthMarks :: Expr -> [ADTD] -> Expr -- replace all placeholders in an expression with a synthetized expr
