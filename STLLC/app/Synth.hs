@@ -88,8 +88,8 @@ addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t) -> ((tag, Left (\ x
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -486,15 +486,22 @@ focus c goal =
         -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
         focus' (Just nh@(n, ADT tyn tps)) c@(g, d) goal = addtrace (FocusLeftADT c (ADT tyn tps) goal) $
             if case goal of
-                 ADT tyn' tps' -> tyn' == tyn && tps == tps'
+                 ADT tyn' tps' -> tyn' == tyn
                  _ -> False
-              then return (Var n, d)
+              then do
+                  let (ADT _ tps') = goal
+                  zipWithM_ unifyadtparams tps tps'
+                  return (Var n, d)
               else do
                   adtcns <- getadtcons (ADT tyn tps) 
                   guard $ not $ null adtcns             -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
                   res <- getrestrictions DeconstructADT
                   guard $ all (\f -> f (ADT tyn tps)) res   -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
                   synth (g, d, [nh]) goal
+                      where
+                          unifyadtparams (ExistentialTypeVar x) y = addconstraint $ Constraint (ExistentialTypeVar x) y
+                          unifyadtparams x (ExistentialTypeVar y) = addconstraint $ Constraint (ExistentialTypeVar y) x
+                          unifyadtparams x y = guard $ x == y
 
 
 

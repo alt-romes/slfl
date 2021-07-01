@@ -1,0 +1,13 @@
+data Maybe a = Nothing | Just a;
+
+
+return :: forall a . (a -o Maybe a);
+return b = Just b;
+
+bind :: forall a b . (Maybe a -o ((! (a -o Maybe b)) -o Maybe b));
+bind c d = let !e = d in 
+    case c of 
+          Nothing  -> Nothing
+        | Just f -> e f;
+
+

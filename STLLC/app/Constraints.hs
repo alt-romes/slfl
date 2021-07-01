@@ -210,6 +210,7 @@ ftv = ftv' Set.empty
         ftv' acc (ExistentialTypeVar x) = Set.insert x acc
         ftv' acc (Sum []) = acc
         ftv' acc (Sum ((i, t):ts)) = ftv' acc t `mappend` ftv' acc (Sum ts)
+        ftv' acc (ADT _ ts) = foldr ((<>) . ftv' acc) mempty ts
         ftv' acc t = acc
 
 
