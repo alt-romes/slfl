@@ -38,7 +38,7 @@ type Synth a = LogicT (StateT SynthState (Reader SynthReaderState)) a
 
 type SynthState = ([Constraint], Int, MemoTable, FocusMemoTable)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
 type MemoTable = Map.Map (([Either Scheme Type], [Type], [Type]), Type, [Constraint], Restrictions) (Maybe (Expr, Delta, [Constraint], Int))
-type FocusMemoTable = Map.Map (Maybe Type, ([Either Scheme Type], [Type]), Type, [Constraint], Restrictions) (Maybe (Expr, Delta, [Constraint], Int))
+type FocusMemoTable = Map.Map (Maybe (Either Scheme Type), ([Either Scheme Type], [Type]), Type, [Constraint], Restrictions) (Maybe (Expr, Delta, [Constraint], Int))
 
 
 type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
@@ -123,11 +123,16 @@ getadtcons (ADT tyn tps) = do
           return $ map (apply subst) cons
       Nothing -> return []
 
+
+
+
+-- !!TODO!!: Refactor the next three functions
+-- UNEFICCIENT
 memoize :: (Ctxt -> Type -> Synth (Expr, Delta)) -> Ctxt -> Type -> Synth (Expr, Delta)
 memoize syn c@(g, d, o) t = do -- TODO: Remove "universal unrestricted hypothesis" from key?
     (cs, i, memot, fmemot) <- lift get
     (res, _, _, _) <- lift $ lift ask
-    let key = ((map snd g, map snd d, map snd o), t, cs, res)
+    let key = ((map snd g, sort $ map snd d, map snd o), t, cs, res)
     case Map.lookup key memot of
       Nothing -> do     -- If this function application hasn't been previously done -- run it and save the resulting values and state
           ifte (syn c t)
@@ -136,17 +141,32 @@ memoize syn c@(g, d, o) t = do -- TODO: Remove "universal unrestricted hypothesi
                 return (e, d'))
             (do lift $ put (cs, i, Map.insert key Nothing memot, fmemot)
                 empty)
-      Just Nothing -> -- trace ("Speed up by skipping synth of " ++ show t)
+      Just Nothing -> trace ("Speed up by skipping synth of " ++ show t)
           empty
-      Just (Just (e, d', cs', deltai)) -> -- trace ("Possible but unused speed up by skipping synth of " ++ show t) $
+      Just (Just (e, d', cs', deltai)) -> trace ("Possible but unused speed up by skipping synth of " ++ show t ++ " using " ++ show (e, d', cs', deltai) ++ " with key " ++ show key) $
           syn c t
-
-
-focusmemoize :: (Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)) -> Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)
-focusmemoize focsyn maybet c@(g,d) t = do
+focusmemoize :: (FocusCtxt -> Type -> Synth (Expr, Delta)) -> FocusCtxt -> Type -> Synth (Expr, Delta)
+focusmemoize syn c@(g, d) t = do -- TODO: Remove "universal unrestricted hypothesis" from key?
     (cs, i, memot, fmemot) <- lift get
     (res, _, _, _) <- lift $ lift ask
-    let key = (fmap snd maybet, (map snd g, map snd d), t, cs, res)
+    let key = ((map snd g, sort $ map snd d, [] :: [Type]), t, cs, res)
+    case Map.lookup key memot of
+      Nothing -> do     -- If this function application hasn't been previously done -- run it and save the resulting values and state
+          ifte (syn c t)
+            (\(e, d') -> do
+                lift $ modify $ \(cs',i',memot', fmemot') -> (cs',i', Map.insert key (Just (e, d', cs', i')) memot', fmemot')
+                return (e, d'))
+            (do lift $ put (cs, i, Map.insert key Nothing memot, fmemot)
+                empty)
+      Just Nothing -> trace ("Speed up by skipping focus on " ++ show t)
+          empty
+      Just (Just (e, d', cs', deltai)) -> trace ("Possible but unused speed up by skipping focus on " ++ show t ++ " using " ++ show (e, d', cs', deltai) ++ " with key " ++ show key) $
+          syn c t
+focus'memoize :: (Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)) -> Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)
+focus'memoize focsyn maybet c@(g,d) t = do
+    (cs, i, memot, fmemot) <- lift get
+    (res, _, _, _) <- lift $ lift ask
+    let key = (fmap (Right . snd) maybet :: Maybe (Either Scheme Type), (map snd g, sort $ map snd d), t, cs, res)
     case Map.lookup key fmemot of
       Nothing -> do     -- If this function application hasn't been previously done -- run it and save the resulting values and state
           ifte (focsyn maybet c t)
@@ -155,10 +175,32 @@ focusmemoize focsyn maybet c@(g,d) t = do
                 return (e, d'))
             (do lift $ put (cs, i, memot, Map.insert key Nothing fmemot)
                 empty)
-      Just Nothing -> -- trace ("Speed up by skipping focused synth of " ++ show t)
+      Just Nothing -> trace ("Speed up by skipping focused synth of " ++ show t)
           empty
-      Just (Just (e, d', cs', deltai)) -> -- trace ("Possible but unused speed up by skipping focused synth of " ++ show t) $
+      Just (Just (e, d', cs', deltai)) -> trace ("Possible but unused speed up by skipping focused synth of " ++ show t ++ " using " ++ show (e, d', cs', deltai) ++ " with key " ++ show key) $
           focsyn maybet c t
+focuschmemoize :: ((String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta))
+               -> (String, Scheme)
+               -> (Gamma, Delta)
+               -> Type
+               -> Synth (Expr, Delta)
+focuschmemoize fschsyn (n, sch) c@(g, d) t = do
+    (cs, i, memot, fmemot) <- lift get
+    (res, _, _, _) <- lift $ lift ask
+    let key = (Just (Left sch) :: Maybe (Either Scheme Type), (map snd g, sort $ map snd d), t, cs, res)
+    case Map.lookup key fmemot of
+      Nothing -> do     -- If this function application hasn't been previously done -- run it and save the resulting values and state
+          ifte (fschsyn (n, sch) c t)
+            (\(e, d') -> do
+                lift $ modify $ \(cs',i',memot',fmemot') -> (cs',i', memot', Map.insert key (Just (e, d', cs', i'-i)) fmemot')
+                return (e, d'))
+            (do lift $ put (cs, i, memot, Map.insert key Nothing fmemot)
+                empty)
+      Just Nothing -> trace ("Speed up by skipping focused synth of " ++ show t)
+          empty
+      Just (Just (e, d', cs', deltai)) -> trace ("Possible but unused speed up by skipping focused synth of " ++ show t ++ " using " ++ show (e, d', cs', deltai) ++ " with key " ++ show key) $
+          fschsyn (n, sch) c t
+
 
 
 clearrestrictions :: RestrictTag -> Synth a -> Synth a
@@ -352,7 +394,7 @@ synth (g, d, p:o) t =
 -- no more asynchronous propositions, focus
 
 synth c@(g, d, []) t = addtrace (Focus c t) $
-    focus (g, d) t
+    focusmemoize focus (g, d) t
 
 
 focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
@@ -367,13 +409,13 @@ focus c goal =
                 then empty
                 else do
                     assertADTHasCons goal >>= guard     -- to decide right, goal cannot be an ADT that has no constructors
-                    focusmemoize focus' Nothing c goal
+                    focus'memoize focus' Nothing c goal
 
 
         decideLeft (g, din) goal =
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\nx@(n,x) -> addtrace (DecideLeft x goal) $ focusmemoize focus' (Just nx) (g, delete nx din) goal)) empty din
+              _ -> foldr ((<|>) . (\nx@(n,x) -> addtrace (DecideLeft x goal) $ focus'memoize focus' (Just nx) (g, delete nx din) goal)) empty din
 
 
         decideLeftBang (g, din) goal =
@@ -382,10 +424,10 @@ focus c goal =
               _ -> foldr ((<|>) . (\case
                                     (n, Right x) -> addtrace (DecideLeftBang x goal) $
                                         managerestrictions x $
-                                            focusmemoize focus' (Just (n, x)) (g, din) goal;
+                                            focus'memoize focus' (Just (n, x)) (g, din) goal;
                                     (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $
                                         managerestrictions (instantiateFrom 0 sch) $
-                                            focusSch (n, sch) (g, din) goal)) empty g
+                                            focuschmemoize focusSch (n, sch) (g, din) goal)) empty g
                                  where
                                      managerestrictions :: Type -> Synth a -> Synth a
                                      managerestrictions x s = do    -- Restrict re-usage of decide left bang to synth the same time a second time
@@ -404,7 +446,7 @@ focus c goal =
             -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
             -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
             (et, etvars) <- existencialInstantiate sch                                          -- tipo com existenciais
-            (se, d') <- focusmemoize focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições
+            (se, d') <- focus'memoize focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições
             (constrs, _, _, _) <- lift get
             let unify = solveconstraintsExistential Map.empty constrs                           -- resolve ou falha -- por conflito ou falta informação
             guard (isJust unify)                                                                -- por conflicto
@@ -423,8 +465,8 @@ focus c goal =
 
         ---- *R
         focus' Nothing c@(g, d) (Tensor a b) = addtrace (RightTensor c (Tensor a b)) $ do
-            (expa, d') <- case a of { ADT _ _ -> focus c a; _ -> focusmemoize focus' Nothing c a }
-            (expb, d'') <- case b of { ADT _ _ -> focus (g, d') b; _ -> focusmemoize focus' Nothing (g, d') b }
+            (expa, d') <- case a of { ADT _ _ -> focusmemoize focus c a; _ -> focus'memoize focus' Nothing c a }
+            (expb, d'') <- case b of { ADT _ _ -> focusmemoize focus (g, d') b; _ -> focus'memoize focus' Nothing (g, d') b }
             return (TensorValue expa expb, d'')
 
         ---- 1R
@@ -433,17 +475,17 @@ focus c goal =
             
         ---- +R
         focus' Nothing c (Plus a b) = addtrace (RightPlus c (Plus a b)) $ do
-            (il, d') <- case a of { ADT _ _ -> focus c a; _ -> focusmemoize focus' Nothing c a }
+            (il, d') <- case a of { ADT _ _ -> focusmemoize focus c a; _ -> focus'memoize focus' Nothing c a }
             return (InjL (Just b) il, d')
             `interleave` do
-            (ir, d') <- case b of { ADT _ _ -> focus c b; _ -> focusmemoize focus' Nothing c b }
+            (ir, d') <- case b of { ADT _ _ -> focusmemoize focus c b; _ -> focus'memoize focus' Nothing c b }
             return (InjR (Just a) ir, d')
 
         ---- sumR
         focus' Nothing c (Sum sts) = addtrace (RightSum (Sum sts)) $
             foldr (interleave . (\(tag, goalt) ->
                 do
-                   (e, d') <- case goalt of { ADT _ _ -> focus c goalt; _ -> focusmemoize focus' Nothing c goalt }
+                   (e, d') <- case goalt of { ADT _ _ -> focusmemoize focus c goalt; _ -> focus'memoize focus' Nothing c goalt }
                    let smts = map (second Just) $ delete (tag, goalt) sts
                    return (SumValue smts (tag, e), d')
                 )) empty sts
@@ -461,7 +503,7 @@ focus c goal =
                                 _ -> False
                             then empty
                             else addrestriction ConstructADT (ADT tyn pts) $ do     -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
-                                (arge, d') <- case argtype of { ADT _ _ -> focus c argtype; _ -> focusmemoize focus' Nothing c argtype }
+                                (arge, d') <- case argtype of { ADT _ _ -> focusmemoize focus c argtype; _ -> focus'memoize focus' Nothing c argtype }
                                 return (App (Var tag) arge, d')
                 )) empty cons
             -- When we're right focused, we might continue right focused as we construct the proof (e.g. RightTensor),
@@ -484,7 +526,7 @@ focus c goal =
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace (LeftFun c (Fun a b) goal) $ do
             nname <- fresh
-            (expb, d') <- focusmemoize focus' (Just (nname, b)) c goal
+            (expb, d') <- focus'memoize focus' (Just (nname, b)) c goal
             guard (nname `notElem` map fst d')
             (expa, d'') <- memoize synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
@@ -493,13 +535,13 @@ focus c goal =
         focus' (Just (n, With a b)) c goal = addtrace (LeftWith c (With a b) goal) $
             do
                 nname <- fresh
-                (lf, d') <- focusmemoize focus' (Just (nname, a)) c goal
+                (lf, d') <- focus'memoize focus' (Just (nname, a)) c goal
                 guard (nname `notElem` map fst d')
                 return (substitute nname (Fst (Var n)) lf, d')
             <|>
             do
                 nname <- fresh
-                (rt, d') <- focusmemoize focus' (Just (nname, b)) c goal
+                (rt, d') <- focus'memoize focus' (Just (nname, b)) c goal
                 guard (nname `notElem` map fst d')
                 return (substitute nname (Snd (Var n)) rt, d')
 
