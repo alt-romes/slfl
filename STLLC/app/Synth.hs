@@ -9,6 +9,7 @@ import Control.Monad.Logic
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.Maybe
+import Data.Either
 import Data.Bifunctor
 import Debug.Trace
 
@@ -39,7 +40,7 @@ type SynthState = ([Constraint], Int)  -- (list of constraints added by the proc
 
 
 type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
-type Restriction = Type -> Bool
+type Restriction = Either (Type -> Type -> Bool) (Type -> Bool)
 type Restrictions = [(RestrictTag, Restriction)]
 
 
@@ -77,7 +78,11 @@ addconstraint c = lift $ modify (first (c :))
 
 
 addrestriction :: RestrictTag -> Type -> Synth a -> Synth a
-addrestriction tag ty = local (\ (rs, adtds, d, t) -> ((tag, (/= ty)):rs, adtds, d, t))
+addrestriction tag ty = local (\ (rs, adtds, d, t) -> ((tag, Right (/= ty)):rs, adtds, d, t))
+
+
+addbinaryrestriction :: RestrictTag -> Type -> Type -> Synth a -> Synth a
+addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t) -> ((tag, Left (\ x y -> (x /= ty) || (y /= ty'))):rs, adtds, d, t))
 
 
 addtrace :: TraceTag -> Synth a -> Synth a
@@ -95,10 +100,16 @@ getdepth :: Synth Int
 getdepth = lift (lift ask) >>= \(a,b,c,d) -> return c
 
 
-getrestrictions :: RestrictTag -> Synth [Restriction]
+getrestrictions :: RestrictTag -> Synth [Type -> Bool]
 getrestrictions tag = do
     rs <- lift (lift ask) >>= \(a,b,c,d) -> return a
-    return $ map snd $ filter (\(n,_) -> n == tag) rs
+    return $ rights $ map snd $ filter (\(n,x) -> n == tag) rs
+
+
+getbinaryrestrictions :: RestrictTag -> Synth [Type -> Type -> Bool]
+getbinaryrestrictions tag = do
+    rs <- lift (lift ask) >>= \(a,b,c,d) -> return a
+    return $ lefts $ map snd $ filter (\(n,x) -> n == tag) rs
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
@@ -336,18 +347,14 @@ focus c goal =
                                         managerestrictions x $
                                             focus' (Just (n, x)) (g, din) goal;
                                     (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $
-                                        managerestrictions (instantiateFrom 0 sch) $ -- For perfect correctness it would probably be best to have restrictions just for the schemes, but this will work since this is the only point where a restriction on schemes is checked and set, meaning their "instances from 0" will all be the same
+                                        managerestrictions (instantiateFrom 0 sch) $
                                             focusSch (n, sch) (g, din) goal)) empty g
                                  where
                                      managerestrictions :: Type -> Synth a -> Synth a
-                                     managerestrictions x s = do
-                                        res <- getrestrictions DecideLeftBangR
-                                        guard $ all (\f -> f x) res
-                                        (if case x of
-                                            Fun a b -> a == goal
-                                            _ -> False
-                                           then addrestriction DecideLeftBangR x
-                                           else id) s
+                                     managerestrictions x s = do    -- Restrict re-usage of decide left bang to synth the same time a second time
+                                        res <- getbinaryrestrictions DecideLeftBangR
+                                        guard $ all (\f -> f x goal) res
+                                        addbinaryrestriction DecideLeftBangR x goal s
 
         
             
