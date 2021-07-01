@@ -83,8 +83,8 @@ addrestriction tag ty = local (\ (rs, adtds, d, t) -> ((tag, (/= ty)):rs, adtds,
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-    local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -407,19 +407,18 @@ focus c goal =
 
         ---- adtR
         focus' Nothing c@(g, d) (ADT tyn pts) = addtrace (RightADT c (ADT tyn pts)) $ do
-            res <- getrestrictions ConstructADT
-            guard $ all (\f -> f (ADT tyn pts)) res
             cons <- getadtcons (ADT tyn pts)
             foldr (interleave . (\(tag, argty) ->
-                addrestriction ConstructADT (ADT tyn pts) $  -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
-                     argtype ->
-                       if case argtype of
-                            ADT tyn' pts' -> tyn == tyn' && pts == pts'   -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
-                            _ -> False
+                     argtype -> do
+                        res <- getrestrictions ConstructADT
+                        guard $ all (\f -> f (ADT tyn pts)) res       -- Assert this ADT's construction isn't restricted
+                        if case argtype of
+                             ADT tyn' pts' -> tyn == tyn' && pts == pts'   -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
+                             _ -> False
                           then empty
-                          else do
+                          else addrestriction ConstructADT (ADT tyn pts) $ do -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
                               (arge, d') <- case argtype of { ADT _ _ -> focus c argtype; _ -> focus' Nothing c argtype }
                               return (App (Var tag) arge, d')
                 )) empty cons
