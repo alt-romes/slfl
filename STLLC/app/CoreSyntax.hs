@@ -71,21 +71,21 @@ data CoreExpr
   
     | CaseOf CoreExpr [(String, CoreExpr)]
 
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 
-newtype Literal = Nat Integer deriving (Eq)
+newtype Literal = Nat Integer deriving (Eq, Ord)
 
 
 
 data Var = Var
     { varMult :: Mult 
     , unVar   :: Scheme
-    } deriving (Eq, Show)
-data Mult = Lin | Unr deriving (Eq, Show)
+    } deriving (Eq, Show, Ord)
+data Mult = Lin | Unr deriving (Eq, Show, Ord)
 
 
-data Scheme = Forall [Int] Type deriving (Eq)
+data Scheme = Forall [Int] Type deriving (Eq, Ord)
 
 
 data Type
@@ -104,10 +104,10 @@ data Type
 
     | ADT String [Type]
     
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 
-data TyLiteral = TyNat deriving (Eq)
+data TyLiteral = TyNat deriving (Eq, Ord)
 
 
 
@@ -155,6 +155,7 @@ instance (Show Literal) where
 
 instance (Show TyLiteral) where
     show TyNat = "Nat"
+
 
 
 

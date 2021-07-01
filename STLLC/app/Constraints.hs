@@ -16,7 +16,7 @@ import CoreSyntax
 -- Datatypes
 -------------------------------------------------------------------------------
 
-data Constraint = Constraint Type Type -- e.g. [X => Y]
+data Constraint = Constraint Type Type deriving (Eq, Ord) -- e.g. [X => Y]
 
 
 type Subst = Map.Map Int Type
