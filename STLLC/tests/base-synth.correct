@@ -27,3 +27,8 @@ main a = (fst a);
 
 main a = ( a | a );
 
+main a = let !b = a in ! 
+    let !c = b in c;
+
+main a = let !b = a in ! ! b;
+

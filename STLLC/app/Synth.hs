@@ -36,7 +36,7 @@ type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 type Synth a = LogicT (StateT SynthState (Reader SynthReaderState)) a 
 
 
-type SynthState = ([Constraint], Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
+type SynthState = (Subst, Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
 
 
 type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
@@ -59,7 +59,7 @@ runSynth (g, d) t st adtds = runReader (evalStateT (observeAllT $ synthComplete 
 
 
 initSynthState :: Int -> SynthState
-initSynthState i = ([], i)
+initSynthState i = (Map.empty, i)
 
 
 initSynthReaderState :: [ADTD] -> SynthReaderState
@@ -73,8 +73,13 @@ initSynthReaderState a = ([], a, 0, [])
 -- Functions
 -------------------------------------------------------------------------------
 
-addconstraint :: Constraint -> Synth ()
-addconstraint c = lift $ modify (first (c :))
+addconstraint :: Constraint -> Synth Subst
+addconstraint c = do
+    (subs, i) <- lift get
+    let maybesubs = solveconstraintsExistential subs [c]
+    guard $ isJust maybesubs
+    lift $ put (fromJust maybesubs, i)
+    return $ fromJust maybesubs
 
 
 addrestriction :: RestrictTag -> Type -> Synth a -> Synth a
@@ -88,8 +93,8 @@ addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t) -> ((tag, Left (ty,
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-    local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -365,11 +370,11 @@ focus c goal =
             -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
             -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
             (et, etvars) <- existencialInstantiate sch                                          -- tipo com existenciais
-            (se, d') <- focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições
-            (constrs, _) <- lift get
-            let unify = solveconstraintsExistential Map.empty constrs                           -- resolve ou falha -- por conflito ou falta informação
-            guard (isJust unify)                                                                -- por conflicto
-            guard (Set.disjoint (Set.fromList etvars) (ftv $ apply (fromJust unify) et))        -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
+            (se, d') <- focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
+            (unifysubs, _) <- lift get
+                                                                                                -- resolve ou falha -- por conflito ou falta informação
+                                                                                                -- por conflicto
+            guard (Set.disjoint (Set.fromList etvars) (ftv $ apply unifysubs et))               -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
             return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
                 where
                     existencialInstantiate (Forall ns t) = do
@@ -471,7 +476,7 @@ focus c goal =
                   if x == y then return (Var n, d)          -- ?a |- ?a succeeds
                             else empty                      -- ?a |- ?b fails
               _ -> do                                       -- ?a |- t  succeeds with constraint
-                  addconstraint $ Constraint (ExistentialTypeVar x) goal
+                  subs <- addconstraint $ Constraint (ExistentialTypeVar x) goal
                   return (Var n, d)
 
 
@@ -487,7 +492,8 @@ focus c goal =
               then do
                   let (ADT _ tps') = goal
                   zipWithM_ unifyadtparams tps tps'
-                  return (Var n, d)
+                  (subs, _) <- lift get
+                  return (apply subs $ Var n, d)
               else do
                   adtcns <- getadtcons (ADT tyn tps) 
                   guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
@@ -496,7 +502,7 @@ focus c goal =
                       where
                           unifyadtparams (ExistentialTypeVar x) y = addconstraint $ Constraint (ExistentialTypeVar x) y
                           unifyadtparams x (ExistentialTypeVar y) = addconstraint $ Constraint (ExistentialTypeVar y) x
-                          unifyadtparams x y = guard $ x == y
+                          unifyadtparams x y = guard (x == y) >> return Map.empty
 
 
 
@@ -509,10 +515,12 @@ focus c goal =
           = addtrace (DefaultFocusLeft c nh goal) $
           do case goal of
                  (ExistentialTypeVar x)     -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
-                   -> do addconstraint $ Constraint (ExistentialTypeVar x) h
-                         return (Var n, d)
-                 _ -> do guard (h == goal)  -- if is atomic and not the goal, fail
-                         return (Var n, d)  -- else, instantiate it
+                   -> do
+                        subs <- addconstraint $ Constraint (ExistentialTypeVar x) h
+                        return (apply subs $ Var n, d)
+                 _ -> do
+                        guard (h == goal)  -- if is atomic and not the goal, fail
+                        return (Var n, d)  -- else, instantiate it
           | otherwise
           = addtrace (DefaultFocusLeft c nh goal) $ synth (g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
 
@@ -521,7 +529,7 @@ focus c goal =
         ---- right focus is not synchronous, unfocus. if it is atomic we fail
 
         focus' Nothing c@(g, d) goal = addtrace (DefaultFocusRight c goal) $
-            synth (g, d, []) goal
+            synth (g, d, []) goal -- <|> if t refined then smt solve t with join context refined with && else empty
 
 
 

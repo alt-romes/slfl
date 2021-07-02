@@ -10,3 +10,5 @@ STLLC "(a * 1) -o a" # v 1
 STLLC "a -o (a * 1)" # v 2
 STLLC " ( a & a ) -o a " # viii 1
 STLLC " a -o ( a & a ) " # viii 2
+STLLC "((! (! a)) -o ! a)"
+STLLC "((! a) -o (! (! a)))"
