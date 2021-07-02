@@ -140,7 +140,7 @@ typeconstraint ce@(FUVar x) = do
 --  -oI
 typeconstraint (Abs t1 e) = do
     tv <- fresh
-    let t1' = fromMaybe tv t1
+    let t1' = fromMaybe tv t1 
     addtoblinctx $ trivialScheme t1'
     newvari <- getlastvarindex
     (t2, ce) <- typeconstraint e
