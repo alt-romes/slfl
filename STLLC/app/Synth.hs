@@ -39,18 +39,18 @@ type Synth a = LogicT (StateT SynthState (Reader SynthReaderState)) a
 type SynthState = (Subst, Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
 
 
-type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag]) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
+type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag], Name) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
 type Restriction = Either (Type, Type) Type
 type Restrictions = [(RestrictTag, Restriction)]
 
 
 data RestrictTag = ConstructADT | DeconstructADT | DecideLeftBangR deriving (Show, Eq)
 
-data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Type Type | DecideLeftBangSch Scheme Type | FocusLeftScheme | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type deriving (Show)
+data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type deriving (Show)
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
-runSynth (g, d) t st adtds = runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st) $ initSynthReaderState adtds
+runSynth (g, d) t st adtds = runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st) $ initSynthReaderState (fst $ head g) adtds -- Head of Gamma is the recursive name since the recursive signature is the last added to the gamma context
     where
         synthComplete (g, d, o) t = do
             (e, d') <- synth (g, d, o) t
@@ -62,8 +62,8 @@ initSynthState :: Int -> SynthState
 initSynthState i = (Map.empty, i)
 
 
-initSynthReaderState :: [ADTD] -> SynthReaderState
-initSynthReaderState a = ([], a, 0, [])
+initSynthReaderState :: Name -> [ADTD] -> SynthReaderState
+initSynthReaderState n a = ([], a, 0, [], n)
 
 
 
@@ -82,43 +82,43 @@ addconstraint c = do
 
 
 addrestriction :: RestrictTag -> Type -> Synth a -> Synth a
-addrestriction tag ty = local (\ (rs, adtds, d, t) -> ((tag, Right ty):rs, adtds, d, t))
+addrestriction tag ty = local (\ (rs, adtds, d, t, e) -> ((tag, Right ty):rs, adtds, d, t, e))
 
 
 addbinaryrestriction :: RestrictTag -> Type -> Type -> Synth a -> Synth a
-addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t) -> ((tag, Left (ty, ty')):rs, adtds, d, t))
+addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t, e) -> ((tag, Left (ty, ty')):rs, adtds, d, t, e))
 
 
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-        local (\(a,b,c,d) -> (a,b,c+1,t:d)) s
+    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
-gettracestack = lift (lift ask) >>= \(a,b,c,d) -> return (d,c)
+gettracestack = lift (lift ask) >>= \(a,b,c,d,e) -> return (d,c)
 
 
 getdepth :: Synth Int
-getdepth = lift (lift ask) >>= \(a,b,c,d) -> return c
+getdepth = lift (lift ask) >>= \(a,b,c,d,e) -> return c
 
 
 checkrestrictions :: RestrictTag -> Type -> Synth Bool
 checkrestrictions tag ty = do
-    rs <- lift (lift ask) >>= \(a,b,c,d) -> return a
+    rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
     return $ notElem ty $ rights $ map snd $ filter (\(n,x) -> n == tag) rs
 
 
 checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Synth Bool
 checkbinaryrestrictions tag typair = do
-    rs <- lift (lift ask) >>= \(a,b,c,d) -> return a
+    rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
     return $ notElem typair $ lefts $ map snd $ filter (\(n,x) -> n == tag) rs
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
 getadtcons (ADT tyn tps) = do
-    adtds <- lift (lift ask) >>= \(a,b,c,d) -> return b
+    adtds <- lift (lift ask) >>= \(a,b,c,d,e) -> return b
     case find (\(ADTD name ps _) -> tyn == name && length tps == length ps) adtds of
       Just (ADTD _ paramvars cons) ->
           let subst = Map.fromList $ zip paramvars tps in
@@ -126,8 +126,21 @@ getadtcons (ADT tyn tps) = do
       Nothing -> return []
 
 
+getsubs :: Synth Subst
+getsubs = fst <$> lift get
+
+
+getrecself :: Synth Name
+getrecself = lift (lift ask) >>= \(a,b,c,d,e) -> return e
+
+
+removerecself :: Gamma -> Synth Gamma
+removerecself g = do
+    recself <- getrecself
+    return $ deleteBy (\ a b -> fst a == fst b) (recself, undefined) g
+
 clearrestrictions :: RestrictTag -> Synth a -> Synth a
-clearrestrictions tag = local (\(rs,b,c,d) -> (filter (\(n,_) -> n /= tag) rs, b, c, d))
+clearrestrictions tag = local (\(rs,b,c,d,e) -> (filter (\(n,_) -> n /= tag) rs, b, c, d,e))
 
 
 fresh :: Synth String
@@ -263,7 +276,7 @@ synth (g, d, (n, Sum tys):o) t = addtrace (LeftSum (Sum tys) t) $ do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth c@(g, d, p@(n, ADT tyn tps):o) t = addtrace (LeftADT c (ADT tyn tps) t) (do
+synth c@(g, d, p@(n, ADT tyn tps):o) t = lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (LeftADT res c (ADT tyn tps) t) (do
     checkrestrictions DeconstructADT (ADT tyn tps) >>= guard
     adtds <- getadtcons (ADT tyn tps)
     if null adtds
@@ -279,7 +292,8 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = addtrace (LeftADT c (ADT tyn tps) t) (d
                        else id) $
                         case vtype of
                           Unit -> do
-                            (exp, d') <- synth (g, d, o) t
+                            g' <- removerecself g -- !TODO: Verificar correto: Eliminar do branch sem elementos a chamada recursiva
+                            (exp, d') <- synth (g', d, o) t
                             return (name, "", exp, d')
                           argty -> do
                             varid <- fresh
@@ -316,7 +330,7 @@ synth (g, d, p:o) t =
 
 -- no more asynchronous propositions, focus
 
-synth c@(g, d, []) t = addtrace (Focus c t) $
+synth c@(g, d, []) t = lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (Focus res c t) $
     focus (g, d) t
 
 
@@ -344,11 +358,13 @@ focus c goal =
         decideLeftBang (g, din) goal =
             case g of
               []   -> empty
-              _ -> foldr ((<|>) . (\case
-                                    (n, Right x) -> addtrace (DecideLeftBang x goal) $
+              _ -> do
+                  (res, _, _, _, _) <- lift $ lift ask
+                  foldr ((<|>) . (\case
+                                    (n, Right x) -> addtrace (DecideLeftBang res x goal) $
                                         managerestrictions x $
                                             focus' (Just (n, x)) (g, din) goal;
-                                    (n, Left sch) -> addtrace (DecideLeftBangSch sch goal) $
+                                    (n, Left sch) -> addtrace (DecideLeftBangSch res sch goal) $
                                         managerestrictions (instantiateFrom 0 sch) $
                                             focusSch (n, sch) (g, din) goal)) empty g
                                  where
@@ -363,22 +379,24 @@ focus c goal =
         focusSch :: (String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta)
 
         ---- VL
-        focusSch (n, sch@(Forall ns t)) ctxt goal = addtrace FocusLeftScheme $ do
-            -- can only try scheme if current constraints are still safe
-            -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
-            -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
-            -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
+        focusSch (n, sch@(Forall ns t)) ctxt goal = do
             (et, etvars) <- existencialInstantiate sch                                          -- tipo com existenciais
-            (se, d') <- focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
-            (unifysubs, _) <- lift get
-                                                                                                -- resolve ou falha -- por conflito ou falta informação
-                                                                                                -- por conflicto
-            guard (Set.disjoint (Set.fromList etvars) (ftv $ apply unifysubs et))               -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido) -- TODO: Não produz coisas erradas mas podemos estar a esconder resultados válidos
-            return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
-                where
-                    existencialInstantiate (Forall ns t) = do
-                        netvs <- mapM (const $ do {i <- freshIndex; return (ExistentialTypeVar i, i)}) ns
-                        return (apply (Map.fromList $ zip ns $ map fst netvs) t, map snd netvs)
+            addtrace (FocusLeftScheme (n, et) ctxt goal) $ do
+                -- can only try scheme if current constraints are still safe
+                -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
+                -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
+                -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
+                -- (et, etvars) <- existencialInstantiate sch                                          -- tipo com existenciais
+                (se, d') <- focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
+                unifysubs <- getsubs
+                                                                                                    -- resolve ou falha -- por conflito ou falta informação
+                                                                                                    -- por conflicto
+                guard (Set.disjoint (Set.fromList etvars) (ftv $ apply unifysubs et))               -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
+                return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
+                    where
+                        existencialInstantiate (Forall ns t) = do
+                            netvs <- mapM (const $ do {i <- freshIndex; return (ExistentialTypeVar i, -i)}) ns
+                            return (apply (Map.fromList $ zip ns $ map fst netvs) t, map snd netvs)
 
 
 
@@ -414,7 +432,7 @@ focus c goal =
                 )) empty sts
 
         ---- adtR
-        focus' Nothing c@(g, d) (ADT tyn pts) = addtrace (RightADT c (ADT tyn pts)) $ do
+        focus' Nothing c@(g, d) (ADT tyn pts) = lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (RightADT res c (ADT tyn pts)) $ do
             cons <- getadtcons (ADT tyn pts)
             foldr (interleave . (\(tag, argty) ->
                    case argty of
@@ -451,6 +469,8 @@ focus c goal =
             nname <- fresh
             (expb, d') <- focus' (Just (nname, b)) c goal
             guard (nname `notElem` map fst d')
+            -- subs <- getsubs
+            -- (expa, d'') <- synth (g, apply subs d', []) (apply subs a)
             (expa, d'') <- synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
@@ -524,7 +544,9 @@ focus c goal =
 
 
 
-        ---- right focus is not synchronous, unfocus. if it is atomic we fail
+        ---- right focus is not synchronous, unfocus.
+
+        focus' Nothing c (ExistentialTypeVar _) = empty
 
         focus' Nothing c@(g, d) goal = addtrace (DefaultFocusRight c goal) $
             synth (g, d, []) goal -- <|> if t refined then smt solve t with join context refined with && else empty
@@ -576,7 +598,7 @@ synthMarks ex adts = transform transformfunc ex
     where
         transformfunc =
             \case
-                (Mark _ name c@(fc, bc) t) -> 
+                (Mark _ name c@(fc, bc) t) ->
                     let sch@(Forall tvs t') = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t in
                     case name of
                       Nothing    -> -- Non-recursive Mark
