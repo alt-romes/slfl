@@ -80,28 +80,6 @@ instance Substitutable CoreExpr where
     apply s e = e
 
 
-instance Substitutable Syntax.Expr where
-    apply s (Syntax.Abs x t e) = Syntax.Abs x (apply s t) $ apply s e
-    apply s (Syntax.App e1 e2) = Syntax.App (apply s e1) (apply s e2)
-    apply s (Syntax.TensorValue e1 e2) = Syntax.TensorValue (apply s e1) (apply s e2)
-    apply s (Syntax.LetTensor x y e1 e2) = Syntax.LetTensor x y (apply s e1) (apply s e2)
-    apply s (Syntax.LetUnit e1 e2) = Syntax.LetUnit (apply s e1) (apply s e2)
-    apply s (Syntax.WithValue e1 e2) = Syntax.WithValue (apply s e1) (apply s e2)
-    apply s (Syntax.Fst e) = Syntax.Fst $ apply s e
-    apply s (Syntax.Snd e) = Syntax.Snd $ apply s e
-    apply s (Syntax.InjL t e) = Syntax.InjL (apply s t) $ apply s e
-    apply s (Syntax.InjR t e) = Syntax.InjR (apply s t) $ apply s e
-    apply s (Syntax.CaseOfPlus e1 x e2 y e3) = Syntax.CaseOfPlus (apply s e1) x (apply s e2) y (apply s e3)
-    apply s (Syntax.BangValue e) = Syntax.BangValue $ apply s e
-    apply s (Syntax.LetBang x e1 e2) = Syntax.LetBang x (apply s e1) (apply s e2)
-    apply s (Syntax.LetIn x e1 e2) = Syntax.LetIn x (apply s e1) (apply s e2)
-    apply s (Syntax.Mark a b c t) = Syntax.Mark a b (apply s c) (apply s t)
-    apply s (Syntax.SumValue mts (s', e)) = Syntax.SumValue (apply s mts) (s', apply s e)
-    apply s (Syntax.CaseOfSum e ls) = Syntax.CaseOfSum (apply s e) (apply s ls)
-    apply s (Syntax.CaseOf e ls) = Syntax.CaseOf (apply s e) (apply s ls)
-    apply s (Syntax.UnrestrictedAbs x t e) = Syntax.UnrestrictedAbs x (apply s t) (apply s e)
-    apply s e = e
-
 instance Substitutable CoreSyntax.Var where
     apply s (CoreSyntax.Var m sch) = Var m $ apply s sch
 
@@ -123,17 +101,9 @@ instance Substitutable a => Substitutable [a] where
     apply s l = map (apply s) l
 
 
-instance (Substitutable a, Substitutable b) => Substitutable (Either a b) where
-    apply s (Right x) = Right $ apply s x
-    apply s (Left x) = Left $ apply s x
-
-
 instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
     apply s (x, y) = (apply s x, apply s y)
 
-
-instance (Substitutable a, Substitutable b, Substitutable c) => Substitutable ((,,) a b c) where
-    apply s (x, y, z) = (apply s x, apply s y, apply s z)
 
 
 

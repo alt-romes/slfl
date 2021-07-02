@@ -73,13 +73,12 @@ initSynthReaderState a = ([], a, 0, [])
 -- Functions
 -------------------------------------------------------------------------------
 
-addconstraint :: Constraint -> Synth Subst
+addconstraint :: Constraint -> Synth ()
 addconstraint c = do
     (subs, i) <- lift get
     let maybesubs = solveconstraintsExistential subs [c]
     guard $ isJust maybesubs
     lift $ put (fromJust maybesubs, i)
-    return $ fromJust maybesubs
 
 
 addrestriction :: RestrictTag -> Type -> Synth a -> Synth a
@@ -476,7 +475,7 @@ focus c goal =
                   if x == y then return (Var n, d)          -- ?a |- ?a succeeds
                             else empty                      -- ?a |- ?b fails
               _ -> do                                       -- ?a |- t  succeeds with constraint
-                  subs <- addconstraint $ Constraint (ExistentialTypeVar x) goal
+                  addconstraint $ Constraint (ExistentialTypeVar x) goal
                   return (Var n, d)
 
 
@@ -492,8 +491,7 @@ focus c goal =
               then do
                   let (ADT _ tps') = goal
                   zipWithM_ unifyadtparams tps tps'
-                  (subs, _) <- lift get
-                  return (apply subs $ Var n, d)
+                  return (Var n, d)
               else do
                   adtcns <- getadtcons (ADT tyn tps) 
                   guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
@@ -502,7 +500,7 @@ focus c goal =
                       where
                           unifyadtparams (ExistentialTypeVar x) y = addconstraint $ Constraint (ExistentialTypeVar x) y
                           unifyadtparams x (ExistentialTypeVar y) = addconstraint $ Constraint (ExistentialTypeVar y) x
-                          unifyadtparams x y = guard (x == y) >> return Map.empty
+                          unifyadtparams x y = guard (x == y)
 
 
 
@@ -516,8 +514,8 @@ focus c goal =
           do case goal of
                  (ExistentialTypeVar x)     -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
                    -> do
-                        subs <- addconstraint $ Constraint (ExistentialTypeVar x) h
-                        return (apply subs $ Var n, d)
+                        addconstraint $ Constraint (ExistentialTypeVar x) h
+                        return (Var n, d)
                  _ -> do
                         guard (h == goal)  -- if is atomic and not the goal, fail
                         return (Var n, d)  -- else, instantiate it
