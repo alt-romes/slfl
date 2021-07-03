@@ -140,8 +140,8 @@ instance (Show Type) where
     show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"
     show (Plus t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
     show (Bang t1) = "(! " ++ show t1 ++ ")"
-    show (TypeVar x) = letters !! x
-    show (ExistentialTypeVar x) = "?" ++ letters !! x
+    show (TypeVar x) = getName x
+    show (ExistentialTypeVar x) = "?" ++ getName x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
     show (ADT n ts) = n ++ concatMap ((" " ++) . show) ts
 

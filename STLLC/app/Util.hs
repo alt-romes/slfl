@@ -23,7 +23,7 @@ letters = [1..] >>= flip replicateM ['a'..'z']
 
 
 getName :: Int -> String
-getName i = letters !! i
+getName i = if i < 0 then '-' : letters !! (-i) else letters !! i
 
 
 getNumCode :: String -> Int

@@ -76,7 +76,7 @@ initSynthReaderState n a = ([], a, 0, [], n)
 addconstraint :: Constraint -> Synth ()
 addconstraint c = do
     (subs, i) <- lift get
-    let maybesubs = solveconstraintsExistential subs [c]
+    let maybesubs = solveconstraintsExistential subs c
     guard $ isJust maybesubs
     lift $ put (fromJust maybesubs, i)
 
@@ -108,14 +108,14 @@ checkrestrictions :: RestrictTag -> Type -> Synth Bool
 checkrestrictions tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construction and Destruction
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
-    return $ ty `notElem` reslist && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
+    return $ ty `notElem` reslist -- && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
 
 
 checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Synth Bool
 checkbinaryrestrictions tag typair = do
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
     let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs
-    return $ typair `notElem` reslist && all ((not . isExistentialType) . snd) reslist
+    return $ typair `notElem` reslist -- && all ((not . isExistentialType) . snd) reslist
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors

@@ -106,6 +106,8 @@ instance (Substitutable a, Substitutable b) => Substitutable ((,) a b) where
     apply s (x, y) = (apply s x, apply s y)
 
 
+instance Substitutable Constraint where
+    apply s (Constraint t1 t2) = Constraint (apply s t1) (apply s t2)
 
 
 
@@ -225,14 +227,19 @@ solveconstraints subs constr =
       [] -> return subs
       Constraint t1 t2:cs -> do
           s <- unify t1 t2
-          solveconstraints (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
+          solveconstraints (compose s subs) $ map (apply s) cs
 
 
-solveconstraintsExistential :: Subst -> [Constraint] -> Maybe Subst
-solveconstraintsExistential subs constr =
-    case constr of
-      [] -> return subs
-      Constraint t1 t2:cs -> do
-          s <- unifyExistential t1 t2
-          solveconstraintsExistential (compose s subs) $ map (\(Constraint t1 t2) -> Constraint (apply s t1) (apply s t2)) cs
+solveconstraintsExistential :: Subst -> Constraint -> Maybe Subst
+solveconstraintsExistential subs c = solveconstraintsExistential' Map.empty (c : map (\(k,v) -> Constraint (ExistentialTypeVar (-k)) v) (Map.toList subs))
+    where
+    -- TODO EFFICIENCY: More efficient way of adding the constraint maybe by only checking against the intersection?
+    -- Right now we solve against all constraints always
+        solveconstraintsExistential' :: Subst -> [Constraint] -> Maybe Subst
+        solveconstraintsExistential' subs constraints =
+            case constraints of
+              [] -> return subs
+              Constraint t1 t2:cs -> do
+                s <- unifyExistential t1 t2
+                solveconstraintsExistential' (compose s subs) $ map (apply s) cs
 
