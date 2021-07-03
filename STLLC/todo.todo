@@ -9,3 +9,6 @@
 20) if i sort gamma b4 synth >> infinite loop
 21) fix typechecker ( try to typecheck Maybe.hs after synth ) ?
 22) fix inference of recursive types ( see last function of Maybe.hs ), and check if it speeds up insert in the List module
+23) quase de certeza que sim, é preciso decidir como fazer as substituições "desaparecem", mas : check if constraints are being propagated to different "backtracking" branches from failed branches - that could be a problem -- - "teste" < Synth.hs could be a clue (pedir ajuda ao prof a fazer uns testes para perceber)
+24) porque é que aqueles "não pode desconstruir/construir/focar para ter um goal > existencial duas vezes" funcionam tão bem?
+25) e a reader tmb pode ser que tenha falhas, pelo menos nas restrictions aparecem coisas estranhas como 2 Maybe ?ex existenciais mesmo sendo supostamente impossível e nos logs não haver um ponto de transição que leve a isso

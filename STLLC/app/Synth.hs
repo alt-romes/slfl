@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Synth (synthAllType, synthType, synthMarks, synthMarksModule) where
+module Synth (synthAllType, synthType, synthMarks, synthMarksModule, synth, runtesti, runteste) where
 
 import Data.List
 import qualified Data.Set as Set
@@ -52,7 +52,7 @@ data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
 runSynth (g, d) t st adtds =
     
-        runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st) $ initSynthReaderState (fst recf) adtds
+    runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st) $ initSynthReaderState (fst recf) adtds
 
     where
         synthComplete (g, d, o) t = do
@@ -112,15 +112,21 @@ getdepth = lift (lift ask) >>= \(a,b,c,d,e) -> return c
 checkrestrictions :: RestrictTag -> Type -> Synth Bool
 checkrestrictions tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construction and Destruction
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
+    subs <- getsubs
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
-    return $ ty `notElem` reslist -- && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
+    let b = ty `notElem` reslist && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
+    -- trace ("Is " ++ show ty ++ " (" ++ show (apply subs ty) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
+    return b
 
 
 checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Synth Bool
 checkbinaryrestrictions tag typair = do
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
+    subs <- getsubs
     let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs
-    return $ typair `notElem` reslist -- && all ((not . isExistentialType) . snd) reslist
+    let b = typair `notElem` reslist && all ((not . isExistentialType) . snd) reslist
+    -- trace ("Is " ++ show typair  ++ " (" ++ show (apply subs typair) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
+    return b
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
@@ -135,6 +141,10 @@ getadtcons (ADT tyn tps) = do
 
 getsubs :: Synth Subst
 getsubs = fst <$> lift get
+
+
+clearsubs :: Synth ()
+clearsubs = modify (\(s, i) -> (Map.empty, i))
 
 
 getrecself :: Synth Name
@@ -394,8 +404,9 @@ focus c goal =
                 (se, d') <- focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
                 unifysubs <- getsubs
                                                                                                     -- resolve ou falha -- por conflito ou falta informação
-                                                                                                    -- por conflicto
+                                                                                                    -- por conflicto durante o processo
                 guard (Set.disjoint (Set.fromList etvars) (ftv $ apply unifysubs et))               -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
+                clearsubs                                                                           -- after making sure no instantiated variables escaped, clear the current substitution so that it doesn't complicate further scheme computations
                 return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
                     where
                         existencialInstantiate (Forall ns t) = do
@@ -631,4 +642,48 @@ synthMarks ex adts = transform transformfunc ex
 -- pre: program has been type inferred
 synthMarksModule :: Program -> Program
 synthMarksModule (Program adts bs ts cs) = Program adts (map (\(Binding n e) -> Binding n $ synthMarks e adts) bs) ts cs
+
+
+
+
+
+
+
+
+tt :: Int -> LogicT (State [Int]) Int
+tt i = do
+    modify (i:)
+    guard $ odd i
+    return i
+
+
+teste :: LogicT (State [Int]) (Int, Int)
+teste = do
+    x <- tt 1 <|> (tt 4 >> tt 3) <|> tt 2
+    y <- tt 4 <|> tt 5
+    return (x, y)
+
+runteste = runState (observeAllT teste) []
+
+
+
+tts :: Int -> StateT [Int] Logic Int
+tts i = do
+    modify (i:)
+    guard $ odd i
+    return i
+
+
+testi :: StateT [Int] Logic (Int, Int)
+testi = do
+    x <- tts 1 <|> (tts 4 >> tts 3) <|> tts 2
+    y <- tts 4 <|> tts 5
+    return (x, y)
+
+runtesti = observeAll (runStateT testi [])
+
+
+
+
+
 
