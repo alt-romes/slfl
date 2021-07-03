@@ -50,12 +50,17 @@ data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type 
 
 
 runSynth :: (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> [(Expr, Delta)]
-runSynth (g, d) t st adtds = runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st) $ initSynthReaderState (fst $ head g) adtds -- Head of Gamma is the recursive name since the recursive signature is the last added to the gamma context
+runSynth (g, d) t st adtds =
+    
+        runReader (evalStateT (observeAllT $ synthComplete (g, d, []) t) st) $ initSynthReaderState (fst recf) adtds
+
     where
         synthComplete (g, d, o) t = do
-            (e, d') <- synth (g, d, o) t
+            (e, d') <- synth ([recf], d, o) t <|> synth (g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
             guard $ null d'
             return (e, d')
+
+        recf = head g -- Head of Gamma is the recursive name since the recursive signature is the last added to the gamma context
 
 
 initSynthState :: Int -> SynthState
