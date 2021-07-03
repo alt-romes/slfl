@@ -163,11 +163,9 @@ unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ExistentialTypeVar x) y =
-    trace ("Unify " ++ show (ExistentialTypeVar x) ++ " with " ++ show y) $
-    if (-x) `notElem` ftv y then trace "success!" $ Just $ Map.singleton (-x) y else Nothing
+    if (-x) `notElem` ftv y then Just $ Map.singleton (-x) y else Nothing
 unifyExistential x (ExistentialTypeVar y) =
-    trace ("Unify " ++ show x ++ " with " ++ show (ExistentialTypeVar y)) $
-    if (-y) `notElem` ftv x then trace "success!" $ Just $ Map.singleton (-y) x else Nothing
+    if (-y) `notElem` ftv x then Just $ Map.singleton (-y) x else Nothing
 unifyExistential (Fun t1 t2) (Fun t1' t2') = do
     s  <- unifyExistential t1 t1'
     s' <- unifyExistential (apply s t2) (apply s t2')
@@ -208,16 +206,16 @@ ftv :: Type -> Set.Set Int
 ftv = ftv' Set.empty
     where
         ftv' :: Set.Set Int -> Type -> Set.Set Int
-        ftv' acc (Fun t t') = ftv' acc t `mappend` ftv' acc t'
-        ftv' acc (Tensor t t') = ftv' acc t `mappend` ftv' acc t'
-        ftv' acc (With t t') = ftv' acc t `mappend` ftv' acc t'
-        ftv' acc (Plus t t') = ftv' acc t `mappend` ftv' acc t'
+        ftv' acc (Fun t t') = ftv' acc t `Set.union` ftv' acc t'
+        ftv' acc (Tensor t t') = ftv' acc t `Set.union` ftv' acc t'
+        ftv' acc (With t t') = ftv' acc t `Set.union` ftv' acc t'
+        ftv' acc (Plus t t') = ftv' acc t `Set.union` ftv' acc t'
         ftv' acc (Bang t) = ftv' acc t
         ftv' acc (TypeVar x) = Set.insert x acc
         ftv' acc (ExistentialTypeVar x) = Set.insert (-x) acc
         ftv' acc (Sum []) = acc
-        ftv' acc (Sum ((i, t):ts)) = ftv' acc t `mappend` ftv' acc (Sum ts)
-        ftv' acc (ADT _ ts) = foldr ((<>) . ftv' acc) mempty ts
+        ftv' acc (Sum ((i, t):ts)) = ftv' acc t `Set.union` ftv' acc (Sum ts)
+        ftv' acc (ADT _ ts) = acc `Set.union` foldr (Set.union . ftv' acc) Set.empty ts
         ftv' acc t = acc
 
 

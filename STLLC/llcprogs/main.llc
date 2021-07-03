@@ -1,7 +1,0 @@
-let fola = (\x -o if x then <> else <>);
-
-let id = (\x -o x true);
-
-let wtf = {{ ... }};
-
-let main = (\x : Bool -o x) (wtf fola)

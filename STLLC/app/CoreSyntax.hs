@@ -1,6 +1,7 @@
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
-    Literal(..), getLitType, TyLiteral(..), isInType, trivialNat) where 
+    Literal(..), getLitType, TyLiteral(..), isInType, trivialNat,
+    isExistentialType) where 
 
 import Control.Monad
 import Data.Maybe
@@ -223,6 +224,20 @@ isInType t1 t2 =
       Plus t1' t2' -> isInType t1 t1' || isInType t1 t2'
       Bang t' -> isInType t1 t'
       _ -> t1 == t2
+
+
+isExistentialType :: Type -> Bool
+isExistentialType (ExistentialTypeVar _) = True
+isExistentialType (Fun t1 t2) = isExistentialType t1 || isExistentialType t2
+isExistentialType (Tensor t1 t2) = isExistentialType t1 || isExistentialType t2
+isExistentialType (With t1 t2) = isExistentialType t1 || isExistentialType t2
+isExistentialType (Plus t1 t2) = isExistentialType t1 || isExistentialType t2
+isExistentialType (Bang t1) = isExistentialType t1
+isExistentialType (Sum ts) = any (isExistentialType . snd) ts
+isExistentialType (ADT n ts) = any isExistentialType ts
+isExistentialType (TyLit l) = False
+isExistentialType (TypeVar x) = False
+isExistentialType Unit = False
 
 
 

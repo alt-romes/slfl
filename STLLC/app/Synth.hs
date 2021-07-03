@@ -14,7 +14,7 @@ import Data.Bifunctor
 import Debug.Trace
 
 
-import CoreSyntax (Name, Type(..), Scheme(..), isInType)
+import CoreSyntax (Name, Type(..), Scheme(..), isInType, isExistentialType)
 import Syntax
 import Program
 import Util
@@ -105,15 +105,17 @@ getdepth = lift (lift ask) >>= \(a,b,c,d,e) -> return c
 
 
 checkrestrictions :: RestrictTag -> Type -> Synth Bool
-checkrestrictions tag ty = do
+checkrestrictions tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construction and Destruction
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
-    return $ notElem ty $ rights $ map snd $ filter (\(n,x) -> n == tag) rs
+    let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
+    return $ ty `notElem` reslist && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
 
 
 checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Synth Bool
 checkbinaryrestrictions tag typair = do
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
-    return $ notElem typair $ lefts $ map snd $ filter (\(n,x) -> n == tag) rs
+    let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs
+    return $ typair `notElem` reslist && all ((not . isExistentialType) . snd) reslist
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
@@ -138,9 +140,6 @@ removerecself :: Gamma -> Synth Gamma
 removerecself g = do
     recself <- getrecself
     return $ deleteBy (\ a b -> fst a == fst b) (recself, undefined) g
-
-clearrestrictions :: RestrictTag -> Synth a -> Synth a
-clearrestrictions tag = local (\(rs,b,c,d,e) -> (filter (\(n,_) -> n /= tag) rs, b, c, d,e))
 
 
 fresh :: Synth String
@@ -470,7 +469,7 @@ focus c goal =
             (expb, d') <- focus' (Just (nname, b)) c goal
             guard (nname `notElem` map fst d')
             -- subs <- getsubs
-            -- (expa, d'') <- synth (g, apply subs d', []) (apply subs a)
+            -- (expa, d'') <- synth (g, apply subs d', []) (apply subs a) -- TODO?
             (expa, d'') <- synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             

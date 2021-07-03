@@ -7,3 +7,5 @@
 18) escrever no relatório derivação exemplo como a de `map`
 19) memoization as an optimization
 20) if i sort gamma b4 synth >> infinite loop
+21) fix typechecker ( try to typecheck Maybe.hs after synth ) ?
+22) fix inference of recursive types ( see last function of Maybe.hs ), and check if it speeds up insert in the List module
