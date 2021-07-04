@@ -150,31 +150,31 @@ instance (Show Expr) where
 -- Traversal
 -------------------------------------------------------------------------------
 
-transformM :: (Monad m, Applicative m) => (Expr -> Expr) -> Expr -> m Expr
-transformM f (Lit x) = pure $ f $ Lit x
-transformM f (Var x) = pure $ f $ Var x
-transformM f (Abs x t e) = f <$> (Abs x t <$> transformM f e)
-transformM f (App e1 e2) = f <$> (App <$> transformM f e1 <*> transformM f e2)
-transformM f (TensorValue e1 e2) = f <$> (TensorValue <$> transformM f e1 <*> transformM f e2)
-transformM f (LetTensor x y e1 e2) = f <$> (LetTensor x y <$> transformM f e1 <*> transformM f e2)
-transformM f UnitValue = pure $ f UnitValue
-transformM f (LetUnit e1 e2) = f <$> (LetUnit <$> transformM f e1 <*> transformM f e2)
-transformM f (WithValue e1 e2) = f <$> (WithValue <$> transformM f e1 <*> transformM f e2)
-transformM f (Fst e) = f <$> (Fst <$> transformM f e)
-transformM f (Snd e) = f <$> (Snd <$> transformM f e)
-transformM f (InjL t e) = f <$> (InjL t <$> transformM f e)
-transformM f (InjR t e) = f <$> (InjR t <$> transformM f e)
-transformM f (CaseOfPlus e1 x e2 y e3) = f <$> (CaseOfPlus <$> transformM f e1 <*> pure x <*> transformM f e2 <*> pure y <*> transformM f e3)
-transformM f (BangValue e) = f <$> (BangValue <$> transformM f e)
-transformM f (LetBang x e1 e2) = f <$> (LetBang x <$> transformM f e1 <*> transformM f e2)
-transformM f (LetIn x e1 e2) = f <$> (LetIn x <$> transformM f e1 <*> transformM f e2)
-transformM f (Mark a b c t) = pure $ f $ Mark a b c t
-transformM f (SumValue mts (s, e)) = f <$> (SumValue mts . (,) s <$> transformM f e)
-transformM f (CaseOfSum e ls) = f <$> (CaseOfSum <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
-transformM f (CaseOf e ls) = f <$> (CaseOf <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
-transformM f (UnrestrictedAbs x t e) = f <$> (UnrestrictedAbs x t <$> transformM f e)
+transformM :: (Monad m, Applicative m) => (Expr -> m Expr) -> Expr -> m Expr
+transformM f (Lit x) = f $ Lit x
+transformM f (Var x) = f $ Var x
+transformM f (Abs x t e) = f . Abs x t =<< transformM f e
+transformM f (App e1 e2) = f =<< (App <$> transformM f e1 <*> transformM f e2)
+transformM f (TensorValue e1 e2) = f =<< (TensorValue <$> transformM f e1 <*> transformM f e2)
+transformM f (LetTensor x y e1 e2) = f =<< (LetTensor x y <$> transformM f e1 <*> transformM f e2)
+transformM f UnitValue = f UnitValue
+transformM f (LetUnit e1 e2) = f =<< (LetUnit <$> transformM f e1 <*> transformM f e2)
+transformM f (WithValue e1 e2) = f =<< (WithValue <$> transformM f e1 <*> transformM f e2)
+transformM f (Fst e) = f . Fst =<< transformM f e
+transformM f (Snd e) = f . Snd =<< transformM f e
+transformM f (InjL t e) = f . InjL t =<< transformM f e
+transformM f (InjR t e) = f . InjR t =<< transformM f e
+transformM f (CaseOfPlus e1 x e2 y e3) = f =<< (CaseOfPlus <$> transformM f e1 <*> pure x <*> transformM f e2 <*> pure y <*> transformM f e3)
+transformM f (BangValue e) = f . BangValue =<< transformM f e
+transformM f (LetBang x e1 e2) = f =<< (LetBang x <$> transformM f e1 <*> transformM f e2)
+transformM f (LetIn x e1 e2) = f =<< (LetIn x <$> transformM f e1 <*> transformM f e2)
+transformM f (Mark a b c t) = f $ Mark a b c t
+transformM f (SumValue mts (s, e)) = f . SumValue mts . (,) s =<< transformM f e
+transformM f (CaseOfSum e ls) = f =<< (CaseOfSum <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
+transformM f (CaseOf e ls) = f =<< (CaseOf <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
+transformM f (UnrestrictedAbs x t e) = f . UnrestrictedAbs x t =<< transformM f e
 
 
 transform :: (Expr -> Expr) -> Expr -> Expr
-transform f e = runIdentity (transformM f e)
+transform f e = runIdentity (transformM (return . f) e)
 

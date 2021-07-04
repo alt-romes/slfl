@@ -5,6 +5,7 @@ module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
 
 import Control.Monad
 import Data.Maybe
+import Data.Hashable
 import Control.Applicative
 import Data.Bifunctor
 import Data.Functor.Identity
@@ -156,6 +157,28 @@ instance (Show Literal) where
 
 instance (Show TyLiteral) where
     show TyNat = "Nat"
+
+
+instance Hashable Scheme where
+    hashWithSalt a (Forall ns t) = foldl ((+) . hashWithSalt (a-100)) 0 ns + hashWithSalt (a-200) t
+
+
+instance Hashable Type where
+    hashWithSalt a t = case t of
+        TyLit l -> hashWithSalt (a+10) l
+        Fun t1 t2 -> hashWithSalt (a+2000) t1 + hashWithSalt (a+2000) t2
+        Tensor t1 t2 -> hashWithSalt (a+3000) t1 + hashWithSalt (a+3000) t2
+        With t1 t2 -> hashWithSalt (a+4000) t1 + hashWithSalt (a+4000) t2
+        Plus t1 t2 -> hashWithSalt (a+5000) t1 + hashWithSalt (a+5000) t2
+        Bang t -> hashWithSalt (a+6000) t
+        TypeVar x -> hashWithSalt (a+7000) x
+        ExistentialTypeVar x -> hashWithSalt (a+8000) x
+        Sum ts -> sum $ map (hashWithSalt (a+9000)) ts
+        ADT tyn tps -> hashWithSalt (a+1000) tyn + sum (map (hashWithSalt (a+1000)) tps)
+
+
+instance Hashable TyLiteral where
+    hashWithSalt a TyNat = hashWithSalt (a+10) "TyNat"
 
 
 
