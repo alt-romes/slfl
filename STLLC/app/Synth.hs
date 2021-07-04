@@ -50,7 +50,7 @@ data RestrictTag = ConstructADT | DeconstructADT | DecideLeftBangR deriving (Sho
 instance Hashable RestrictTag where
     hashWithSalt a r = hashWithSalt a (show r)
 
-data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type deriving (Show)
+data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | MoveLeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Name Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type deriving (Show)
 
 
 runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> ([Expr], MemoTable)
@@ -86,7 +86,7 @@ initSynthReaderState n a = ([], a, 0, [], n)
 -------------------------------------------------------------------------------
 
 memoize :: Maybe (Maybe (Either (String, Scheme) (String, Type))) -> Ctxt -> Type -> Synth (Expr, Delta) -> Synth (Expr, Delta)
-memoize maybefocus c t syn = do
+memoize maybefocus c t syn = do -- TODO: Can possibly be improved/optimized if we look at the existential type vars and restrictions... perhaps the hash function can play a role in it...
     (memot, cs, i) <- lift get
     res <- getres
     let key = hash c + hash (Map.toList cs) + hash res + hash t + hash maybefocus
@@ -98,10 +98,11 @@ memoize maybefocus c t syn = do
                  return (e, d'))
              (do lift $ put (Map.insert key Nothing memot, cs, i)
                  empty)
-       Just Nothing -> trace ("Speed up by skipping synth of " ++ show t) empty
+       Just Nothing -> -- trace ("Speed up by skipping synth of " ++ show t)
+           empty
        Just (Just (e, d', cs', deltai)) -> do 
-           trace ("Speed up by skipping synth of " ++ show t ++ " and returning " ++ show e) $
-               lift $ put (memot, cs', i + deltai)
+           -- trace ("Speed up by skipping synth of " ++ show t ++ " and returning " ++ show e) $
+           lift $ put (memot, cs', i + deltai)
            return (e, d') -- TODO: I think this has some issues with variable names that might collide
 
 memoizesynth :: (Ctxt -> Type -> Synth (Expr, Delta)) -> Ctxt -> Type -> Synth (Expr, Delta)
@@ -332,7 +333,7 @@ synth (g, d, (n, Sum tys):o) t = addtrace (LeftSum (Sum tys) t) $ do
     return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
 
 ---- adtL
-synth c@(g, d, p@(n, ADT tyn tps):o) t = lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (LeftADT res c (ADT tyn tps) t) (do
+synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (LeftADT res c (ADT tyn tps) t) $ do
     checkrestrictions DeconstructADT (ADT tyn tps) >>= guard
     adtds <- getadtcons (ADT tyn tps)
     if null adtds
@@ -361,8 +362,8 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = lift (lift ask) >>= \(res,_,_,_,_) -> a
             let (n1, varid1, e1, d1') = head ls
             guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
             return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
-    <|>
-    do
+    ) <|> (
+    lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (MoveLeftADT res c (ADT tyn tps) t) $ do
     checkrestrictions DeconstructADT (ADT tyn tps) >>= guard . not          -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)
     memoizesynth synth (g, p:d, o) t)                                                    -- So if we failed above because a restriction didn't allow us to invert this ADT, try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
 
@@ -489,9 +490,10 @@ focus c goal =
                 )) empty sts
 
         ---- adtR
-        focus' Nothing c@(g, d) (ADT tyn pts) = lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (RightADT res c (ADT tyn pts)) $ do
+        focus' Nothing c@(g, d) (ADT tyn pts) = lift (lift ask) >>= \(res,_,_,_,_) -> do
             cons <- getadtcons (ADT tyn pts)
             foldr (interleave . (\(tag, argty) ->
+                addtrace (RightADT tag res c (ADT tyn pts)) $
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype -> do
@@ -566,7 +568,7 @@ focus c goal =
                  ADT tyn' tps' -> tyn' == tyn
                  _ -> False
               then do
-                  let (ADT _ tps') = goal
+                  let (ADT tyn' tps') = goal
                   zipWithM_ unifyadtparams tps tps'
                   return (Var n, d)
               else do
@@ -575,8 +577,13 @@ focus c goal =
                   checkrestrictions DeconstructADT (ADT tyn tps) >>= guard  -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
                   memoizesynth synth (g, d, [nh]) goal
                       where
+                          unifyadtparams :: Type -> Type -> Synth ()
+
+                          unifyadtparams (ADT tyn'' tps'') (ADT tyn''' tps''') = do
+                              guard $ tyn'' == tyn'''
+                              zipWithM_ unifyadtparams tps'' tps'''
                           unifyadtparams (ExistentialTypeVar x) y = addconstraint $ Constraint (ExistentialTypeVar x) y
-                          unifyadtparams x (ExistentialTypeVar y) = addconstraint $ Constraint (ExistentialTypeVar y) x
+                          unifyadtparams x (ExistentialTypeVar y) = unifyadtparams (ExistentialTypeVar y) x
                           unifyadtparams x y = guard (x == y)
 
 

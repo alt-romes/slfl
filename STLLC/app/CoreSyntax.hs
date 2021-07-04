@@ -73,7 +73,7 @@ data CoreExpr
   
     | CaseOf CoreExpr [(String, CoreExpr)]
 
-    deriving (Eq, Ord)
+    deriving (Eq)
 
 
 newtype Literal = Nat Integer deriving (Eq, Ord)
@@ -83,11 +83,11 @@ newtype Literal = Nat Integer deriving (Eq, Ord)
 data Var = Var
     { varMult :: Mult 
     , unVar   :: Scheme
-    } deriving (Eq, Show, Ord)
-data Mult = Lin | Unr deriving (Eq, Show, Ord)
+    } deriving (Eq, Show)
+data Mult = Lin | Unr deriving (Eq, Show)
 
 
-data Scheme = Forall [Int] Type deriving (Eq, Ord)
+data Scheme = Forall [Int] Type deriving (Eq)
 
 
 data Type
@@ -102,14 +102,17 @@ data Type
     | TypeVar Int       -- Type variable (uninterpreted type) used for reconstruction
     | ExistentialTypeVar Int
 
-    | Sum [(String, Type)]
+    | Sum [(Name, Type)]
 
-    | ADT String [Type]
+    | ADT Name [Type]
+
+    | RefinementType Name Type Formula
     
-    deriving (Eq, Ord)
+    deriving (Eq)
 
+data TyLiteral = TyNat deriving (Eq)
 
-data TyLiteral = TyNat deriving (Eq, Ord)
+data Formula = Formula deriving (Eq)
 
 
 

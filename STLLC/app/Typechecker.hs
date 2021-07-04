@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Writer (WriterT, writer, runWriterT) 
+import Data.SBV
 
 
 import CoreSyntax
