@@ -1,17 +1,17 @@
-a = (λa -o (λb -o let c*d = b in a c d));
-b = (λa -o (λb -o (λc -o a ( b , c ))));
-c = (λa -o ( (λb -o fst (a b)) | (λe -o snd (a e)) ));
-d = (λa -o (λb -o ( (fst a) b | (snd a) b )));
-e = (λa -o ( (λb -o a inl b ) | (λd -o a inr d ) ));
-f = (λa -o (λb -o case b of
+a = (λa -> (λb -> let c*d = b in a c d));
+b = (λa -> (λb -> (λc -> a ( b , c ))));
+c = (λa -> ( (λb -> fst (a b)) | (λe -> snd (a e)) ));
+d = (λa -> (λb -> ( (fst a) b | (snd a) b )));
+e = (λa -> ( (λb -> a inl b ) | (λd -> a inr d ) ));
+f = (λa -> (λb -> case b of
               inl c -> (fst a) c
             | inr d -> (snd a) d));
-g = (λa -o let !b = a in ( ! fst b , ! snd b ));
-h = (λa -o
+g = (λa -> let !b = a in ( ! fst b , ! snd b ));
+h = (λa ->
     let b*c = a in
         let !d = c in
             let !e = b in ! ( e | d ));
-i = (λa -o let b*c = a in let _ = c in b);
-j = (λa -o ( a , () ));
-k = (λa -o fst a);
-l = (λa -o ( a | a ));
+i = (λa -> let b*c = a in let _ = c in b);
+j = (λa -> ( a , () ));
+k = (λa -> fst a);
+l = (λa -> ( a | a ));

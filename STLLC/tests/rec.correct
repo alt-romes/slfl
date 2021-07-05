@@ -1,7 +1,7 @@
 data ABC = A | B | C;
 
 
-rectest :: (ABC -o 1);
+rectest :: (ABC -> 1);
 rectest x = case x of 
       A  -> ()
     | B  -> rectest A

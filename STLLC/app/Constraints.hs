@@ -59,6 +59,7 @@ instance Substitutable Type where
     apply s t@(ExistentialTypeVar i) = Map.findWithDefault t (-i) s
     apply s (Sum tl) = Sum $ map (second $ apply s) tl
     apply s (ADT n tp) = ADT n $ map (apply s) tp
+    apply s (RefinementType n tp p) = RefinementType n (apply s tp) p
     apply s t = t
 
 
@@ -145,6 +146,7 @@ unify (Plus t1 t2) (Plus t1' t2') = do
     s' <- unify (apply s t2) (apply s t2')
     return $ compose s' s
 unify (Bang x) (Bang y) = unify x y
+unify (RefinementType _ x _) (RefinementType _ y _) = unify x y
 unify (Sum xtl) (Sum ytl) = do
     let xtl' = sortBy (\(a,_) (b,_) -> compare a b) xtl
     let ytl' = sortBy (\(a,_) (b,_) -> compare a b) ytl
@@ -185,6 +187,7 @@ unifyExistential (Plus t1 t2) (Plus t1' t2') = do
     s' <- unifyExistential (apply s t2) (apply s t2')
     return $ compose s' s
 unifyExistential (Bang x) (Bang y) = unifyExistential x y
+unifyExistential (RefinementType _ x _) (RefinementType _ y _) = unifyExistential x y
 unifyExistential (Sum xtl) (Sum ytl) = do
     let xtl' = sortBy (\(a,_) (b,_) -> compare a b) xtl
     let ytl' = sortBy (\(a,_) (b,_) -> compare a b) ytl
@@ -205,20 +208,18 @@ s' `compose` s = Map.map (apply s') s `Map.union` s'
 -------------------------------------------------------------------------------
 
 ftv :: Type -> Set.Set Int
-ftv = ftv' Set.empty
-    where
-        ftv' :: Set.Set Int -> Type -> Set.Set Int
-        ftv' acc (Fun t t') = ftv' acc t `Set.union` ftv' acc t'
-        ftv' acc (Tensor t t') = ftv' acc t `Set.union` ftv' acc t'
-        ftv' acc (With t t') = ftv' acc t `Set.union` ftv' acc t'
-        ftv' acc (Plus t t') = ftv' acc t `Set.union` ftv' acc t'
-        ftv' acc (Bang t) = ftv' acc t
-        ftv' acc (TypeVar x) = Set.insert x acc
-        ftv' acc (ExistentialTypeVar x) = Set.insert (-x) acc
-        ftv' acc (Sum []) = acc
-        ftv' acc (Sum ((i, t):ts)) = ftv' acc t `Set.union` ftv' acc (Sum ts)
-        ftv' acc (ADT _ ts) = acc `Set.union` foldr (Set.union . ftv' acc) Set.empty ts
-        ftv' acc t = acc
+ftv (Fun t t') = ftv t `Set.union` ftv t'
+ftv (Tensor t t') = ftv t `Set.union` ftv t'
+ftv (With t t') = ftv t `Set.union` ftv t'
+ftv (Plus t t') = ftv t `Set.union` ftv t'
+ftv (Bang t) = ftv t
+ftv (TypeVar x) = Set.singleton x 
+ftv (ExistentialTypeVar x) = Set.singleton (-x) 
+ftv (Sum []) = Set.empty
+ftv (Sum ((i, t):ts)) = ftv t `Set.union` ftv (Sum ts)
+ftv (ADT _ ts) = foldr (Set.union . ftv ) Set.empty ts
+ftv (RefinementType _ x _) = ftv x
+ftv t = Set.empty
 
 
 solveconstraints :: Subst -> [Constraint] -> Maybe Subst -- w/ substitution accumulator and list of constraints generate a substitution

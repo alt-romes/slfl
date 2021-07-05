@@ -11,6 +11,4 @@ synth bind :: (Maybe a -> !(a -> Maybe b) -> Maybe b);
 
 synth maybe :: (!b -> !(a -> b) -> Maybe a -> b);
 
-# infinite loop if List a = Nil | Cons (a * ! List a);
-synth listToMaybe :: (List a -> Maybe a);
-
+#synth listToMaybe :: (List a -> Maybe a);

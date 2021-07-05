@@ -45,7 +45,7 @@ runinfer fc i e = runStateT (runStateT (runWriterT $ typeconstraint e) ([], fc))
 addtoblinctx :: Scheme -> Infer ()
 addtoblinctx c = do
     (bc, _) <- get
-    traceShow bc $ modify (first (Just (Var Lin c) :))
+    modify (first (Just (Var Lin c) :))
 
 
 addtobunrctx :: Scheme -> Infer ()
@@ -354,7 +354,7 @@ typeconstraint (CaseOf e exps) = do
     -- TODO: Probably doable in a more idiomatic way
     let inferredexps' = catMaybes inferredexps
     let (t1', s1, ce1, ctx1') = head inferredexps'
-    guard $ all ((== first catMaybes ctx1') . (\(_,_,_,c) -> first catMaybes c)) (tail inferredexps')
+    guard $ all (equalDeltas ctx1' . (\(_,_,_,c) -> c)) (tail inferredexps')
     (adtname, adttypes) <- getadt fctx s1
     guard $ all ((== adtname) . (\(_,constr,_,_) -> getadtname fctx constr)) (tail inferredexps')
     writer ((t1', CaseOf ce (map (\(_,s,c,_) -> (s,c)) inferredexps')), Constraint st (ADT adtname adttypes):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps'))

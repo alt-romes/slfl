@@ -153,7 +153,7 @@ instance (Show Type) where
     show Unit = "1"
     show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"
     show (Plus t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
-    show (Bang t1) = "(!" ++ show t1 ++ ")"
+    show (Bang t1) = "!" ++ show t1
     show (TypeVar x) = getName x
     show (ExistentialTypeVar x) = "?" ++ getName x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
@@ -198,7 +198,8 @@ instance Hashable Type where
         ExistentialTypeVar x -> hashWithSalt (a+8000) x
         Sum ts -> sum $ map (hashWithSalt (a+9000)) ts
         ADT tyn tps -> hashWithSalt (a+1000) tyn + sum (map (hashWithSalt (a+1000)) tps)
-        x -> error (" what is this " ++ show x)
+        RefinementType n tp p -> hashWithSalt (a+20000) n + hashWithSalt (a+2000) tp
+        -- x -> error ("Hashing unknown type " ++ show x)
 
 
 instance Hashable TyLiteral where
@@ -284,6 +285,7 @@ isExistentialType (Sum ts) = any (isExistentialType . snd) ts
 isExistentialType (ADT n ts) = any isExistentialType ts
 isExistentialType (TyLit l) = False
 isExistentialType (TypeVar x) = False
+isExistentialType (RefinementType _ t _) = isExistentialType t
 isExistentialType Unit = False
 
 
