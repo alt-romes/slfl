@@ -158,7 +158,7 @@ unifyExistential (ADT x ts) (ADT y ts') =
     if x == y
        then do
            guard $ length ts == length ts'
-           let maybesubs = zipWith unify ts ts'
+           let maybesubs = zipWith unifyExistential ts ts'
            foldM (\p n -> compose p <$> n) Map.empty maybesubs
        else Nothing
 unifyExistential Unit Unit = Just Map.empty
@@ -226,8 +226,9 @@ solveconstraints subs constr =
     case constr of
       [] -> return subs
       Constraint t1 t2:cs -> do
-          s <- unify t1 t2
-          solveconstraints (compose s subs) $ map (apply s) cs
+          case unify t1 t2 of
+            Nothing -> error ("Failed to unify " ++ show t1 ++ " with " ++ show t2)
+            Just s -> solveconstraints (compose s subs) $ map (apply s) cs
 
 
 solveconstraintsExistential :: Subst -> Constraint -> Maybe Subst

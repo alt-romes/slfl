@@ -1,7 +1,7 @@
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
     Literal(..), getLitType, TyLiteral(..), isInType, trivialNat,
-    isExistentialType) where 
+    isExistentialType, Predicate(..)) where 
 
 import Control.Monad
 import Data.Maybe
@@ -83,11 +83,11 @@ newtype Literal = Nat Integer deriving (Eq, Ord)
 data Var = Var
     { varMult :: Mult 
     , unVar   :: Scheme
-    } deriving (Eq, Show)
-data Mult = Lin | Unr deriving (Eq, Show)
+    } deriving (Eq, Show, Ord)
+data Mult = Lin | Unr deriving (Eq, Show, Ord)
 
 
-data Scheme = Forall [Int] Type deriving (Eq)
+data Scheme = Forall [Int] Type deriving (Eq, Ord)
 
 
 data Type
@@ -106,13 +106,23 @@ data Type
 
     | ADT Name [Type]
 
-    | RefinementType Name Type Formula
+    | RefinementType Name Type (Maybe Predicate)
     
-    deriving (Eq)
+    deriving (Eq, Ord)
 
-data TyLiteral = TyNat deriving (Eq)
+data TyLiteral = TyNat deriving (Eq, Ord)
 
-data Formula = Formula deriving (Eq)
+data Predicate
+    = PVar Name
+    | Boolean Bool
+    | Number Int
+    | Conjunction Predicate Predicate
+    | Disjunction Predicate Predicate
+    | Negation Predicate
+    | Conditional Predicate Predicate Predicate
+    | UnaryOp Name Predicate
+    | BinaryOp Name Predicate Predicate
+    deriving (Eq, Ord)
 
 
 
@@ -143,7 +153,7 @@ instance (Show Type) where
     show Unit = "1"
     show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"
     show (Plus t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
-    show (Bang t1) = "(! " ++ show t1 ++ ")"
+    show (Bang t1) = "(!" ++ show t1 ++ ")"
     show (TypeVar x) = getName x
     show (ExistentialTypeVar x) = "?" ++ getName x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
@@ -168,7 +178,8 @@ instance Hashable Scheme where
 
 instance Hashable Type where
     hashWithSalt a t = case t of
-        TyLit l -> hashWithSalt (a+10) l
+        Unit -> hashWithSalt (a+10) "Unit"
+        TyLit l -> hashWithSalt a l
         Fun t1 t2 -> hashWithSalt (a+2000) t1 + hashWithSalt (a+2000) t2
         Tensor t1 t2 -> hashWithSalt (a+3000) t1 + hashWithSalt (a+3000) t2
         With t1 t2 -> hashWithSalt (a+4000) t1 + hashWithSalt (a+4000) t2
@@ -178,6 +189,7 @@ instance Hashable Type where
         ExistentialTypeVar x -> hashWithSalt (a+8000) x
         Sum ts -> sum $ map (hashWithSalt (a+9000)) ts
         ADT tyn tps -> hashWithSalt (a+1000) tyn + sum (map (hashWithSalt (a+1000)) tps)
+        x -> error (" what is this " ++ show x)
 
 
 instance Hashable TyLiteral where

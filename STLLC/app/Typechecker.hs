@@ -43,7 +43,9 @@ runinfer fc i e = runStateT (runStateT (runWriterT $ typeconstraint e) ([], fc))
 -------------------------------------------------------------------------------
 
 addtoblinctx :: Scheme -> Infer ()
-addtoblinctx c = modify (first (Just (Var Lin c) :))
+addtoblinctx c = do
+    (bc, _) <- get
+    traceShow bc $ modify (first (Just (Var Lin c) :))
 
 
 addtobunrctx :: Scheme -> Infer ()
@@ -53,7 +55,9 @@ addtobunrctx c = modify (first (Just (Var Unr c) :))
 wasBLVConsumed :: Int -> Infer Bool
 wasBLVConsumed i = do
     (bc, _) <- get
-    return $ isNothing $ bc !! (length bc - 1 - i) -- Appends are done to the head of the list, so check the index counting from the end
+    case bc !! (length bc - 1 - i) of -- Appends are done to the head of the list, so check the index counting from the end
+      Nothing -> return True
+      Just x -> error $ "BLV " ++ show x ++ " wasn't consumed!"
 
 
 getlastvarindex :: Infer Int
@@ -61,7 +65,9 @@ getlastvarindex = gets (\(bc, _) -> length bc - 1)
 
 
 equalDeltas :: Ctxt -> Ctxt -> Bool
-equalDeltas (ba, _) (bb, _) = catMaybes ba == catMaybes bb || trace "[Typecheck] Failed resource management." False
+equalDeltas (ba, _) (bb, _) = filterD ba == filterD bb || trace ("[Typecheck] Failed resource management comparing " ++ show (filterD ba) ++ " with " ++ show (filterD bb)) False
+    where
+        filterD = filter (\v -> varMult v == Lin) . catMaybes
 
 
 fresh :: Infer Type 
@@ -109,10 +115,10 @@ typeconstraint ce@(Lit x) = return (getLitType x, ce)
 --- hyp --------------------
 
 typeconstraint ce@(BLVar x) = do
-    ctx <- get
-    let (pre, maybeschv:end) = splitAt x $ fst ctx
+    (bc, fc) <- get
+    let (pre, maybeschv:end) = splitAt x bc
     schv <- lift $ lift $ lift maybeschv
-    put (pre ++ Nothing:end, snd ctx)
+    put (pre ++ Nothing:end, fc)
     t <- instantiate $ unVar schv
     return (t, ce)
 
@@ -169,11 +175,13 @@ typeconstraint (LetTensor e1 e2) = do
     tv2 <- fresh
     (t, ce1) <- typeconstraint e1
     addtoblinctx $ trivialScheme tv1
+    lastvari1 <- getlastvarindex
     addtoblinctx $ trivialScheme tv2
-    lastvari <- getlastvarindex
+    lastvari2 <- getlastvarindex
     (t3, ce2) <- typeconstraint e2
-    wasBLVConsumed (lastvari - 1) >>= guard -- make sure linear variables were used and don't exit the binder
-    wasBLVConsumed lastvari >>= guard
+    wasBLVConsumed lastvari1 >>= guard -- make sure linear variables were used and don't exit the binder
+    (bc, _) <- get
+    wasBLVConsumed lastvari2 >>= guard
     writer ((t3, LetTensor ce1 ce2), [Constraint t (Tensor tv1 tv2)])
 
 --- 1 ----------------------
@@ -347,22 +355,33 @@ typeconstraint (CaseOf e exps) = do
     let inferredexps' = catMaybes inferredexps
     let (t1', s1, ce1, ctx1') = head inferredexps'
     guard $ all ((== first catMaybes ctx1') . (\(_,_,_,c) -> first catMaybes c)) (tail inferredexps')
-    let (adtname, adttypes) = getadtname fctx s1
-    guard $ all ((== adtname) . (\(_,constr,_,_) -> fst $ getadtname fctx constr)) (tail inferredexps')
+    (adtname, adttypes) <- getadt fctx s1
+    guard $ all ((== adtname) . (\(_,constr,_,_) -> getadtname fctx constr)) (tail inferredexps')
     writer ((t1', CaseOf ce (map (\(_,s,c,_) -> (s,c)) inferredexps')), Constraint st (ADT adtname adttypes):map (\(t'',_,_,_) -> Constraint t1' t'') (tail inferredexps'))
         where
+            getadt fctx s = case lookup s fctx of
+                        Just (Forall ns (Fun _ (ADT adtname adttypes))) -> do
+                            adttypes' <- mapM (instantiate . Forall ns) adttypes
+                            return (adtname, adttypes') -- Constructor takes an argument
+                        Just (Forall ns (ADT adtname adttypes)) -> do
+                            adttypes' <- mapM (instantiate . Forall ns) adttypes
+                            return (adtname, adttypes') -- Constructor does not take an argument
+
             getadtname fctx s = case lookup s fctx of
-                        Just (Forall _ (Fun _ (ADT adtname adttypes))) -> (adtname, adttypes) -- Constructor takes an argument
-                        Just (Forall _ (ADT adtname adttypes)) -> (adtname, adttypes) -- Constructor does not take an argument
+                        Just (Forall _ (Fun _ (ADT adtname _))) -> adtname -- Constructor takes an argument
+                        Just (Forall _ (ADT adtname _)) -> adtname -- Constructor does not take an argument
+
 
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst, Int)
 typeinfer fc e = do
     ((((ctype, cexp), constraints), (bc, _)), i') <- runinfer fc 0 e
     -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity?
-    s <- solveconstraints Map.empty constraints
-    let (ctype', cexp') = apply s (ctype, cexp)
-    return (ctype', cexp', s, i')
+    case solveconstraints Map.empty constraints of
+      Nothing -> error ("[TypeInfer] Failed solving constraints " ++ show constraints)
+      Just s -> do
+        let (ctype', cexp') = apply s (ctype, cexp)
+        return (ctype', cexp', s, i')
 
 
 

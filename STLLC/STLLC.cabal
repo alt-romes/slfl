@@ -60,5 +60,6 @@ executable STLLC
         Typechecker,
         Util,
         Constraints,
-        Program
+        Program,
+        Minimize
 

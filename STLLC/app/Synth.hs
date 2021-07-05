@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Synth (synthAllType, synthType, synthMarks, synthMarksModule, synth, runtesti, runteste) where
+module Synth (synthAllType, synthType, synthMarks, synthMarksModule, synth) where
 
 import Data.List
 import qualified Data.Set as Set
@@ -20,6 +20,7 @@ import Syntax
 import Program
 import Util
 import Constraints
+import Minimize
 import Typechecker (instantiateFrom)
 
 
@@ -56,18 +57,18 @@ data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type 
 runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> ([Expr], MemoTable)
 runSynth n (g, d) t st adtds =
     
-    let (exps_deltas, (memot, _, _)) = runReader (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (fst recf) adtds in
+    let (exps_deltas, (memot, _, _)) = runReader (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds in
         (map fst exps_deltas, memot)
 
     where
         synthComplete (g, d, o) t = do
-            (e, d') <- memoizesynth synth ([recf], d, o) t <|> memoizesynth synth (g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
+            (e, d') <- memoizesynth synth (recf, d, o) t <|> memoizesynth synth (g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
             guard $ null d'
             return (e, d')
 
         recf = case g of
-                 [] -> error "No recursive name" -- Head of Gamma is the recursive name since the recursive signature is the last added to the gamma context
-                 x:xs -> x
+                 [] -> []
+                 x:xs -> [x] -- head of Gamma is the recursive name since the recursive signature is the last added to the gamma context
 
 
 initSynthState :: MemoTable -> Int -> SynthState
@@ -698,54 +699,10 @@ synthMarks ex adts = transformM transformfunc ex
 
 -- pre: program has been type inferred
 synthMarksModule :: Program -> Program
-synthMarksModule (Program adts bs ts cs) = Program adts (synthMarksModule' Map.empty bs) ts cs
+synthMarksModule (Program adts bs ts cs) = minimize $ Program adts (synthMarksModule' Map.empty bs) ts cs
     where
         synthMarksModule' _ [] = []
         synthMarksModule' memot ((Binding n e):xs) =
             let (syne, memot') = runState (synthMarks e adts) memot in
                 (Binding n syne : synthMarksModule' memot' xs)
-
-
-
-
-
-
-
-
-tt :: Int -> LogicT (State [Int]) Int
-tt i = do
-    modify (i:)
-    guard $ odd i
-    return i
-
-
-teste :: LogicT (State [Int]) (Int, Int)
-teste = do
-    x <- tt 1 <|> (tt 4 >> tt 3) <|> tt 2
-    y <- tt 4 <|> tt 5
-    return (x, y)
-
-runteste = runState (observeAllT teste) []
-
-
-
-tts :: Int -> StateT [Int] Logic Int
-tts i = do
-    modify (i:)
-    guard $ odd i
-    return i
-
-
-testi :: StateT [Int] Logic (Int, Int)
-testi = do
-    x <- tts 1 <|> (tts 4 >> tts 3) <|> tts 2
-    y <- tts 4 <|> tts 5
-    return (x, y)
-
-runtesti = observeAll (runStateT testi [])
-
-
-
-
-
 

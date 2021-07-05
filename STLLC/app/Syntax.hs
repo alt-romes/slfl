@@ -100,13 +100,13 @@ instance (Show Expr) where
             showexpr' d (Abs x _ e) = "(λ" ++ x ++ " -o " ++ showexpr' (d+1) e ++ ")"
             showexpr' d (App e1 e2@(App _ _)) = showexpr' d e1 ++ " (" ++ showexpr' d e2 ++ ")"
             showexpr' d (App e1 e2) = showexpr' d e1 ++ " " ++ showexpr' d e2
-            showexpr' d (TensorValue e1 e2) = "( " ++ showexpr' d e1 ++ " , " ++ showexpr' d e2 ++ " )"
+            showexpr' d (TensorValue e1 e2) = "(" ++ showexpr' d e1 ++ ", " ++ showexpr' d e2 ++ ")"
             showexpr' d (LetTensor u v e1 e2) = indent d ++ "let " ++ u ++ "*" ++ v ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d UnitValue = "()"
             showexpr' d (LetUnit e1 e2) = indent d ++ "let _ = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (WithValue e1 e2) = "( " ++ showexpr' d e1 ++ " | " ++ showexpr' d e2 ++ " )"
-            showexpr' d (Fst a@(App _ _)) = "fst (" ++ showexpr' d a ++ ")"
-            showexpr' d (Snd a@(App _ _)) = "snd (" ++ showexpr' d a ++ ")"
+            showexpr' d (Fst a@(App _ _)) = "(fst (" ++ showexpr' d a ++ "))"
+            showexpr' d (Snd a@(App _ _)) = "(snd (" ++ showexpr' d a ++ "))"
             showexpr' d (Fst e) = "(fst " ++ showexpr' d e ++ ")"
             showexpr' d (Snd e) = "(snd " ++ showexpr' d e ++ ")"
             -- showexpr' d (InjL (Just t) e) = "inl " ++ showexpr' d e ++ " : " ++ show t
@@ -116,7 +116,7 @@ instance (Show Expr) where
             showexpr' d (CaseOfPlus e1 x e2 y e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
                                                         indent (d+1) ++ "  inl " ++ x ++ " -> " ++ showexpr' (d+2) e2 ++
                                                         indent (d+1) ++ "| inr " ++ y ++ " -> " ++ showexpr' (d+2) e3
-            showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
+            showexpr' d (BangValue e) = "(!" ++ showexpr' d e ++ ")"
             showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (Mark _ _ _ (Just t)) = "{{ " ++ show t ++ " }}"

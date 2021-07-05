@@ -15,3 +15,8 @@
 26) more haskell-like syntax
 27) pedir ao prof ajuda para perceber como acontecem aqueles saltos (primeiro D3 depois de um D8 RADT), correr teste do concat
 28) fix infinite recursion on concat List (List a) -> List a
+29) i can't infer this  main :: forall a b c d . ((! (a -o b)) -o (((! (a -o b)) -o (d -o c)) -o (d -o c)));
+                        main e f g = let !h = e in f ! (λk -o h k) g;
+    because f !(\k -o h k) g doesn't consume g ?? but !h works ?? =)
+    
+
