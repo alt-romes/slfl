@@ -272,7 +272,8 @@ ty = tylit <|> parens type'
 
 
 tylit :: Parser Type 
-tylit =      sumty
+tylit =     sumty
+        <|> try refinementty
         <|> (reservedOp "1" >> return Unit)
         <|> (reserved "Nat" >> return (TyLit TyNat))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- !TODO: fazer parse de lowercase identifiers as type variables :)
@@ -282,6 +283,47 @@ tylit =      sumty
         <|> (reservedOp "e" >> return (TypeVar 4))
         <|> (reservedOp "f" >> return (TypeVar 5))
         <|> adty -- TODO: can't write ADTs starting by any of those letters above ^:) e não consegui resolver com o try (fazer "starts with uppercase" e assim)
+
+
+refinementty :: Parser Type
+refinementty = do
+    name <- identifier
+    reservedOp "{"
+    typ <- ty
+    pred <- option Nothing (do
+        reservedOp "|"
+        Just <$> predicate
+        )
+    reservedOp "}"
+    return $ RefinementType name typ pred
+
+predicate :: Parser Predicate
+predicate = Ex.buildExpressionParser tyops predname
+    where 
+        infixOp x f = Ex.Infix (reservedOp x >> return f)
+        prefixOp x f = Ex.Prefix (reservedOp x >> return f)
+        tyops = [[
+            infixOp "==" (BinaryOp "==") Ex.AssocNone,
+            infixOp ">=" (BinaryOp ">=") Ex.AssocNone,
+            infixOp ">" (BinaryOp ">") Ex.AssocNone,
+            infixOp "<" (BinaryOp "<") Ex.AssocNone,
+            infixOp "<=" (BinaryOp "<=") Ex.AssocNone
+            ],
+            [
+            prefixOp "-" (UnaryOp "-")
+            ],
+            [
+            infixOp "*" (BinaryOp "*") Ex.AssocLeft,
+            infixOp "/" (BinaryOp "/") Ex.AssocLeft
+            ],
+            [
+            infixOp "+" (BinaryOp "+") Ex.AssocLeft,
+            infixOp "-" (BinaryOp "-") Ex.AssocLeft
+            ]]
+
+        predname = (PVar <$> identifier) <|> (PNum <$> natural)
+
+
 
 
 sumty :: Parser Type

@@ -114,8 +114,8 @@ data TyLiteral = TyNat deriving (Eq, Ord)
 
 data Predicate
     = PVar Name
-    | Boolean Bool
-    | Number Int
+    | PBool Bool
+    | PNum Integer
     | Conjunction Predicate Predicate
     | Disjunction Predicate Predicate
     | Negation Predicate
@@ -158,6 +158,8 @@ instance (Show Type) where
     show (ExistentialTypeVar x) = "?" ++ getName x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
     show (ADT n ts) = n ++ concatMap ((" " ++) . show) ts
+    show (RefinementType n t Nothing) = n ++ " { " ++ show t ++ " }"
+    show (RefinementType n t (Just p)) = n ++ " { " ++ show t ++ " | " ++ show p ++ " }"
 
 
 instance (Show Scheme) where
@@ -170,6 +172,13 @@ instance (Show Literal) where
 
 instance (Show TyLiteral) where
     show TyNat = "Nat"
+
+
+instance Show Predicate where
+    show (PVar n) = n
+    show (PNum n) = show n
+    show (UnaryOp n p) = n ++ show p
+    show (BinaryOp n p1 p2) = show p1 ++ " " ++ n ++ " " ++ show p2
 
 
 instance Hashable Scheme where
