@@ -1,14 +1,14 @@
-STLLC "(a -o (b -o c)) -o ( (a * b) -o c )" # i 1
-STLLC "( (a * b) -o c ) -o ( a -o ( b -o c ) )" # i 2
-STLLC "(a -o (b & c)) -o ((a -o b) & (a -o c))" # ii 1
-STLLC "((a -o b) & (a -o c)) -o (a -o (b & c))" # ii 2
-STLLC "((a + b) -o c) -o ( (a -o c) & (b -o c) )" # iii 1
-STLLC "( (a -o c) & (b -o c) ) -o ((a + b) -o c)" # iii 2
-STLLC "(! (a & b)) -o (! a * ! b)" # iv 1
-STLLC "( ! a * ! b ) -o ( ! (a & b))" # iv 2
-STLLC "(a * 1) -o a" # v 1
-STLLC "a -o (a * 1)" # v 2
-STLLC " ( a & a ) -o a " # viii 1
-STLLC " a -o ( a & a ) " # viii 2
-STLLC "((! (! a)) -o ! a)"
-STLLC "((! a) -o (! (! a)))"
+STLLC "(a -> (b -> c)) -> ( (a * b) -> c )" # i 1
+STLLC "( (a * b) -> c ) -> ( a -> ( b -> c ) )" # i 2
+STLLC "(a -> (b & c)) -> ((a -> b) & (a -> c))" # ii 1
+STLLC "((a -> b) & (a -> c)) -> (a -> (b & c))" # ii 2
+STLLC "((a + b) -> c) -> ( (a -> c) & (b -> c) )" # iii 1
+STLLC "( (a -> c) & (b -> c) ) -> ((a + b) -> c)" # iii 2
+STLLC "(! (a & b)) -> (! a * ! b)" # iv 1
+STLLC "( ! a * ! b ) -> ( ! (a & b))" # iv 2
+STLLC "(a * 1) -> a" # v 1
+STLLC "a -> (a * 1)" # v 2
+STLLC " ( a & a ) -> a " # viii 1
+STLLC " a -> ( a & a ) " # viii 2
+STLLC "((! (! a)) -> ! a)"
+STLLC "((! a) -> (! (! a)))"

@@ -30,7 +30,7 @@ lambda = do
     reservedOp "\\" <|> reservedOp "λ"
     x <- identifier
     t <- option Nothing (do { reservedOp ":"; Just <$> ty })
-    try (do { reservedOp "-o"; Syntax.Abs x t <$> expr }) <|> do {reservedOp "->"; Syntax.UnrestrictedAbs x t <$> expr }
+    try (do { reservedOp "->"; Syntax.Abs x t <$> expr }) <|> do {reservedOp "=>"; Syntax.UnrestrictedAbs x t <$> expr }
 
 
 -- A (*) B
@@ -275,7 +275,7 @@ tylit :: Parser Type
 tylit =     sumty
         <|> try refinementty
         <|> (reservedOp "1" >> return Unit)
-        <|> (reserved "Nat" >> return (TyLit TyNat))
+        <|> (reserved "Int" >> return (TyLit TyInt))
         <|> (reservedOp "a" >> return (TypeVar 0)) -- !TODO: fazer parse de lowercase identifiers as type variables :)
         <|> (reservedOp "b" >> return (TypeVar 1))
         <|> (reservedOp "c" >> return (TypeVar 2))
@@ -354,7 +354,7 @@ type' = Ex.buildExpressionParser tyops ty
         infixOp x f = Ex.Infix (reservedOp x >> return f)
         prefixOp x f = Ex.Prefix (reservedOp x >> return f)
         tyops = [[
-            infixOp "-o" Fun Ex.AssocRight,
+            infixOp "->" Fun Ex.AssocRight,
             infixOp "*" Tensor Ex.AssocLeft,
             infixOp "&" With Ex.AssocLeft,
             infixOp "+" Plus Ex.AssocLeft,

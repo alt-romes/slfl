@@ -4,19 +4,19 @@ data Maybe a = Nothing | Just a;
 
 
 
-synth singleton :: (a -o List a);
+synth singleton :: (a -> List a);
 
-synth append :: (List a -o List a -o List a);
+synth append :: (List a -> List a -> List a);
 
-synth map :: ((!(a -o b)) -o List a -o List b);
+synth map :: ((!(a -> b)) -> List a -> List b);
 
-synth foldl :: (!(b -o a -o b) -o b -o List a -o b);
+synth foldl :: (!(b -> a -> b) -> b -> List a -> b);
 
-synth uncons :: (List a -o Maybe (a * List a));
+synth uncons :: (List a -> Maybe (a * List a));
 
 # is wrong, synth is equal to foldl c parametros trocados -- escrever
-synth foldr :: (!(a -o b -o b) -o b -o List a -o b);
+synth foldr :: (!(a -> b -> b) -> b -> List a -> b);
 
-synth insert :: (a -o List a -o List a);
+synth insert :: (a -> List a -> List a);
 
-#synth concat :: (List (List a) -o List a);
+#synth concat :: (List (List a) -> List a);

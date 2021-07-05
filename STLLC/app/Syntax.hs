@@ -97,7 +97,7 @@ instance (Show Expr) where
             showexpr' d (Lit x) = show x
             showexpr' d (Var x) = x
             -- showexpr' d (Abs x (Just t) e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -o " ++ showexpr' (d+1) e ++ ")"
-            showexpr' d (Abs x _ e) = "(λ" ++ x ++ " -o " ++ showexpr' (d+1) e ++ ")"
+            showexpr' d (Abs x _ e) = "(λ" ++ x ++ " -> " ++ showexpr' (d+1) e ++ ")"
             showexpr' d (App e1 e2@(App _ _)) = showexpr' d e1 ++ " (" ++ showexpr' d e2 ++ ")"
             showexpr' d (App e1 e2) = showexpr' d e1 ++ " " ++ showexpr' d e2
             showexpr' d (TensorValue e1 e2) = "(" ++ showexpr' d e1 ++ ", " ++ showexpr' d e2 ++ ")"
@@ -138,7 +138,7 @@ instance (Show Expr) where
                                                                 showexpr' (d+2) ex) "" exps
 
             -- showexpr' d (UnrestrictedAbs x (Just t) e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -> " ++ showexpr' (d+1) e ++ ")"
-            showexpr' d (UnrestrictedAbs x _ e) = indent d ++ "(λ" ++ x ++ " -> " ++ showexpr' (d+1) e ++ ")"
+            showexpr' d (UnrestrictedAbs x _ e) = indent d ++ "(λ" ++ x ++ " => " ++ showexpr' (d+1) e ++ ")"
 
             indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
 

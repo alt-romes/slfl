@@ -110,7 +110,7 @@ data Type
     
     deriving (Eq, Ord)
 
-data TyLiteral = TyNat deriving (Eq, Ord)
+data TyLiteral = TyInt deriving (Eq, Ord)
 
 data Predicate
     = PVar Name
@@ -148,7 +148,7 @@ instance (Show CoreExpr) where
 
 instance (Show Type) where 
     show (TyLit l) = show l
-    show (Fun t1 t2) = "(" ++ show t1 ++ " -o " ++ show t2 ++ ")"
+    show (Fun t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
     show (Tensor t1 t2) = "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
     show Unit = "1"
     show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"
@@ -171,7 +171,7 @@ instance (Show Literal) where
 
 
 instance (Show TyLiteral) where
-    show TyNat = "Nat"
+    show TyInt = "Int"
 
 
 instance Show Predicate where
@@ -202,7 +202,7 @@ instance Hashable Type where
 
 
 instance Hashable TyLiteral where
-    hashWithSalt a TyNat = hashWithSalt (a+10) "TyNat"
+    hashWithSalt a TyInt = hashWithSalt (a+10) "TyInt"
 
 
 
@@ -255,11 +255,11 @@ trivialScheme = Forall []
 
 
 trivialNat :: Type
-trivialNat = TyLit TyNat
+trivialNat = TyLit TyInt
 
 
 getLitType :: Literal -> Type
-getLitType (Nat x) = TyLit TyNat
+getLitType (Nat x) = TyLit TyInt
 
 
 isInType :: Type -> Type -> Bool
