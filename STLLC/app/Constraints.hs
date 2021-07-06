@@ -3,6 +3,7 @@ module Constraints (Constraint(..), Subst(..), Substitutable(..), ftv, solvecons
 
 import Data.List (sortBy)
 import Data.Bifunctor (second)
+import Data.Char (ord)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Debug.Trace
@@ -59,8 +60,20 @@ instance Substitutable Type where
     apply s t@(ExistentialTypeVar i) = Map.findWithDefault t (-i) s
     apply s (Sum tl) = Sum $ map (second $ apply s) tl
     apply s (ADT n tp) = ADT n $ map (apply s) tp
-    apply s (RefinementType n tp p) = RefinementType n (apply s tp) p
+    apply s t@(RefinementType n tp p) =
+        case Map.lookup (keyFromName n) s of
+          Nothing -> RefinementType n (apply s tp) (apply s p)
+          Just (RefinementType n' tp' p') -> RefinementType n' (apply s tp') (apply s p')
     apply s t = t
+
+
+instance Substitutable Predicate where
+    apply s (PVar name) = case Map.lookup (keyFromName name) s of
+                            Nothing -> PVar name
+                            Just (RefinementType n' _ _) -> PVar n'
+    apply s (PNum i) = PNum i
+    apply s (BinaryOp n p p') = BinaryOp n (apply s p) (apply s p') 
+    apply s (Conjunction p p') = Conjunction (apply s p) (apply s p') 
 
 
 instance Substitutable CoreExpr where
@@ -147,15 +160,24 @@ unify (Plus t1 t2) (Plus t1' t2') = do
     s' <- unify (apply s t2) (apply s t2')
     return $ compose s' s
 unify (Bang x) (Bang y) = unify x y
-unify (RefinementType _ x p) (RefinementType _ y p') = unify x y -- Verification Conditions are checked later
-unify (RefinementType _ x _) y = unify x y                       -- TODO: Unifico tudo, e no fim é que verifico se as condições são satisfazíveis, OK?
-unify x (RefinementType _ y _) = unify x y                       -- Refinements are checked after inference
+unify a@(RefinementType n x (Just p)) (RefinementType n' y Nothing) = do
+    s' <- unify x y
+    return $ compose (Map.singleton (keyFromName n') a) s' -- TODO: keyFromName can generate number collisions, ignore for now
+unify a@(RefinementType n x Nothing) b@(RefinementType n' y (Just p')) = unify b a
+unify a@(RefinementType n x Nothing) (RefinementType n' y Nothing) = compose (Map.singleton (keyFromName n') a) <$> unify x y
+unify (RefinementType n x (Just p)) (RefinementType n' y (Just p')) = do
+    s <- unify x y
+    return $ Map.singleton (keyFromName n) (RefinementType n x (Just $ Conjunction p p')) `compose` Map.singleton (keyFromName n') (RefinementType n x (Just $ Conjunction p p')) `compose` s -- weird
+unify (RefinementType _ x _) y = unify x y
+unify x (RefinementType _ y _) = unify x y 
 unify (Sum xtl) (Sum ytl) = do
     let xtl' = sortBy (\(a,_) (b,_) -> compare a b) xtl
     let ytl' = sortBy (\(a,_) (b,_) -> compare a b) ytl
     let maybesubs = zipWith (\x y -> snd x `unify` snd y) xtl' ytl'
     foldM (\p n -> compose p <$> n) Map.empty maybesubs
 unify _ _ = Nothing
+
+keyFromName n = - (sum $ map ord n)
 
 
 unifyExistential :: Type -> Type -> Maybe Subst 
@@ -190,7 +212,6 @@ unifyExistential (Plus t1 t2) (Plus t1' t2') = do
     s' <- unifyExistential (apply s t2) (apply s t2')
     return $ compose s' s
 unifyExistential (Bang x) (Bang y) = unifyExistential x y
-unifyExistential (RefinementType _ x _) (RefinementType _ y _) = unifyExistential x y
 unifyExistential (Sum xtl) (Sum ytl) = do
     let xtl' = sortBy (\(a,_) (b,_) -> compare a b) xtl
     let ytl' = sortBy (\(a,_) (b,_) -> compare a b) ytl

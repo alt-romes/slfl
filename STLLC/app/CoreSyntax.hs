@@ -180,6 +180,7 @@ instance Show Predicate where
     show (PNum n) = show n
     show (UnaryOp n p) = n ++ show p
     show (BinaryOp n p1 p2) = show p1 ++ " " ++ n ++ " " ++ show p2
+    show (Conjunction p1 p2) = show p1 ++ " ^ " ++ show p2
 
 
 instance Hashable Scheme where

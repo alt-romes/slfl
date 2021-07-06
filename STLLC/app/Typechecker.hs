@@ -28,11 +28,11 @@ type Ctxt = (BoundCtxt, FreeCtxt)
 -- Infer "Monad"
 -------------------------------------------------------------------------------
 
-type Infer = WriterT [Constraint] (StateT Ctxt (StateT (Int, [(Type, (Type,Type))]) Maybe))
+type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
 
 
-runinfer :: FreeCtxt -> Int -> CoreExpr -> Maybe ((((Type, CoreExpr), [Constraint]), Ctxt), (Int, [(Type, (Type,Type))]))
-runinfer fc i e = runStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) (i, [])
+runinfer :: FreeCtxt -> Int -> CoreExpr -> Maybe ((((Type, CoreExpr), [Constraint]), Ctxt), Int)
+runinfer fc i e = runStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) i
 
 
 
@@ -70,14 +70,10 @@ equalDeltas (ba, _) (bb, _) = filterD ba == filterD bb || trace ("[Typecheck] Fa
         filterD = filter (\v -> varMult v == Lin) . catMaybes
 
 
-addrefinementsubs :: Type -> Type -> Infer () -- Add entry meaning T1 is the result of a function applied to T2, and used to replace occurences of T2 name in T1 refinements
-addrefinementsubs t t' = lift $ lift $ modify $ second ((t, (t,t')):)
-
-
 fresh :: Infer Type 
 fresh = do 
-    (n, m) <- lift $ lift get 
-    lift $ lift $ put (n+1, m)
+    n <- lift $ lift get 
+    lift $ lift $ put (n+1)
     return $ TypeVar n 
 
 
@@ -117,8 +113,8 @@ typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 --- lit --------------------
 
 typeconstraint ce@(Lit (Int x)) = do
-    (i, m) <- lift $ lift get
-    lift $ lift $ put (i+1, m)
+    i <- lift $ lift get
+    lift $ lift $ put (i+1)
     let name = getName i
     return (RefinementType name (TyLit TyInt) (Just $ BinaryOp "==" (PVar name) (PNum x)), ce)
 
@@ -169,7 +165,6 @@ typeconstraint (App e1 e2) = do
     tv <- fresh 
     (t1, ce1) <- typeconstraint e1
     (t2, ce2) <- typeconstraint e2
-    addrefinementsubs tv t2
     writer ((tv, App ce1 ce2), [Constraint t1 (Fun t2 tv)])
 
 --- * ----------------------
@@ -306,8 +301,8 @@ typeconstraint (Mark i n _ t) = do
     let t' = fromMaybe (trivialScheme tv) t
     case t' of
       Forall [] t'' -> do
-        (vari, m) <- lift $ lift get
-        lift $ lift $ put (vari + length (ftv t''), m)
+        vari <- lift $ lift get
+        lift $ lift $ put (vari + length (ftv t''))
         return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t''))
       _ -> error "Type inference shouldn't have marks with bound polimorfic variables"
 
@@ -386,23 +381,13 @@ typeconstraint (CaseOf e exps) = do
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst, Int)
 typeinfer fc e = do
-    ((((ctype, cexp), constraints), (bc, _)), (i',m)) <- runinfer fc 0 e
+    ((((ctype, cexp), constraints), (bc, _)), i') <- runinfer fc 0 e
     -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity?
     case solveconstraints Map.empty constraints of
       Nothing -> error ("[TypeInfer] Failed solving constraints " ++ show constraints)
       Just s -> do
-        let m' = map (second (substrefinements . apply s)) m
-          -- ADD HERE SUBSTITUTION ON REFINEMENTS
         let (ctype', cexp') = apply s (ctype, cexp)
         return (ctype', cexp', s, i')
-
-    where
-        substrefinements :: (Type, Type) -> Type -- Replace names inside refinements from function application
-        substrefinements (t1, t2) = undefined --case t1 of
-            -- RefinementType name ty pred -> case t2 of 
-            --     RefinementType name' ty pred' -> 
-            -- t -> t
-
 
 
 
