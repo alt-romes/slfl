@@ -6,15 +6,15 @@
 
 #rmult = mult 4;
 
-num :: x { Int | x < 0 }
+num :: x { Int | x > 0 }
 num = 3;
 
 #     smtSat (x > 0) 
 #  ------------------ (ENT-Emp??? ent e o ctxt?)
 #   x: Int |- x > 0
 # ----------------------- (WF-Base)
-nat :: x { Int | x > 0 };
-nat = add 6 3;
+#nat :: x { Int | x > 0 };
+#nat = add 6 3;
 
 #                               x:Int, y:Int |- true            X:Int, y:Int, z:Int |- z == x + y
 #                              ----------------------         ----------------------------------------------- (WF-BASE?)
@@ -33,3 +33,7 @@ plus x y = add x y;
 # ---------------------------------------------------------------------------
 inc :: (x { Int | x > 0 } -> z { Int | z == x + 1 });
 inc x = add x 1;
+
+
+pluswrong :: (x { Int } -> y { Int | y == x } -> z { Int | z > x + y });
+pluswrong x y = add x y;

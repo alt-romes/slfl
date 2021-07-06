@@ -301,23 +301,27 @@ predicate = Ex.buildExpressionParser tyops predname
     where 
         infixOp x f = Ex.Infix (reservedOp x >> return f)
         prefixOp x f = Ex.Prefix (reservedOp x >> return f)
-        tyops = [[
+        tyops = [
+            [
+            prefixOp "-" (UnaryOp "-")
+            ],
+            [
+            infixOp "+" (BinaryOp "+") Ex.AssocLeft,
+            infixOp "-" (BinaryOp "-") Ex.AssocLeft
+            ],
+            [
+            infixOp "*" (BinaryOp "*") Ex.AssocLeft
+            ],
+            [
+            infixOp "&&" (BinaryOp "&&") Ex.AssocNone,
+            infixOp "||" (BinaryOp "||") Ex.AssocNone
+            ],
+            [
             infixOp "==" (BinaryOp "==") Ex.AssocNone,
             infixOp ">=" (BinaryOp ">=") Ex.AssocNone,
             infixOp ">" (BinaryOp ">") Ex.AssocNone,
             infixOp "<" (BinaryOp "<") Ex.AssocNone,
             infixOp "<=" (BinaryOp "<=") Ex.AssocNone
-            ],
-            [
-            prefixOp "-" (UnaryOp "-")
-            ],
-            [
-            infixOp "*" (BinaryOp "*") Ex.AssocLeft,
-            infixOp "/" (BinaryOp "/") Ex.AssocLeft
-            ],
-            [
-            infixOp "+" (BinaryOp "+") Ex.AssocLeft,
-            infixOp "-" (BinaryOp "-") Ex.AssocLeft
             ]]
 
         predname = (PVar <$> identifier) <|> (PNum <$> natural)

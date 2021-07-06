@@ -65,7 +65,7 @@ maindesugarModule :: String -> IO Program
 maindesugarModule fname = do
    bindings <- mainparseModule fname
    let cbindings = desugarModule bindings -- desugaring is automatically followed by typechecking+inference
-   return $ typeinferModule cbindings
+   typeinferModule cbindings
 
 
 maintypecheckModule :: String -> IO Program

@@ -61,19 +61,20 @@ instance Substitutable Type where
     apply s (Sum tl) = Sum $ map (second $ apply s) tl
     apply s (ADT n tp) = ADT n $ map (apply s) tp
     apply s t@(RefinementType n tp p) =
-        case Map.lookup (keyFromName n) s of
-          Nothing -> RefinementType n (apply s tp) (apply s p)
-          Just (RefinementType n' tp' p') -> RefinementType n' (apply s tp') (apply s p')
+        RefinementType n (apply s tp) p
+        -- case Map.lookup (keyFromName n) s of
+        --   Nothing -> RefinementType n (apply s tp) (apply s p)
+        --   Just (RefinementType n' tp' p') -> RefinementType n' (apply s tp') (apply s p')
     apply s t = t
 
 
-instance Substitutable Predicate where
-    apply s (PVar name) = case Map.lookup (keyFromName name) s of
-                            Nothing -> PVar name
-                            Just (RefinementType n' _ _) -> PVar n'
-    apply s (PNum i) = PNum i
-    apply s (BinaryOp n p p') = BinaryOp n (apply s p) (apply s p') 
-    apply s (Conjunction p p') = Conjunction (apply s p) (apply s p') 
+-- instance Substitutable Predicate where
+--     apply s (PVar name) = case Map.lookup (keyFromName name) s of
+--                             Nothing -> PVar name
+--                             Just (RefinementType n' _ _) -> PVar n'
+--     apply s (PNum i) = PNum i
+--     apply s (BinaryOp n p p') = BinaryOp n (apply s p) (apply s p') 
+--     apply s (Conjunction p p') = Conjunction (apply s p) (apply s p') 
 
 
 instance Substitutable CoreExpr where
@@ -161,13 +162,15 @@ unify (Plus t1 t2) (Plus t1' t2') = do
     return $ compose s' s
 unify (Bang x) (Bang y) = unify x y
 unify a@(RefinementType n x (Just p)) (RefinementType n' y Nothing) = do
-    s' <- unify x y
-    return $ compose (Map.singleton (keyFromName n') a) s' -- TODO: keyFromName can generate number collisions, ignore for now
+    unify x y
+    -- s' <- unify x y
+    -- return $ compose (Map.singleton (keyFromName n') a) s' -- TODO: keyFromName can generate number collisions, ignore for now
 unify a@(RefinementType n x Nothing) b@(RefinementType n' y (Just p')) = unify b a
-unify a@(RefinementType n x Nothing) (RefinementType n' y Nothing) = compose (Map.singleton (keyFromName n') a) <$> unify x y
+unify a@(RefinementType n x Nothing) (RefinementType n' y Nothing) = unify x y -- compose (Map.singleton (keyFromName n') a) <$> unify x y
 unify (RefinementType n x (Just p)) (RefinementType n' y (Just p')) = do
-    s <- unify x y
-    return $ Map.singleton (keyFromName n) (RefinementType n x (Just $ Conjunction p p')) `compose` Map.singleton (keyFromName n') (RefinementType n x (Just $ Conjunction p p')) `compose` s -- weird
+    unify x y
+    -- s <- unify x y
+    -- return $ Map.singleton (keyFromName n) (RefinementType n x (Just $ Conjunction p p')) `compose` Map.singleton (keyFromName n') (RefinementType n x (Just $ Conjunction p p')) `compose` s -- weird
 unify (RefinementType _ x _) y = unify x y
 unify x (RefinementType _ y _) = unify x y 
 unify (Sum xtl) (Sum ytl) = do

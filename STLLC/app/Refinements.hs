@@ -1,11 +1,13 @@
-module Refinements (satunifyrefinements) where 
+module Refinements (satunifyrefinements, getvc, renameR, composeVC) where 
 
 import Control.Monad.State
 import Debug.Trace
-import Data.Set hiding (map)
+import Data.Maybe
+import Data.Set as Set hiding (map)
 import qualified Data.Map as Map
 import Data.Bifunctor
 import Data.List (intercalate)
+import Data.SBV as SBV hiding (Predicate)
 
 import CoreSyntax
 import Util
@@ -75,9 +77,10 @@ composeVC (VCPred s p) (VCImpl s' ps) = VCImpl (s' `union` s) (p:ps)
 composeVC (VCImpl s ps) (VCTrue s') = VCTrue (s' `union` s)
 composeVC (VCImpl s ps) (VCPred s' p') = VCImpl (s' `union` s) (ps ++ [p'])
 composeVC (VCImpl s ps) (VCImpl s' ps') = VCImpl (s' `union` s) (ps ++ ps')
+composeVC (VCConj v1 v2) (VCConj v1' v2') = VCConj (v1 `composeVC` v1') (v2 `composeVC` v2')
 composeVC x (VCConj v1 v2) = VCConj (x `composeVC` v1) (x `composeVC` v2)
-composeVC (VCConj v1 v2) y = y
--- composeVC x y = error ("[Refinement] Composing " ++ show x ++ " with " ++ show y)
+-- composeVC (VCConj v1 v2) y = y
+composeVC x y = error ("[Refinement] Composing " ++ show x ++ " with " ++ show y)
 
 
 getvc :: Type -> VerificationCondition
@@ -91,14 +94,94 @@ getvc t = case t of
     t' -> VCTrue empty -- TODO: What to do with other types inside a dependent function?
 
 
-satunifyrefinements :: Type -> Type -> Bool
+satunifyrefinements :: Type -> Type -> IO Bool
 satunifyrefinements t t' = do -- Rename to match the refinement variables in the two types so that the composition is useful
-    satvc (getvc (renameR t) `composeVC` getvc (renameR t'))
+    trace ("composing " ++ show (getvc (renameR t)) ++ "\nwith " ++ show (getvc (renameR t')) ++ "\nto get " ++ show (getvc (renameR t) `composeVC` getvc (renameR t'))) $ satvc (getvc (renameR t) `composeVC` getvc (renameR t'))
 
 
 
-satvc :: VerificationCondition -> Bool
-satvc vc = traceShow vc True
-    
+satvc :: VerificationCondition -> IO Bool
+satvc vc = case vc of
+    VCTrue _ -> return True
+    VCPred s p -> modelExists <$> res
+        where
+            res :: IO SatResult
+            res = sat $ do
+                intls <- mapM (\(n,t) -> makeSInt (n,t) >>= \x' -> return (n, x')) (toList $ Set.filter (isInt . snd) s)
+                constrainPred intls p
+
+    VCImpl s ps -> modelExists <$> res
+        where
+            res :: IO SatResult
+            res = sat $ do
+                intls <- mapM (\(n,t) -> makeSInt (n,t) >>= \x' -> return (n, x')) (toList $ Set.filter (isInt . snd) s)
+                mapM_ (constrainPred intls) ps
+        
+
+    VCConj v1 v2 -> do
+        s1 <- satvc v1
+        s2 <- satvc v2
+        return $ s1 && s2
 
 
+makeSInt :: (String, Type) -> Symbolic SInteger
+makeSInt (n, TyLit TyInt) = sInteger n
+
+
+constrainPred :: [(Name, SInteger)] -> Predicate -> Symbolic ()
+constrainPred ls (BinaryOp name p1 p2)
+    | name == "==" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        constrain $ sv1 .== sv2
+
+    | name == ">=" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        constrain $ sv1 .>= sv2
+
+    | name == ">" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        constrain $ sv1 .> sv2
+
+    | name == "<" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        constrain $ sv1 .< sv2
+
+    | name == "<=" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        constrain $ sv1 .<= sv2
+
+    | otherwise = error ("[Refinement] No boolean op in predicate " ++ show (BinaryOp name p1 p2))
+
+    where
+        getSVals ls p1 p2 = do
+            sv1 <- getSValPred ls p1
+            sv2 <- getSValPred ls p2
+            return (sv1, sv2)
+
+
+getSValPred :: [(Name, SInteger)] -> Predicate -> Symbolic SInteger
+getSValPred ls (BinaryOp name p1 p2)
+
+    | name == "+" = do
+        sv1 <- getSValPred ls p1
+        sv2 <- getSValPred ls p2
+        return $ sv1 + sv2
+
+    | name == "-" = do
+        sv1 <- getSValPred ls p1
+        sv2 <- getSValPred ls p2
+        return $ sv1 - sv2
+
+    | name == "*" = do
+        sv1 <- getSValPred ls p1
+        sv2 <- getSValPred ls p2
+        return $ sv1 * sv2
+       
+    | otherwise = error "[Refinement] Error 6"
+
+getSValPred ls (PVar n) =
+    case lookup n ls of
+        Just sv -> return sv
+        Nothing -> error ("[Refinement] No symbolic integer variable " ++ show n ++ " in " ++ show ls)
+
+getSValPred ls (PNum i) = return $ literal i

@@ -2,7 +2,7 @@
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
     Literal(..), TyLiteral(..), isInType, trivialInt,
-    isExistentialType, Predicate(..), trivialIntRefinement) where 
+    isExistentialType, Predicate(..), trivialIntRefinement, isInt) where 
 
 import Control.Monad
 import Data.Maybe
@@ -179,7 +179,7 @@ instance Show Predicate where
     show (PVar n) = n
     show (PNum n) = show n
     show (UnaryOp n p) = n ++ show p
-    show (BinaryOp n p1 p2) = show p1 ++ " " ++ n ++ " " ++ show p2
+    show (BinaryOp n p1 p2) = "(" ++ show p1 ++ " " ++ n ++ " " ++ show p2 ++ ")"
     show (Conjunction p1 p2) = show p1 ++ " ^ " ++ show p2
 
 
@@ -256,9 +256,13 @@ transform f e = runIdentity (transformM (return . f) e)
 trivialScheme :: Type -> Scheme 
 trivialScheme = Forall []
 
-
 trivialInt :: Type
 trivialInt = TyLit TyInt
+
+isInt :: Type -> Bool
+isInt t = case t of
+            TyLit TyInt -> True
+            _ -> False
 
 trivialRefinement :: Name -> Type -> Type
 trivialRefinement n t = RefinementType n t Nothing

@@ -387,8 +387,14 @@ typeinfer fc e = do
       Nothing -> error ("[TypeInfer] Failed solving constraints " ++ show constraints)
       Just s -> do
         let (ctype', cexp') = apply s (ctype, cexp)
+        let ctype'' = updateRefinements undefined ctype'
         return (ctype', cexp', s, i')
 
+    where
+        updateRefinements refsapps r@(RefinementType n t p) =
+            case Map.lookup n refsapps of
+              Nothing -> r
+              Just r' -> RefinementType n t p
 
 
 
@@ -438,15 +444,17 @@ typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] e)
 
 
-typeinferModule :: Program -> Program -- typecheck and use inferred types
-typeinferModule (Program adts bs ts cbs) =
-    let (finalcbs, finalts) = typeinferModule' cbs (processadts adts ++ generalizetbs ts) in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
-            completeFrontendMarksCtx $ Program adts bs finalts finalcbs
+typeinferModule :: Program -> IO Program -- typecheck and use inferred types
+typeinferModule (Program adts bs ts cbs) = do
+
+    (finalcbs, finalts) <- typeinferModule' cbs (processadts adts ++ generalizetbs ts)  -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
+    return $ completeFrontendMarksCtx $ Program adts bs finalts finalcbs
+
     where
-        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> ([CoreBinding], [TypeBinding])
+        typeinferModule' :: [CoreBinding] -> [TypeBinding] -> IO ([CoreBinding], [TypeBinding])
         typeinferModule' corebindings knownts = -- Corebindings to process, knownts = known type bindings, i = next var nº to use in inference, subst = substitution to compose with when solving next constraints
             case corebindings of
-              [] -> ([], knownts)
+              [] -> return ([], knownts)
               (CoreBinding n ce):corebindings' ->
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition (annotation) for this function name
@@ -463,7 +471,7 @@ typeinferModule (Program adts bs ts cbs) =
                          -> FreeCtxt
                          -> CoreExpr
                          -> Scheme
-                         -> ([CoreBinding], [TypeBinding])
+                         -> IO ([CoreBinding], [TypeBinding])
         inferWithRecName corebindings' knownts n tbs_pairs ce selftype@(Forall stvs selftypet) = 
             case typeinfer tbs_pairs ce of -- Use type annotation in inference, and solve it after by adding a constraint manually
               Nothing -> error ("[Typeinfer Module] Failed checking: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
@@ -474,11 +482,12 @@ typeinferModule (Program adts bs ts cbs) =
                       let (btype', bexpr') = apply subst'' (btype, bexpr)        -- Use new substitution that solves annotation with actual type
                       let bsch = if selftypet == TypeVar 0 then generalize ([], []) $ cleanLetters btype' else selftype     -- Use the type annotation if one was given, else use the inferred type
                       let bexpr'' = substSelfTypeMarks n bsch bexpr'
-                      if satunifyrefinements (cleanLetters btype') (instantiateFrom 0 selftype)     -- Satisfy the refinements of the inferred type with the annotation together
+                      satunify <- satunifyrefinements (cleanLetters btype') (instantiateFrom 0 selftype)
+                      if satunify     -- Satisfy the refinements of the inferred type with the annotation together
                         then
-                          first (CoreBinding n bexpr'':) $
+                          first (CoreBinding n bexpr'':) <$>
                             typeinferModule' corebindings' (TypeBinding n bsch:knownts) -- Re-add self-type to type bindings
-                        else error $ "[Infer] Failed to satisfy refinements of type with possible annotation " ++ show bsch
+                        else error $ "[Infer] Failed to satisfy refinements of type with possible annotation " ++ show bsch ++ " with verification condition " ++ show (getvc (renameR $ cleanLetters btype') `composeVC` getvc (renameR $ instantiateFrom 0 selftype))
 
 
         cleanLetters :: Type -> Type
