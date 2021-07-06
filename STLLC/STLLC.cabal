@@ -61,5 +61,6 @@ executable STLLC
         Util,
         Constraints,
         Program,
-        Minimize
+        Minimize,
+        Refinements
 

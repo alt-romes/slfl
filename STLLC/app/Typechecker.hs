@@ -10,13 +10,13 @@ import qualified Data.Set as Set
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Writer (WriterT, writer, runWriterT) 
-import Data.SBV
+import Refinements
 
 
 import CoreSyntax
 import Program
 import Constraints
-import Util (findDelete)
+import Util
 
 
 
@@ -28,11 +28,11 @@ type Ctxt = (BoundCtxt, FreeCtxt)
 -- Infer "Monad"
 -------------------------------------------------------------------------------
 
-type Infer = WriterT [Constraint] (StateT Ctxt (StateT Int Maybe))
+type Infer = WriterT [Constraint] (StateT Ctxt (StateT (Int, [(Type, (Type,Type))]) Maybe))
 
 
-runinfer :: FreeCtxt -> Int -> CoreExpr -> Maybe ((((Type, CoreExpr), [Constraint]), Ctxt), Int)
-runinfer fc i e = runStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) i
+runinfer :: FreeCtxt -> Int -> CoreExpr -> Maybe ((((Type, CoreExpr), [Constraint]), Ctxt), (Int, [(Type, (Type,Type))]))
+runinfer fc i e = runStateT (runStateT (runWriterT $ typeconstraint e) ([], fc)) (i, [])
 
 
 
@@ -70,10 +70,14 @@ equalDeltas (ba, _) (bb, _) = filterD ba == filterD bb || trace ("[Typecheck] Fa
         filterD = filter (\v -> varMult v == Lin) . catMaybes
 
 
+addrefinementsubs :: Type -> Type -> Infer () -- Add entry meaning T1 is the result of a function applied to T2, and used to replace occurences of T2 name in T1 refinements
+addrefinementsubs t t' = lift $ lift $ modify $ second ((t, (t,t')):)
+
+
 fresh :: Infer Type 
 fresh = do 
-    n <- lift $ lift get 
-    lift $ lift $ put (n+1)
+    (n, m) <- lift $ lift get 
+    lift $ lift $ put (n+1, m)
     return $ TypeVar n 
 
 
@@ -105,12 +109,18 @@ ftvctx = ftvctx' Set.empty
 -- Main Logic
 -------------------------------------------------------------------------------
 
+-- !TODO: Typecheck predicates
+
 -- Generate a list of constraints, a type that may have type varibales, and a modified expression with type variables instead of nothing for untyped types
 typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
 --- lit --------------------
 
-typeconstraint ce@(Lit x) = return (getLitType x, ce)
+typeconstraint ce@(Lit (Int x)) = do
+    (i, m) <- lift $ lift get
+    lift $ lift $ put (i+1, m)
+    let name = getName i
+    return (RefinementType name (TyLit TyInt) (Just $ BinaryOp "==" (PVar name) (PNum x)), ce)
 
 --- hyp --------------------
 
@@ -159,6 +169,7 @@ typeconstraint (App e1 e2) = do
     tv <- fresh 
     (t1, ce1) <- typeconstraint e1
     (t2, ce2) <- typeconstraint e2
+    addrefinementsubs tv t2
     writer ((tv, App ce1 ce2), [Constraint t1 (Fun t2 tv)])
 
 --- * ----------------------
@@ -295,8 +306,8 @@ typeconstraint (Mark i n _ t) = do
     let t' = fromMaybe (trivialScheme tv) t
     case t' of
       Forall [] t'' -> do
-        vari <- lift $ lift get
-        lift $ lift $ put (vari + length (ftv t''))
+        (vari, m) <- lift $ lift get
+        lift $ lift $ put (vari + length (ftv t''), m)
         return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t''))
       _ -> error "Type inference shouldn't have marks with bound polimorfic variables"
 
@@ -375,13 +386,22 @@ typeconstraint (CaseOf e exps) = do
 
 typeinfer :: FreeCtxt -> CoreExpr -> Maybe (Type, CoreExpr, Subst, Int)
 typeinfer fc e = do
-    ((((ctype, cexp), constraints), (bc, _)), i') <- runinfer fc 0 e
+    ((((ctype, cexp), constraints), (bc, _)), (i',m)) <- runinfer fc 0 e
     -- guard (...) -- TODO: No linear variables in the exit context -- todo: annotate variables with linearity?
     case solveconstraints Map.empty constraints of
       Nothing -> error ("[TypeInfer] Failed solving constraints " ++ show constraints)
       Just s -> do
+        let m' = map (second (substrefinements . apply s)) m
+          -- ADD HERE SUBSTITUTION ON REFINEMENTS
         let (ctype', cexp') = apply s (ctype, cexp)
         return (ctype', cexp', s, i')
+
+    where
+        substrefinements :: (Type, Type) -> Type -- Replace names inside refinements from function application
+        substrefinements (t1, t2) = undefined --case t1 of
+            -- RefinementType name ty pred -> case t2 of 
+            --     RefinementType name' ty pred' -> 
+            -- t -> t
 
 
 
@@ -433,8 +453,6 @@ typeinferExpr :: CoreExpr -> CoreExpr
 typeinferExpr e = maybe (errorWithoutStackTrace "[Typecheck] Failed") (\(_, ce, _, _) -> ce) (typeinfer [] e)
 
 
--- !TODO: Rever como estou a fazer as type annotations com o prof
--- TODO: Var ids are overshot sometimes to avoid collisions. Isn't clean but it works
 typeinferModule :: Program -> Program -- typecheck and use inferred types
 typeinferModule (Program adts bs ts cbs) =
     let (finalcbs, finalts) = typeinferModule' cbs (processadts adts ++ generalizetbs ts) in -- Infer and typecheck iteratively every expression, and in the end apply the final substitution (unified constraints) to all expressions
@@ -461,18 +479,21 @@ typeinferModule (Program adts bs ts cbs) =
                          -> CoreExpr
                          -> Scheme
                          -> ([CoreBinding], [TypeBinding])
-        inferWithRecName corebindings' knownts n tbs_pairs ce selftype@(Forall stvs _) = 
+        inferWithRecName corebindings' knownts n tbs_pairs ce selftype@(Forall stvs selftypet) = 
             case typeinfer tbs_pairs ce of -- Use type annotation in inference, and solve it after by adding a constraint manually
-              Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed checking: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
-              Just (btype, bexpr, subst', i') -> 
-                  case solveconstraints subst' [Constraint btype $ instantiateFrom i' selftype] of -- Solve type annotation with actual type
-                    Nothing -> errorWithoutStackTrace ("[Typeinfer Module] Failed to solve annotation \"" ++ show (instantiateFrom i' selftype) ++ "\" with actual type \"" ++ show btype ++ "\" when typing: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
-                    Just subst'' ->
-                      let (btype', bexpr') = apply subst'' (btype, bexpr) in -- Use new substitution that solves annotation with actual type
-                          let bsch = (generalize ([], []) $ cleanLetters btype') in
-                              let bexpr'' = substSelfTypeMarks n bsch bexpr' in
-                                  first (CoreBinding n bexpr'':) $
-                                    typeinferModule' corebindings' (TypeBinding n bsch:knownts)
+              Nothing -> error ("[Typeinfer Module] Failed checking: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+              Just (btype, bexpr, subst', i') ->
+                  case solveconstraints subst' [Constraint btype $ instantiateFrom i' selftype] of  -- Solve type annotation with actual type
+                    Nothing -> error ("[Typeinfer Module] Failed to solve annotation \"" ++ show (instantiateFrom i' selftype) ++ "\" with actual type \"" ++ show btype ++ "\" when typing: " ++ show ce ++ " with context " ++ show tbs_pairs) -- Failed to solve constraints
+                    Just subst'' -> do
+                      let (btype', bexpr') = apply subst'' (btype, bexpr)        -- Use new substitution that solves annotation with actual type
+                      let bsch = if selftypet == TypeVar 0 then generalize ([], []) $ cleanLetters btype' else selftype     -- Use the type annotation if one was given, else use the inferred type
+                      let bexpr'' = substSelfTypeMarks n bsch bexpr'
+                      if satunifyrefinements (cleanLetters btype') (instantiateFrom 0 selftype)     -- Satisfy the refinements of the inferred type with the annotation together
+                        then
+                          first (CoreBinding n bexpr'':) $
+                            typeinferModule' corebindings' (TypeBinding n bsch:knownts) -- Re-add self-type to type bindings
+                        else error $ "[Infer] Failed to satisfy refinements of type with possible annotation " ++ show bsch
 
 
         cleanLetters :: Type -> Type

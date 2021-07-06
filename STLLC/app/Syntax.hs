@@ -19,15 +19,15 @@ data Binding = Binding Name Expr
 data Expr
 
     = Lit Literal
-    | Var String
+    | Var Name
 
     -- A -o B
-    | Abs String (Maybe Type) Expr     -- \x:T -> M . with Bruijn indices
+    | Abs Name (Maybe Type) Expr     -- \x:T -> M . with Bruijn indices
     | App Expr Expr     -- M N
 
     -- A (*) B
     | TensorValue Expr Expr
-    | LetTensor String String Expr Expr
+    | LetTensor Name Name Expr Expr
 
     -- 1
     | UnitValue
@@ -41,27 +41,27 @@ data Expr
     -- A (+) B
     | InjL (Maybe Type) Expr    -- inl:B M : typeof M (+) A
     | InjR (Maybe Type) Expr    -- inr:A M : A (+) typeof M
-    | CaseOfPlus Expr String Expr String Expr -- case M of inl x => N | inr y => P : C
+    | CaseOfPlus Expr Name Expr Name Expr -- case M of inl x => N | inr y => P : C
 
     -- !A
     | BangValue Expr
-    | LetBang String Expr Expr
+    | LetBang Name Expr Expr
 
     -- Non-canonical
 
-    | LetIn String Expr Expr
+    | LetIn Name Expr Expr
 
-    | Mark Int (Maybe Name) ([(String, Either Scheme Type)], [(String, Type)]) (Maybe Scheme)
+    | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme)
 
     -- Sum types
-    | SumValue [(String, Maybe Type)] (String, Expr)
-    | CaseOfSum Expr [(String, String, Expr)]
+    | SumValue [(Name, Maybe Type)] (Name, Expr)
+    | CaseOfSum Expr [(Name, Name, Expr)]
 
-    | CaseOf Expr [(String, String, Expr)]
+    | CaseOf Expr [(Name, Name, Expr)]
 
     -- Added sugar :)
 
-    | UnrestrictedAbs String (Maybe Type) Expr
+    | UnrestrictedAbs Name (Maybe Type) Expr
 
 
 data Pattern

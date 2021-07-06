@@ -215,8 +215,7 @@ pairepxr = try tensor -- try tensor because "with" is also between "< >"... look
 
 
 num :: Parser Expr
-num = do
-    Syntax.Lit . Nat <$> natural
+num = Syntax.Lit . Int <$> natural
 
 
 aexp :: Parser Expr 

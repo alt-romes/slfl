@@ -112,6 +112,7 @@ instance Substitutable Constraint where
 
 
 
+
 -------------------------------------------------------------------------------
 -- Functions
 -------------------------------------------------------------------------------
@@ -146,7 +147,9 @@ unify (Plus t1 t2) (Plus t1' t2') = do
     s' <- unify (apply s t2) (apply s t2')
     return $ compose s' s
 unify (Bang x) (Bang y) = unify x y
-unify (RefinementType _ x _) (RefinementType _ y _) = unify x y
+unify (RefinementType _ x p) (RefinementType _ y p') = unify x y -- Verification Conditions are checked later
+unify (RefinementType _ x _) y = unify x y                       -- TODO: Unifico tudo, e no fim é que verifico se as condições são satisfazíveis, OK?
+unify x (RefinementType _ y _) = unify x y                       -- Refinements are checked after inference
 unify (Sum xtl) (Sum ytl) = do
     let xtl' = sortBy (\(a,_) (b,_) -> compare a b) xtl
     let ytl' = sortBy (\(a,_) (b,_) -> compare a b) ytl

@@ -1,7 +1,8 @@
+{-# LANGUAGE LambdaCase #-}
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
-    Literal(..), getLitType, TyLiteral(..), isInType, trivialNat,
-    isExistentialType, Predicate(..)) where 
+    Literal(..), TyLiteral(..), isInType, trivialInt,
+    isExistentialType, Predicate(..), trivialIntRefinement) where 
 
 import Control.Monad
 import Data.Maybe
@@ -76,7 +77,7 @@ data CoreExpr
     deriving (Eq)
 
 
-newtype Literal = Nat Integer deriving (Eq, Ord)
+newtype Literal = Int Integer deriving (Eq, Ord)
 
 
 
@@ -157,7 +158,7 @@ instance (Show Type) where
     show (TypeVar x) = getName x
     show (ExistentialTypeVar x) = "?" ++ getName x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
-    show (ADT n ts) = n ++ concatMap ((" " ++) . show) ts
+    show (ADT n ts) = n ++ concatMap ((" " ++) . (\case t@ADT {} -> "(" ++ show t ++ ")"; t -> show t)) ts
     show (RefinementType n t Nothing) = n ++ " { " ++ show t ++ " }"
     show (RefinementType n t (Just p)) = n ++ " { " ++ show t ++ " | " ++ show p ++ " }"
 
@@ -167,7 +168,7 @@ instance (Show Scheme) where
 
 
 instance (Show Literal) where
-    show (Nat x) = show x
+    show (Int x) = show x
 
 
 instance (Show TyLiteral) where
@@ -255,12 +256,14 @@ trivialScheme :: Type -> Scheme
 trivialScheme = Forall []
 
 
-trivialNat :: Type
-trivialNat = TyLit TyInt
+trivialInt :: Type
+trivialInt = TyLit TyInt
 
+trivialRefinement :: Name -> Type -> Type
+trivialRefinement n t = RefinementType n t Nothing
 
-getLitType :: Literal -> Type
-getLitType (Nat x) = TyLit TyInt
+trivialIntRefinement :: Name -> Type
+trivialIntRefinement n = RefinementType n trivialInt Nothing
 
 
 isInType :: Type -> Type -> Bool
