@@ -77,7 +77,7 @@ data CoreExpr
     deriving (Eq)
 
 
-newtype Literal = Int Integer deriving (Eq, Ord)
+newtype Literal = LitInt Integer deriving (Eq, Ord)
 
 
 
@@ -107,7 +107,7 @@ data Type
 
     | ADT Name [Type]
 
-    | RefinementType Name Type (Maybe Predicate)
+    | RefinementType Name Type [Type] (Maybe Predicate)
     
     deriving (Eq, Ord)
 
@@ -159,8 +159,8 @@ instance (Show Type) where
     show (ExistentialTypeVar x) = "?" ++ getName x
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
     show (ADT n ts) = n ++ concatMap ((" " ++) . (\case t@ADT {} -> "(" ++ show t ++ ")"; t -> show t)) ts
-    show (RefinementType n t Nothing) = n ++ " { " ++ show t ++ " }"
-    show (RefinementType n t (Just p)) = n ++ " { " ++ show t ++ " | " ++ show p ++ " }"
+    show (RefinementType n t _ Nothing) = n ++ " { " ++ show t ++ " }"
+    show (RefinementType n t l (Just p)) = n ++ " { " ++ show t ++ " | " ++ show p ++ " }" ++ " com " ++ show l
 
 
 instance (Show Scheme) where
@@ -168,7 +168,7 @@ instance (Show Scheme) where
 
 
 instance (Show Literal) where
-    show (Int x) = show x
+    show (LitInt x) = show x
 
 
 instance (Show TyLiteral) where
@@ -200,7 +200,7 @@ instance Hashable Type where
         ExistentialTypeVar x -> hashWithSalt (a+8000) x
         Sum ts -> sum $ map (hashWithSalt (a+9000)) ts
         ADT tyn tps -> hashWithSalt (a+1000) tyn + sum (map (hashWithSalt (a+1000)) tps)
-        RefinementType n tp p -> hashWithSalt (a+20000) n + hashWithSalt (a+2000) tp
+        RefinementType n tp ls p -> hashWithSalt (a+20000) n + hashWithSalt (a+2000) tp + hashWithSalt (a+20000) ls
         -- x -> error ("Hashing unknown type " ++ show x)
 
 
@@ -265,10 +265,10 @@ isInt t = case t of
             _ -> False
 
 trivialRefinement :: Name -> Type -> Type
-trivialRefinement n t = RefinementType n t Nothing
+trivialRefinement n t = RefinementType n t [] Nothing
 
 trivialIntRefinement :: Name -> Type
-trivialIntRefinement n = RefinementType n trivialInt Nothing
+trivialIntRefinement n = RefinementType n trivialInt [] Nothing
 
 
 isInType :: Type -> Type -> Bool
@@ -293,7 +293,7 @@ isExistentialType (Sum ts) = any (isExistentialType . snd) ts
 isExistentialType (ADT n ts) = any isExistentialType ts
 isExistentialType (TyLit l) = False
 isExistentialType (TypeVar x) = False
-isExistentialType (RefinementType _ t _) = isExistentialType t
+isExistentialType (RefinementType _ t _ _) = isExistentialType t
 isExistentialType Unit = False
 
 

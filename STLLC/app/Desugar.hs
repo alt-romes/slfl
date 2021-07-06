@@ -146,13 +146,13 @@ desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Sy
 -------------------------------------------------------------------------------
 
 pmult :: TypeBinding
-pmult = TypeBinding "mult" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt (Just $ BinaryOp "==" (PVar "z") (BinaryOp "*" (PVar "x") (PVar "y"))))))
+pmult = TypeBinding "mult" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "*" (PVar "x") (PVar "y"))))))
 
 psub :: TypeBinding
-psub = TypeBinding "sub" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt (Just $ BinaryOp "==" (PVar "z") (BinaryOp "-" (PVar "x") (PVar "y"))))))
+psub = TypeBinding "sub" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "-" (PVar "x") (PVar "y"))))))
 
 psum :: TypeBinding
-psum = TypeBinding "add" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt (Just $ BinaryOp "==" (PVar "z") (BinaryOp "+" (PVar "x") (PVar "y"))))))
+psum = TypeBinding "add" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "+" (PVar "x") (PVar "y"))))))
 
 addPrelude :: [TypeBinding] -> [TypeBinding]
 addPrelude ts = ts ++ [psum, psub, pmult]

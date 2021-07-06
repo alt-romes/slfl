@@ -215,7 +215,7 @@ pairepxr = try tensor -- try tensor because "with" is also between "< >"... look
 
 
 num :: Parser Expr
-num = Syntax.Lit . Int <$> natural
+num = Syntax.Lit . LitInt <$> natural
 
 
 aexp :: Parser Expr 
@@ -294,7 +294,7 @@ refinementty = do
         Just <$> predicate
         )
     reservedOp "}"
-    return $ RefinementType name typ pred
+    return $ RefinementType name typ [] pred
 
 predicate :: Parser Predicate
 predicate = Ex.buildExpressionParser tyops predname

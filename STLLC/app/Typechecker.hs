@@ -112,11 +112,11 @@ typeconstraint :: CoreExpr -> Infer (Type, CoreExpr)
 
 --- lit --------------------
 
-typeconstraint ce@(Lit (Int x)) = do
+typeconstraint ce@(Lit (LitInt x)) = do
     i <- lift $ lift get
     lift $ lift $ put (i+1)
     let name = getName i
-    return (RefinementType name (TyLit TyInt) (Just $ BinaryOp "==" (PVar name) (PNum x)), ce)
+    return (RefinementType name (TyLit TyInt) [] (Just $ BinaryOp "==" (PVar name) (PNum x)), ce)
 
 --- hyp --------------------
 
@@ -387,14 +387,39 @@ typeinfer fc e = do
       Nothing -> error ("[TypeInfer] Failed solving constraints " ++ show constraints)
       Just s -> do
         let (ctype', cexp') = apply s (ctype, cexp)
-        let ctype'' = updateRefinements undefined ctype'
-        return (ctype', cexp', s, i')
+        let refinementctxt = makeRefinementCtxt s constraints -- Look at substitutions from function of refined types to function of refined types, e.g. [x {Int} -o y {Int | y == x + 1} => a {Int | a == 1} -o y { Int | y == x + 1 }] and replace a with name x to context of y
+        let ctype'' = updateRefinements refinementctxt ctype'
+        return (ctype'', cexp', s, i')
 
     where
-        updateRefinements refsapps r@(RefinementType n t p) =
-            case Map.lookup n refsapps of
+        updateRefinements :: Map.Map Name [Type] -> Type -> Type
+        updateRefinements c r@(RefinementType n t ls p) =
+            case Map.lookup n c of
               Nothing -> r
-              Just r' -> RefinementType n t p
+              Just rs -> RefinementType n t (ls ++ rs) p
+        updateRefinements c (Fun t1 t2) = Fun (updateRefinements c t1) (updateRefinements c t2)
+        updateRefinements c t = t
+
+        makeRefinementCtxt :: Map.Map Int Type -> [Constraint] -> Map.Map Name [Type]
+        makeRefinementCtxt m cns = makeRefinementCtxt' $ filter (\ (a,_) -> case a of                            -- e.g. [x {Int} -o y {Int | y == x + 1} => a {Int | a == 1} -o y { Int | y == x + 1 }] and replace a with name x to context of y
+                                                             Fun _ (Fun _ _) -> True                -- choose only types in which the value's refinement might have been altered by the argument
+                                                             Fun _ RefinementType {} -> True
+                                                             _ -> False
+                                                 ) $ map (\(Constraint t1 t2) -> (t1, t2)) $ apply m cns
+                                                 
+        makeRefinementCtxt' :: [(Type, Type)] -> Map.Map Name [Type]
+        makeRefinementCtxt' l@((Fun (RefinementType n1 _ _ _) RefinementType {}, Fun a@(RefinementType n2 t ls p) (RefinementType n3 _ _ _)):xs) =
+            Map.insertWith (++) n3 [RefinementType n1 t ls (replaceName (Map.singleton n2 n1) <$> p)] $ makeRefinementCtxt' xs
+        makeRefinementCtxt' ((Fun (RefinementType n1 _ _ _) _, Fun (RefinementType n2 t ls p) innert):xs) = foldr (\name rs -> Map.insertWith (++) name [RefinementType n1 t ls (replaceName (Map.singleton n2 n1) <$> p)] rs) (makeRefinementCtxt' xs) (getRefinementNames innert)
+        makeRefinementCtxt' (_:xs) = makeRefinementCtxt' xs
+        makeRefinementCtxt' [] = Map.empty
+
+        getRefinementNames :: Type -> [Name]
+        getRefinementNames (Fun t1 t2) = getRefinementNames t1 ++ getRefinementNames t2
+        getRefinementNames (RefinementType n _ _ _) = [n]
+        getRefinementNames _ = []
+
+
 
 
 

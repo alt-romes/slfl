@@ -1,9 +1,9 @@
-module Refinements (satunifyrefinements, getvc, renameR, composeVC) where 
+module Refinements (satunifyrefinements, getvc, renameR, composeVC, replaceName) where 
 
 import Control.Monad.State
 import Debug.Trace
 import Data.Maybe
-import Data.Set as Set hiding (map)
+import Data.Set as Set hiding (map, foldr)
 import qualified Data.Map as Map
 import Data.Bifunctor
 import Data.List (intercalate)
@@ -55,15 +55,17 @@ renameR t = evalState (renameR' t) (0, Map.empty)
                 t1' <- renameR' t1
                 t2' <- renameR' t2
                 return $ Fun t1' t2'
-            RefinementType n t' (Just p) -> do
+            RefinementType n t' ls (Just p) -> do
                 nname <- fresh
                 addentry n nname
+                ls' <- mapM renameR' ls
                 m <- gets snd
-                return $ RefinementType nname t' (Just $ replaceName m p)
-            RefinementType n t' Nothing -> do
+                return $ RefinementType nname t' ls' (Just $ replaceName m p)
+            RefinementType n t' ls Nothing -> do
                 nname <- fresh
                 addentry n nname
-                return $ RefinementType nname t' Nothing
+                ls' <- mapM renameR' ls
+                return $ RefinementType nname t' ls' Nothing
             t' -> return t' -- TODO: What to do with other types inside a dependent function?
 
 
@@ -79,6 +81,7 @@ composeVC (VCImpl s ps) (VCPred s' p') = VCImpl (s' `union` s) (ps ++ [p'])
 composeVC (VCImpl s ps) (VCImpl s' ps') = VCImpl (s' `union` s) (ps ++ ps')
 composeVC (VCConj v1 v2) (VCConj v1' v2') = VCConj (v1 `composeVC` v1') (v2 `composeVC` v2')
 composeVC x (VCConj v1 v2) = VCConj (x `composeVC` v1) (x `composeVC` v2)
+composeVC vc@(VCConj v1 v2) (VCTrue _) = vc
 -- composeVC (VCConj v1 v2) y = y
 composeVC x y = error ("[Refinement] Composing " ++ show x ++ " with " ++ show y)
 
@@ -89,9 +92,10 @@ getvc t = case t of
         let vct1 = getvc t1
         let vct2 = vct1 `composeVC` getvc t2
         VCConj vct1 vct2
-    RefinementType n t' (Just p) -> VCPred (singleton (n, t')) p
-    RefinementType n t' Nothing -> VCTrue (singleton (n, t'))
-    t' -> VCTrue empty -- TODO: What to do with other types inside a dependent function?
+    RefinementType n t' ls (Just p) -> foldr (composeVC . getvc) (VCPred (singleton (n, t')) p) ls
+    RefinementType n t' ls Nothing -> foldr (composeVC . getvc) (VCTrue (singleton (n, t'))) ls
+
+    t' -> VCTrue empty  -- TODO: What to do with other types inside a dependent function?
 
 
 satunifyrefinements :: Type -> Type -> IO Bool
