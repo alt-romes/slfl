@@ -35,7 +35,6 @@ replaceName m p = case p of
                  Just n'' -> PVar n''
     PNum x -> PNum x
     BinaryOp opn p1 p2 -> BinaryOp opn (replaceName m p1) (replaceName m p2)
-    Conjunction p1 p2 -> Conjunction (replaceName m p1) (replaceName m p2)
 
 addentry :: Name -> Name -> State (Int, Map.Map Name Name) ()
 addentry n n' = modify $ second $ Map.insert n n'

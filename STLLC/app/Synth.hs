@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Synth (synthAllType, synthType, synthMarks, synthMarksModule, synth, ) where
+module Synth (synthAllType, synthType, synthMarks, synthMarksModule, synth) where
 
 import Data.List
 import qualified Data.Set as Set
@@ -138,8 +138,8 @@ addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t, e) -> ((tag, Left (
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-        local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
+    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -240,6 +240,7 @@ isAtomic t =
        TyLit _              -> True
        TypeVar _            -> True
        ExistentialTypeVar _ -> True
+       RefinementType {}    -> True
        _                    -> False
 
 
@@ -503,10 +504,10 @@ focus c goal =
                    case argty of
                      Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype -> do
-                         rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
-                         let reslist = rights $ map snd $ filter (\(n,x) -> n == ConstructADT) rs
-                         b <- checkrestrictions' res ConstructADT (ADT tyn pts)
-                         trace ("Check if " ++ show (ADT tyn pts) ++ " is not restricted by " ++ show reslist ++ " in " ++ show rs ++ " : " ++ show b ++ "? ?? " ++ show res) $ checkrestrictions' res ConstructADT (ADT tyn pts) >>= guard     -- Assert this ADT's construction isn't restricted
+                         -- rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
+                         -- let reslist = rights $ map snd $ filter (\(n,x) -> n == ConstructADT) rs
+                         checkrestrictions' res ConstructADT (ADT tyn pts) >>= guard
+                         -- trace ("Check if " ++ show (ADT tyn pts) ++ " is not restricted by " ++ show reslist ++ " in " ++ show rs ++ " : " ++ show b ++ "? ?? " ++ show res) $ checkrestrictions' res ConstructADT (ADT tyn pts) >>= guard     -- Assert this ADT's construction isn't restricted
                          if case argtype of
                                 ADT tyn' pts' -> tyn == tyn' && pts == pts'         -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left. -- TODO: Questionable
                                 _ -> False

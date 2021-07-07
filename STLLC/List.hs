@@ -20,6 +20,6 @@ data Maybe a = Nothing | Just a;
 # is wrong, synth is equal to foldl c parametros trocados -- escrever
 #synth foldr :: (!(a -> b -> b) -> b -> List a -> b);
 
-#synth insert :: (a -> List a -> List a);
+#synth insert :: (a -> List a -> List a)
 
 synth concat :: (List (List a) -> List a);

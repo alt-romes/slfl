@@ -117,9 +117,6 @@ data Predicate
     = PVar Name
     | PBool Bool
     | PNum Integer
-    | Conjunction Predicate Predicate
-    | Disjunction Predicate Predicate
-    | Negation Predicate
     | Conditional Predicate Predicate Predicate
     | UnaryOp Name Predicate
     | BinaryOp Name Predicate Predicate
@@ -180,7 +177,6 @@ instance Show Predicate where
     show (PNum n) = show n
     show (UnaryOp n p) = n ++ show p
     show (BinaryOp n p1 p2) = "(" ++ show p1 ++ " " ++ n ++ " " ++ show p2 ++ ")"
-    show (Conjunction p1 p2) = show p1 ++ " ^ " ++ show p2
 
 
 instance Hashable Scheme where
