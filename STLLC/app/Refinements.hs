@@ -55,17 +55,31 @@ renameR t = evalState (renameR' t) (0, Map.empty)
                 t2' <- renameR' t2
                 return $ Fun t1' t2'
             RefinementType n t' ls (Just p) -> do
-                nname <- fresh
-                addentry n nname
+                nname <- newname n
+                state <- get
                 ls' <- mapM renameR' ls
                 m <- gets snd
+                put state  -- Reset state after renaming the context variables for this refined type
+                           -- the letters used for the context aren't important
+                           -- because they come after all dependent variables used in this type
+                           -- And this way we keep the dependent variables correctly named which is crucial for the refinements to work
                 return $ RefinementType nname t' ls' (Just $ replaceName m p)
             RefinementType n t' ls Nothing -> do
-                nname <- fresh
-                addentry n nname
+                nname <- newname n
+                state <- get
                 ls' <- mapM renameR' ls
+                put state
                 return $ RefinementType nname t' ls' Nothing
             t' -> return t' -- TODO: What to do with other types inside a dependent function?
+
+        newname n = do
+            m <- gets snd
+            case Map.lookup n m of
+              Nothing -> do
+                nname <- fresh
+                addentry n nname
+                return nname
+              Just nname -> return nname
 
 
 composeVC :: VerificationCondition -> VerificationCondition -> VerificationCondition
