@@ -34,6 +34,7 @@ replaceName m p = case p of
                  Nothing -> PVar n'
                  Just n'' -> PVar n''
     PNum x -> PNum x
+    PBool x -> PBool x
     BinaryOp opn p1 p2 -> BinaryOp opn (replaceName m p1) (replaceName m p2)
 
 addentry :: Name -> Name -> State (Int, Map.Map Name Name) ()
@@ -113,7 +114,7 @@ getvc t = case t of
 
 satunifyrefinements :: Type -> Type -> IO Bool
 satunifyrefinements t t' = do -- Rename to match the refinement variables in the two types so that the composition is useful
-    trace ("composing " ++ show (getvc (renameR t)) ++ "\nwith " ++ show (getvc (renameR t')) ++ "\nto get " ++ show (getvc (renameR t) `composeVC` getvc (renameR t'))) $ satvc (getvc (renameR t) `composeVC` getvc (renameR t'))
+    satvc (getvc (renameR t) `composeVC` getvc (renameR t'))
 
 
 
@@ -124,15 +125,16 @@ satvc vc = case vc of
         where
             res :: IO SatResult
             res = sat $ do
-                intls <- mapM (\(n,t) -> makeSInt (n,t) >>= \x' -> return (n, x')) (toList $ Set.filter (isInt . snd) s)
-                constrainPred intls p
+                symls <- mapM (\(n,t) -> makeSVar (n,t) >>= \x' -> return (n, x')) (toList s)
+                Left sv <- getSValPred symls p
+                constrain sv
 
     VCImpl s ps -> modelExists <$> res
         where
             res :: IO SatResult
             res = sat $ do
-                intls <- mapM (\(n,t) -> makeSInt (n,t) >>= \x' -> return (n, x')) (toList $ Set.filter (isInt . snd) s)
-                mapM_ (constrainPred intls) ps
+                symls <- mapM (\(n,t) -> makeSVar (n,t) >>= \x' -> return (n, x')) (toList s)
+                mapM_ (getSValPred symls >=> \(Left sv) -> constrain sv) ps
         
 
     VCConj v1 v2 -> do
@@ -141,64 +143,76 @@ satvc vc = case vc of
         return $ s1 && s2
 
 
-makeSInt :: (String, Type) -> Symbolic SInteger
-makeSInt (n, TyLit TyInt) = sInteger n
+makeSVar :: (Name, Type) -> Symbolic (Either SBool SInteger)
+makeSVar (n, ADT _ _) = Left <$> sBool n
+makeSVar (n, TyLit TyInt) = Right <$> sInteger n
+makeSVar (n, t) = error ("[Refinement] Can't make symbolic variable " ++ show n ++ " of type " ++ show t)
 
 
-constrainPred :: [(Name, SInteger)] -> Predicate -> Symbolic ()
-constrainPred ls (BinaryOp name p1 p2)
-    | name == "==" = do
-        (sv1, sv2) <- getSVals ls p1 p2
-        constrain $ sv1 .== sv2
-
-    | name == ">=" = do
-        (sv1, sv2) <- getSVals ls p1 p2
-        constrain $ sv1 .>= sv2
-
-    | name == ">" = do
-        (sv1, sv2) <- getSVals ls p1 p2
-        constrain $ sv1 .> sv2
-
-    | name == "<" = do
-        (sv1, sv2) <- getSVals ls p1 p2
-        constrain $ sv1 .< sv2
-
-    | name == "<=" = do
-        (sv1, sv2) <- getSVals ls p1 p2
-        constrain $ sv1 .<= sv2
-
-    | otherwise = error ("[Refinement] No boolean op in predicate " ++ show (BinaryOp name p1 p2))
-
-    where
-        getSVals ls p1 p2 = do
-            sv1 <- getSValPred ls p1
-            sv2 <- getSValPred ls p2
-            return (sv1, sv2)
+getSVals :: [(Name, Either SBool SInteger)] -> Predicate -> Predicate -> Symbolic (Either SBool SInteger, Either SBool SInteger)
+getSVals ls p1 p2 = do
+    sv1 <- getSValPred ls p1
+    sv2 <- getSValPred ls p2
+    return (sv1, sv2)
 
 
-getSValPred :: [(Name, SInteger)] -> Predicate -> Symbolic SInteger
+getSValPred :: [(Name, Either SBool SInteger)] -> Predicate -> Symbolic (Either SBool SInteger)
 getSValPred ls (BinaryOp name p1 p2)
 
     | name == "+" = do
-        sv1 <- getSValPred ls p1
-        sv2 <- getSValPred ls p2
-        return $ sv1 + sv2
+        (Right sv1, Right sv2) <- getSVals ls p1 p2
+        return $ Right $ sv1 + sv2
 
     | name == "-" = do
-        sv1 <- getSValPred ls p1
-        sv2 <- getSValPred ls p2
-        return $ sv1 - sv2
+        (Right sv1, Right sv2) <- getSVals ls p1 p2
+        return $ Right $ sv1 - sv2
 
     | name == "*" = do
-        sv1 <- getSValPred ls p1
-        sv2 <- getSValPred ls p2
-        return $ sv1 * sv2
+        (Right sv1, Right sv2) <- getSVals ls p1 p2
+        return $ Right $ sv1 * sv2
+
+    | name == "==" = do
+        (Right sv1, Right sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .== sv2
+
+    | name == "!=" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 ./= sv2
+
+    | name == ">=" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .>= sv2
+
+    | name == ">" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .> sv2
+
+    | name == "<" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .< sv2
+
+    | name == "<=" = do
+        (sv1, sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .<= sv2
+
+    | name == "&&" = do
+        (Left sv1, Left sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .&& sv2
+
+    | name == "||" = do
+        (Left sv1, Left sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .|| sv2
        
     | otherwise = error "[Refinement] Error 6"
 
 getSValPred ls (PVar n) =
     case lookup n ls of
-        Just sv -> return sv
+        Just ebi -> case ebi of
+            Left v -> return $ Left v
+            Right v -> return $ Right v
+
         Nothing -> error ("[Refinement] No symbolic integer variable " ++ show n ++ " in " ++ show ls)
 
-getSValPred ls (PNum i) = return $ literal i
+getSValPred ls (PNum i) = return $ Right $ literal i
+
+getSValPred ls (PBool x) = if x then return $ Left sTrue else return $ Left sFalse

@@ -313,18 +313,21 @@ predicate = Ex.buildExpressionParser tyops predname
             infixOp "*" (BinaryOp "*") Ex.AssocLeft
             ],
             [
-            infixOp "&&" (BinaryOp "&&") Ex.AssocNone,
-            infixOp "||" (BinaryOp "||") Ex.AssocNone
-            ],
-            [
+            infixOp "!=" (BinaryOp "!=") Ex.AssocNone,
             infixOp "==" (BinaryOp "==") Ex.AssocNone,
             infixOp ">=" (BinaryOp ">=") Ex.AssocNone,
             infixOp ">" (BinaryOp ">") Ex.AssocNone,
             infixOp "<" (BinaryOp "<") Ex.AssocNone,
             infixOp "<=" (BinaryOp "<=") Ex.AssocNone
+            ],
+            [
+            infixOp "&&" (BinaryOp "&&") Ex.AssocNone,
+            infixOp "||" (BinaryOp "||") Ex.AssocNone
             ]]
 
-        predname = (PVar <$> identifier) <|> (PNum <$> natural)
+        predname =  (PBool <$> ((reserved "true" >> return True)
+                <|> (reserved "false" >> return False)))
+                <|> (PVar <$> identifier) <|> (PNum <$> natural) 
 
 
 
