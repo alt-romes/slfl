@@ -1,8 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
-    Literal(..), TyLiteral(..), isInType, trivialInt,
-    isExistentialType, Predicate(..), trivialIntRefinement, isInt, isADTBool) where 
+    Literal(..), TyLiteral(..), isInType, trivialInt, isExistentialType,
+    Predicate(..), trivialIntRefinement, isInt, isADTBool, transformTypeM,
+    transformType) where 
 
 import Control.Monad
 import Data.Maybe
@@ -157,7 +158,7 @@ instance (Show Type) where
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
     show (ADT n ts) = n ++ concatMap ((" " ++) . (\case t@ADT {} -> "(" ++ show t ++ ")"; t -> show t)) ts
     show (RefinementType n t _ Nothing) = n ++ " { " ++ show t ++ " }"
-    show (RefinementType n t l (Just p)) = n ++ " { " ++ show t ++ " | " ++ show p ++ " }" ++ " com " ++ show l
+    show (RefinementType n t l (Just p)) = n ++ " { " ++ show t ++ " | " ++ foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> show p' ++ " => "}) ++)) "" l ++ show p ++ " }"
 
 
 instance (Show Scheme) where
@@ -242,6 +243,23 @@ transform :: (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
 transform f e = runIdentity (transformM (return . f) e)
 
 
+transformTypeM :: (Monad m, Applicative m) => (Type -> m Type) -> Type -> m Type
+transformTypeM f (TyLit x) = f $ TyLit x
+transformTypeM f Unit = f Unit
+transformTypeM f (Fun t1 t2) = f =<< (Fun <$> transformTypeM f t1 <*> transformTypeM f t2)
+transformTypeM f (Tensor t1 t2) = f =<< (Tensor <$> transformTypeM f t1 <*> transformTypeM f t2)
+transformTypeM f (With t1 t2) = f =<< (With <$> transformTypeM f t1 <*> transformTypeM f t2)
+transformTypeM f (Plus t1 t2) = f =<< (Plus <$> transformTypeM f t1 <*> transformTypeM f t2)
+transformTypeM f (Bang t) = f . Bang =<< transformTypeM f t
+transformTypeM f (TypeVar i) = f $ TypeVar i
+transformTypeM f (ExistentialTypeVar i) = f $ ExistentialTypeVar i
+transformTypeM f (Sum nts) = f . Sum =<< traverse (\(n,t) -> (,) n <$> transformTypeM f t) nts
+transformTypeM f (ADT n ls) = f . ADT n =<< traverse (transformTypeM f) ls
+transformTypeM f (RefinementType n t ls mp) = f =<< (RefinementType n <$> transformTypeM f t <*> traverse (transformTypeM f) ls <*> pure mp)
+
+
+transformType :: (Type -> Type) -> Type -> Type
+transformType f e = runIdentity (transformTypeM (return . f) e)
 
 
 

@@ -36,13 +36,13 @@ maineval :: String -> CoreExpr
 maineval = evalExpr . maindesugar
 
 
-mainsynth :: String -> Expr
+mainsynth :: String -> IO Expr
 mainsynth t =
     let surroundtype = '(':t ++ ")" in
         synthType (parseType surroundtype)
 
 
-mainsynthAll :: String -> [Expr]
+mainsynthAll :: String -> IO [Expr]
 mainsynthAll t =
     let surroundtype = '(':t ++ ")" in
         synthAllType (parseType surroundtype)
@@ -82,7 +82,7 @@ mainsynthMarksModule :: String -> IO Program
 mainsynthMarksModule fname = do
     bindings <- mainparseModule fname
     ctbindings <- maindesugarModule fname -- TODO: por causa tb de memoization aqui não faz mal chamar tudo de novo em vez de aproveitar os resultados do primeiro parse right
-    return $ synthMarksModule ctbindings
+    synthMarksModule ctbindings
 
 
 
@@ -102,8 +102,8 @@ main = do
                         else "llcprogs/main.llc"
                (argx:_) -> argx)
     case action of
-      "synth" -> print . Binding "main" $ mainsynth arg
-      "all" -> print $ mainsynthAll arg
+      "synth" -> print . Binding "main" =<< mainsynth arg
+      "all" -> print =<< mainsynthAll arg
       "complete" -> mainsynthMarksModule arg >>= print
       "fdesugar" -> print $ maindesugar arg
       "desugar" -> maindesugarModule arg >>= print . _cbinds
@@ -113,5 +113,5 @@ main = do
       "eval" -> mainevalModule arg >>= print
       "fparse" -> print $ mainparse arg
       "parse" -> mainparseModule arg >>= print
-      _ -> print . Binding "main" $ mainsynth action
+      _ -> print . Binding "main" =<< mainsynth action
 

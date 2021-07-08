@@ -1,4 +1,5 @@
-module Refinements (satunifyrefinements, getvc, renameR, composeVC, replaceName) where 
+{-# LANGUAGE LambdaCase #-}
+module Refinements (satunifyrefinements, getvc, renameR, composeVC, replaceName, addRefinementToCtxs, getModelExpr) where 
 
 import Control.Monad.State
 import Debug.Trace
@@ -10,6 +11,7 @@ import Data.List (intercalate)
 import Data.SBV as SBV hiding (Predicate)
 
 import CoreSyntax
+import Syntax
 import Util
 
 
@@ -27,6 +29,9 @@ instance Show VerificationCondition where
     show (VCConj v1 v2) = show v1 ++ " /\\ " ++ show v2
 
 
+
+addRefinementToCtxs :: Type -> Type -> Type
+addRefinementToCtxs r = transformType (\case RefinementType rn rt ls mp -> RefinementType rn rt (ls ++ [r]) mp; t' -> t')
 
 replaceName :: Map.Map Name Name -> Predicate -> Predicate
 replaceName m p = case p of
@@ -120,7 +125,9 @@ satunifyrefinements t t' = do -- Rename to match the refinement variables in the
 
 satvc :: VerificationCondition -> IO Bool
 satvc vc = case vc of
+
     VCTrue _ -> return True
+
     VCPred s p -> modelExists <$> res
         where
             res :: IO SatResult
@@ -136,7 +143,6 @@ satvc vc = case vc of
                 symls <- mapM (\(n,t) -> makeSVar (n,t) >>= \x' -> return (n, x')) (toList s)
                 mapM_ (getSValPred symls >=> \(Left sv) -> constrain sv) ps
         
-
     VCConj v1 v2 -> do
         s1 <- satvc v1
         s2 <- satvc v2
@@ -202,6 +208,10 @@ getSValPred ls (BinaryOp name p1 p2)
     | name == "||" = do
         (Left sv1, Left sv2) <- getSVals ls p1 p2
         return $ Left $ sv1 .|| sv2
+
+    | name == "=>" = do
+        (Left sv1, Left sv2) <- getSVals ls p1 p2
+        return $ Left $ sv1 .=> sv2
        
     | otherwise = error "[Refinement] Error 6"
 
@@ -216,3 +226,52 @@ getSValPred ls (PVar n) =
 getSValPred ls (PNum i) = return $ Right $ literal i
 
 getSValPred ls (PBool x) = if x then return $ Left sTrue else return $ Left sFalse
+
+
+
+getModelExpr :: Type -> IO (Maybe SatResult)
+getModelExpr r = do
+    model <- getModel r
+    return $ Just model
+
+
+getModel :: Type -> IO SatResult
+getModel r@(RefinementType rname rtype ls (Just pred)) = sat axiom
+    where
+        axiom :: Symbolic ()
+        axiom = do
+            setTimeOut 500
+            addAxiom "refinement-type"
+                [
+                "(declare-fun " ++ rname ++ "(" ++ unwords (map (\(RefinementType _ ty' _ _) -> show ty') ls) ++ ") " ++ show rtype ++ ")",
+                makeAxiomFromPredicate r
+                ]
+
+        makeAxiomFromPredicate :: Type -> String
+        makeAxiomFromPredicate (RefinementType name rtype ls (Just pred)) =
+            "(assert (forall (" ++ -- init
+            unwords (map (\(RefinementType name' ty' _ _) -> "(" ++ name' ++ " " ++ show ty' ++ ")") ls) ++ -- variables quantified universally
+            ")" ++ -- close universal quantification
+             makePredicateString (foldr (\(RefinementType _ _ _ mp) -> ((case mp of Nothing -> []; Just p -> [p]) ++)) [pred] ls) ++ -- predicate
+             "))" -- close forall, close assert
+
+
+        makePredicateString :: [Predicate] -> String
+        makePredicateString [] = error "Shouldn't be making a predicate string from an empty list of predicates"
+        makePredicateString [PVar vname] = if vname == rname
+                                              then "(" ++ vname ++ " " ++ unwords (map (\(RefinementType n' _ _ _) -> n') ls) ++ ")" -- Use function call instead of variable by itself
+                                              else vname
+        makePredicateString [PBool b] = if b then "true" else "false"
+        makePredicateString [PNum i] = show i
+        makePredicateString [BinaryOp opn p1 p2] = let core = "(" ++ getSMTLibName opn ++ " " ++ makePredicateString [p1] ++ " " ++ makePredicateString [p2] ++ ")" in
+                                                       if opn == "!=" then "(not " ++ core ++ ")"
+                                                                      else core
+        makePredicateString (p:xs) = "(=>" ++ makePredicateString [p] ++ " " ++ makePredicateString xs ++ ")"
+
+
+        getSMTLibName :: String -> String
+        getSMTLibName n
+            | n == "==" = "="
+            | n == "&&" = "and"
+            | n == "||" = "or"
+            | otherwise = n

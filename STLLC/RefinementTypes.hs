@@ -4,6 +4,8 @@
 nat :: x { Int | x > 0 };
 nat = add 6 3;
 
+sum2 = add 6 3;
+
 
 wplus :: (x { Int } -> y { Int | x == y } -> z { Int | z >= x + y });
 wplus x y = add x y;

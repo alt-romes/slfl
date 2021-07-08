@@ -13,6 +13,7 @@ import Data.Maybe
 import Data.Either
 import Data.Bifunctor
 import Debug.Trace
+import Refinements
 
 
 import CoreSyntax (Name, Type(..), Scheme(..), isInType, isExistentialType)
@@ -35,7 +36,7 @@ type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 -- Synth "Monad"
 -------------------------------------------------------------------------------
 
-type Synth a = LogicT (StateT SynthState (Reader SynthReaderState)) a 
+type Synth a = LogicT (StateT SynthState (ReaderT SynthReaderState IO)) a 
 
 
 type SynthState = (MemoTable, Subst, Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
@@ -51,14 +52,13 @@ data RestrictTag = ConstructADT | DeconstructADT | DecideLeftBangR deriving (Sho
 instance Hashable RestrictTag where
     hashWithSalt a r = hashWithSalt a (show r)
 
-data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | MoveLeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Name Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type deriving (Show)
+data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | MoveLeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Name Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type | LeftRefinement Ctxt (Name, Type) Type | FocusLeftRefinement FocusCtxt (Name, Type) Type | RightRefinement FocusCtxt Type deriving (Show)
 
 
-runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> ([Expr], MemoTable)
-runSynth n (g, d) t st adtds =
-    
-    let (exps_deltas, (memot, _, _)) = runReader (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds in
-        (map fst exps_deltas, memot)
+runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> IO ([Expr], MemoTable)
+runSynth n (g, d) t st adtds = do
+    (exps_deltas, (memot, _, _)) <- runReaderT (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds
+    return (map fst exps_deltas, memot)
 
     where
         synthComplete (g, d, o) t = do
@@ -240,7 +240,6 @@ isAtomic t =
        TyLit _              -> True
        TypeVar _            -> True
        ExistentialTypeVar _ -> True
-       RefinementType {}    -> True
        _                    -> False
 
 
@@ -271,7 +270,6 @@ isRecursiveType :: Type -> Synth Bool
 isRecursiveType (ADT tyn tps) = do
     adtds <- getadtcons (ADT tyn tps)
     return $ any (\(_, ty) -> ADT tyn tps `isInType` ty) adtds
-
 
 
 
@@ -381,6 +379,10 @@ synth c@(g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do
     guard (nname `notElem` map fst d')
     return (LetBang nname (Var n) exp, d')
 
+---- refinementL
+synth c@(g, d, rn@(n, r@RefinementType {}):o) t = addtrace (LeftRefinement c rn t) $ do
+    let t' = addRefinementToCtxs r t    -- Add this refinement to the context of refinement types in t
+    synth (g, rn:d, o) t'
 
 
 ---- * Synchronous left propositions to Δ * -------
@@ -530,6 +532,16 @@ focus c goal =
             return (BangValue expa, d')
 
 
+        ---- refinementR
+        focus' Nothing c@(g, d) r@(RefinementType rname ty rctx mpred) = addtrace (RightRefinement c r) $
+            case mpred of
+              Nothing -> focus' Nothing c ty    -- If there's no predicate try instancing the type
+              Just pred -> do
+                  model <- liftIO $ getModelExpr r
+                  case model of
+                    Nothing -> empty   -- the SMT solver couldn't generate a model for this predicate
+                    Just expr -> error ("Got model " ++ show expr ++ " and now utilizing variables to instance it")
+
 
         ---- * Left synchronous rules * -------------------
 
@@ -571,8 +583,8 @@ focus c goal =
 
         ---- * Proposition no longer synchronous * --------
 
-        -- adtLFocus
-        -- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
+        ---- adtLFocus
+        ---- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
         focus' (Just nh@(n, ADT tyn tps)) c@(g, d) goal = addtrace (FocusLeftADT c (ADT tyn tps) goal) $
             if case goal of
                  ADT tyn' tps' -> tyn' == tyn
@@ -588,7 +600,6 @@ focus c goal =
                   memoizesynth synth (g, d, [nh]) goal
                       where
                           unifyadtparams :: Type -> Type -> Synth ()
-
                           unifyadtparams (ADT tyn'' tps'') (ADT tyn''' tps''') = do
                               guard $ tyn'' == tyn'''
                               zipWithM_ unifyadtparams tps'' tps'''
@@ -596,6 +607,12 @@ focus c goal =
                           unifyadtparams x (ExistentialTypeVar y) = unifyadtparams (ExistentialTypeVar y) x
                           unifyadtparams x y = guard (x == y)
 
+
+        ---- refinementLFocus
+        focus' (Just nh@(n, RefinementType rname ty rctx mpred)) c@(g, d) goal = addtrace (FocusLeftRefinement c nh goal) $
+            case goal of
+              RefinementType {} -> empty    -- using proposition to instance a refinement type requires extra logic
+              _ -> focus' (Just (n, ty)) c goal -- using the focus proposition to instance any other type is the same as using the type without the refinements
 
 
         ---- left focus is either atomic or not.
@@ -639,18 +656,19 @@ removeadtcons adts (fc, bc) = case adts of -- During the synth process, construc
     (ADTD _ _ cons):xs -> removeadtcons xs (filter (\(n, _) -> isNothing $ lookup n cons) fc, bc)
 
 
-synthCtxAllType :: Int -> MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> ([Expr], MemoTable)
-synthCtxAllType n mt c i adts t =
-    let c' = removeadtcons adts c in
-    let (exps, memot) = runSynth n c' t (initSynthState mt i) adts in
-                  if null exps
-                     then errorWithoutStackTrace $ "[Synth] Failed synthesis of: " ++ show t
-                     else (exps, memot)
+synthCtxAllType :: Int -> MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> IO ([Expr], MemoTable)
+synthCtxAllType n mt c i adts t = do
+    let c' = removeadtcons adts c
+    (exps, memot) <- runSynth n c' t (initSynthState mt i) adts
+    if null exps
+        then error $ "[Synth] Failed synthesis of: " ++ show t
+        else return (exps, memot)
 
 
-synthCtxType :: MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> (Expr, MemoTable)
-synthCtxType mt c i adts t = let (exps, memot) = synthCtxAllType 1 mt c i adts t in (head exps, memot)
-
+synthCtxType :: MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> IO (Expr, MemoTable)
+synthCtxType mt c i adts t = do
+    (exps, memot) <- synthCtxAllType 1 mt c i adts t
+    return (head exps, memot)
 
 
 
@@ -659,17 +677,18 @@ synthCtxType mt c i adts t = let (exps, memot) = synthCtxAllType 1 mt c i adts t
 -- Exported Functions
 -------------------------------------------------------------------------------
 
-synthAllType :: Type -> [Expr]
-synthAllType t = fst $ synthCtxAllType 5 Map.empty ([], []) 0 [] t -- Not really *all* bc runSynth might loop forever?
+synthAllType :: Type -> IO [Expr]
+synthAllType t = fst <$> synthCtxAllType 5 Map.empty ([], []) 0 [] t -- Not really *all* bc runSynth might loop forever?
 
 
-synthType :: Type -> Expr
-synthType t = head $ synthAllType $ instantiateFrom 0 $ generalize ([], []) t
+synthType :: Type -> IO Expr
+synthType t = head <$> synthAllType (instantiateFrom 0 $ generalize ([], []) t)
 
 
-synthMarks :: Expr -> [ADTD] -> State MemoTable Expr -- replace all placeholders in an expression with a synthetized expr
+synthMarks :: Expr -> [ADTD] -> (StateT MemoTable IO) Expr -- replace all placeholders in an expression with a synthetized expr
 synthMarks ex adts = transformM transformfunc ex
     where
+        transformfunc :: Expr -> (StateT MemoTable IO) Expr
         transformfunc =
             \case
                 (Mark _ name c@(fc, bc) t) -> do
@@ -677,7 +696,7 @@ synthMarks ex adts = transformM transformfunc ex
                     let sch@(Forall tvs t') = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t
                     case name of
                       Nothing    -> do -- Non-recursive Mark
-                        let (exp, memot') = synthCtxType mt c (length tvs) adts $ instantiateFrom 0 sch
+                        (exp, memot') <- liftIO $ synthCtxType mt c (length tvs) adts $ instantiateFrom 0 sch
                         modify (`Map.union` memot')
                         return exp
                       Just name' -> -- Recursive Mark
@@ -688,15 +707,15 @@ synthMarks ex adts = transformM transformfunc ex
                                   branches <- synthBranches adtcons (i+1)
                                   return $ Abs (getName i) (Just (ADT tyn tps)) $ CaseOf (Var (getName i)) branches
                               where
-                                  synthBranches :: [(Name, Type)] -> Int -> State MemoTable [(String, String, Expr)]
+                                  synthBranches :: [(Name, Type)] -> Int -> (StateT MemoTable IO) [(String, String, Expr)]
                                   synthBranches adtcons i = mapM (\(name, vtype) ->
                                         case vtype of
                                           Unit -> do
-                                              let (exp, memot') = synthCtxType mt c i adts t2
+                                              (exp, memot') <- liftIO $ synthCtxType mt c i adts t2
                                               modify (`Map.union` memot')
                                               return (name, "", exp)
                                           argty -> do
-                                              let (exp, memot') = synthCtxType mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2
+                                              (exp, memot') <- liftIO $ synthCtxType mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2
                                               modify (`Map.union` memot')
                                               return (name, getName i, exp) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
                                       ) adtcons
@@ -707,11 +726,14 @@ synthMarks ex adts = transformM transformfunc ex
 
 
 -- pre: program has been type inferred
-synthMarksModule :: Program -> Program
-synthMarksModule (Program adts bs ts cs) = minimize $ Program adts (synthMarksModule' Map.empty bs) ts cs
+synthMarksModule :: Program -> IO Program
+synthMarksModule (Program adts bs ts cs) = do
+    synthbs <- synthMarksModule' Map.empty bs
+    return $ minimize $ Program adts synthbs ts cs
     where
-        synthMarksModule' _ [] = []
-        synthMarksModule' memot ((Binding n e):xs) =
-            let (syne, memot') = runState (synthMarks e adts) memot in
-                (Binding n syne : synthMarksModule' memot' xs)
+        synthMarksModule' :: MemoTable -> [Binding] -> IO [Binding]
+        synthMarksModule' _ [] = return []
+        synthMarksModule' memot ((Binding n e):xs) = do
+            (syne, memot') <- runStateT (synthMarks e adts) memot
+            (Binding n syne :) <$> synthMarksModule' memot' xs
 
