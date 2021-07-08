@@ -5,11 +5,11 @@ nat :: x { Int | x > 0 };
 nat = add 6 3;
 
 
-wplus :: (x { Int } -> y { Int | x == y } -> z { Int | x >= y && x == y });
+wplus :: (x { Int } -> y { Int | x == y } -> z { Int | z >= x + y });
 wplus x y = add x y;
 
 
-inc :: (x { Int | x > 0 } -> z { Int | z == x + 1 });
+inc :: (x { Int | x >= 0 } -> z { Int | z == x + 1 && x == 0 });
 inc = add 1;
 
 
