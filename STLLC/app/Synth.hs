@@ -157,8 +157,8 @@ checkrestrictions tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construc
     subs <- getsubs
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
     let b = ty `notElem` reslist && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
-    trace ("Is " ++ show ty ++ " (" ++ show (apply subs ty) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
-        return b
+    -- trace ("Is " ++ show ty ++ " (" ++ show (apply subs ty) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
+    return b
 
 checkrestrictions' :: Restrictions -> RestrictTag -> Type -> Synth Bool
 checkrestrictions' rs tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construction and Destruction
@@ -542,28 +542,27 @@ focus c goal =
                   case model of
                     Nothing -> empty   -- the SMT solver couldn't generate a model for this predicate
                     Just expr -> do -- error ("Got model " ++ show expr ++ " and " ++ show rctx ++ " and now utilizing variables to instance it")
-                        (expr', d') <- trace ("Exp and delta are \n\n" ++ show expr ++ "/" ++ show d) $ replaceRefVariables expr
-                        trace ("AFTER :\n" ++ show expr ++ "/" ++ show d) $ return (expr', d')
+                        (expr', d') <- ifte (replaceRefVariables expr) return (trace ("Failed to instance expression from the SMT Solver: " ++ show expr) empty)
+                        return (expr', d')
 
             where
                 replaceRefVariables :: Expr -> Synth (Expr, Delta)
-                replaceRefVariables e = maybe empty (return . second (d \\)) $ runStateT (transformM replaceTransform e) []
+                replaceRefVariables e = maybe empty return $ runStateT (transformM replaceTransform e) d
                 
                 replaceTransform :: Expr -> (StateT Delta) Maybe Expr
-                replaceTransform (Abs name mt bod) = trace "Abs" $ findVarName False name >>= \nvname -> return (Abs nvname mt bod)
                 replaceTransform (Var name) =
-                    trace "Var" $ case readMaybe name :: Maybe Int of -- The variable might be a function like "add", it isn't necessarily a placeholder number
+                    case readMaybe name :: Maybe Int of -- The variable might be a function like "add", it isn't necessarily a placeholder number
                         Nothing -> return $ Var name
-                        Just _ -> Var <$> findVarName True name
-
+                        Just _ -> Var <$> findVarName name
                 replaceTransform e = return e
 
-                findVarName :: Bool -> Name -> (StateT Delta) Maybe String
-                findVarName shouldConsume name = do
-                    let refname = rctx !! read name
-                    case trace ("find " ++ show refname ++ " in " ++ show d) $ find ((refname ==) . snd) d of
+                findVarName :: Name -> (StateT Delta) Maybe String
+                findVarName name = do
+                    let refname = getRefName $ rctx !! read name
+                    delta <- get
+                    case find ((refname ==) . getRefName . snd) delta of
                       Just (vname, ft) -> do
-                          when shouldConsume $ modify ((vname, ft):) -- TODO: there is no alternative for choosing the variables to instantiate the type synthetised by the SMT, there's no backtracking, we always try to find in delta first and will always instantiate one when available
+                          put $ delete (vname, ft) delta        -- TODO: there is no alternative for choosing the variables to instantiate the type synthetised by the SMT, there's no backtracking, we always try to find in delta first and will always instantiate one when available
                           return vname 
                       Nothing ->
                           case find ((\case

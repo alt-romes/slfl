@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Refinements (satunifyrefinements, getvc, renameR, composeVC, replaceName, addRefinementToCtxs, getModelExpr) where 
+module Refinements (satunifyrefinements, getvc, renameR, composeVC,
+    replaceName, addRefinementToCtxs, getModelExpr, getRefName) where 
 
 import Control.Monad.State
 import Lexer
@@ -8,7 +9,7 @@ import Parser (tylit)
 import Text.Parsec hiding (State)
 import Debug.Trace
 import Data.Maybe
-import Data.Set as Set hiding (map, foldr, foldl)
+import Data.Set as Set hiding (map, foldr, foldl, null)
 import qualified Data.Map as Map
 import Data.Bifunctor
 import Data.List (intercalate)
@@ -36,6 +37,9 @@ instance Show VerificationCondition where
     show (VCConj v1 v2) = show v1 ++ " /\\ " ++ show v2
 
 
+
+getRefName :: Type -> Name
+getRefName (RefinementType n _ _ _) = n
 
 addRefinementToCtxs :: Type -> Type -> Type
 addRefinementToCtxs r = transformType (\case RefinementType rn rt ls mp -> RefinementType rn rt (r:ls) mp; t' -> t')
@@ -237,7 +241,7 @@ getSValPred ls (PBool x) = if x then return $ Left sTrue else return $ Left sFal
 
 
 getModelExpr :: Type -> IO (Maybe Expr)
-getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3{verbose = True} problem
+getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3 problem -- z3{verbose = True}
 
     where
         problem :: Symbolic (Maybe Expr)
@@ -267,30 +271,35 @@ getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3{verbo
 
         makeAxiomFromPredicate :: Type -> String
         makeAxiomFromPredicate (RefinementType name rtype ls (Just pred)) =
-            mparens ("assert " ++
-                mparens ("forall " ++
-                mparens (unwords (map (\(RefinementType name' ty' _ _) -> mparens (name' ++ " " ++ show ty')) ls)) ++ " " ++ -- variables quantified universally
-                makePredicateString (foldr (\(RefinementType _ _ _ mp) -> ((case mp of Nothing -> []; Just p -> [p]) ++)) [pred] ls) -- predicate
-             ))
+            let predicateFormula = makePredicateString (null ls) (foldr (\(RefinementType _ _ _ mp) -> ((case mp of Nothing -> []; Just p -> [p]) ++)) [pred] ls) in
+            if null ls then
+                mparens ("assert " ++ predicateFormula)
+            else
+                mparens ("assert " ++
+                    mparens ("forall " ++
+                        mparens (unwords (map (\(RefinementType name' ty' _ _) -> mparens (name' ++ " " ++ show ty')) ls)) ++ " " ++ -- variables quantified universally
+                    predicateFormula
+                 ))
 
 
-        makePredicateString :: [Predicate] -> String
-        makePredicateString [] = error "Shouldn't be making a predicate string from an empty list of predicates"
-        makePredicateString [PVar vname] = if vname == rname
-                                              then mparens $
-                                                  vname ++ " " ++ unwords (map (\(RefinementType n' _ _ _) -> n') ls) -- Use function call instead of variable by itself
+        makePredicateString :: Bool -> [Predicate] -> String
+        makePredicateString _ [] = error "Shouldn't be making a predicate string from an empty list of predicates"
+        makePredicateString hasNoArgs [PVar vname] = if vname == rname
+                                              then (if hasNoArgs then id else mparens) $
+                                                  vname ++ " " ++ unwords (map getRefName ls) -- Use function call instead of variable by itself
                                               else vname
-        makePredicateString [PBool b] = if b then "true" else "false"
-        makePredicateString [PNum i] = show i
-        makePredicateString [BinaryOp opn p1 p2] = let core = mparens $ getSMTLibName opn ++ " " ++ makePredicateString [p1] ++ " " ++ makePredicateString [p2] in
+        makePredicateString _ [PBool b] = if b then "true" else "false"
+        makePredicateString _ [PNum i] = show i
+        makePredicateString b [BinaryOp opn p1 p2] = let core = mparens $ getSMTLibName opn ++ " " ++ makePredicateString b [p1] ++ " " ++ makePredicateString b [p2] in
                                                        if opn == "!=" then mparens $ "not " ++ core
                                                                       else core
-        makePredicateString (p:xs) = mparens $ "=> " ++ makePredicateString [p] ++ " " ++ makePredicateString xs
+        makePredicateString b (p:xs) = mparens $ "=> " ++ makePredicateString b [p] ++ " " ++ makePredicateString b xs
 
 
         getSMTLibName :: String -> String
         getSMTLibName n
             | n == "==" = "="
+            | n == "!=" = "=" -- a not is added in this case
             | n == "&&" = "and"
             | n == "||" = "or"
             | otherwise = n
@@ -310,8 +319,7 @@ pexpr = parens $ do
     name <- identifier
     args <- parens $ many pargument
     returnty <- tylit
-    body <- paexp
-    return $ foldr (\(i,t) bod -> Abs (show i) (Just t) bod) body args
+    paexp
 
 
 pargument :: Parser (Integer, Type)
@@ -327,7 +335,10 @@ paexp =  litexp
      <|> parens (do
              funname <- operator
              exps <- many1 paexp
-             return $ foldl Syntax.App (Var funname) exps)
+             let exps' = if funname == "sub" && length exps == 1    -- the subtraction might be a prefix meaning 0 - x
+                            then Syntax.Lit (LitInt 0):exps
+                            else exps
+             return $ foldl Syntax.App (Var funname) exps')
 
 
 litexp :: Parser Expr

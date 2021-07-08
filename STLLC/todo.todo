@@ -19,3 +19,4 @@
                         main e f g = let !h = e in f ! (λk -o h k) g;
         f !(\k -o h k) g should consume g (?...) but !h works ?? =)
 30) type inference on refinement types - não é aplicada uma substituição às variáveis dentro do predicado ao entrar no "binder" da app e perde-se informação
+31) (z {Int} * Int) when decomposed adds z to its own refinement context for some reason :)
