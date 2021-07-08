@@ -1,4 +1,4 @@
-module Parser (parseExpr, parseModule, parseType) where
+module Parser (parseExpr, parseModule, parseType, tylit) where
 
 import Prelude hiding (sum)
 import Text.Parsec
@@ -12,7 +12,7 @@ import Lexer
 import CoreSyntax hiding (Var(..))
 import Syntax
 import Program
-import Util
+import Util hiding (parens)
 
 
 

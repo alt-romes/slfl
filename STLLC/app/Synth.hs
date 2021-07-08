@@ -2,6 +2,7 @@
 module Synth (synthAllType, synthType, synthMarks, synthMarksModule, synth) where
 
 import Data.List
+import Text.Read (readMaybe)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Control.Applicative
@@ -156,8 +157,8 @@ checkrestrictions tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construc
     subs <- getsubs
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
     let b = ty `notElem` reslist && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
-    -- trace ("Is " ++ show ty ++ " (" ++ show (apply subs ty) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
-    return b
+    trace ("Is " ++ show ty ++ " (" ++ show (apply subs ty) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
+        return b
 
 checkrestrictions' :: Restrictions -> RestrictTag -> Type -> Synth Bool
 checkrestrictions' rs tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construction and Destruction
@@ -540,7 +541,40 @@ focus c goal =
                   model <- liftIO $ getModelExpr r
                   case model of
                     Nothing -> empty   -- the SMT solver couldn't generate a model for this predicate
-                    Just expr -> error ("Got model " ++ show expr ++ " and now utilizing variables to instance it")
+                    Just expr -> do -- error ("Got model " ++ show expr ++ " and " ++ show rctx ++ " and now utilizing variables to instance it")
+                        (expr', d') <- trace ("Exp and delta are \n\n" ++ show expr ++ "/" ++ show d) $ replaceRefVariables expr
+                        trace ("AFTER :\n" ++ show expr ++ "/" ++ show d) $ return (expr', d')
+
+            where
+                replaceRefVariables :: Expr -> Synth (Expr, Delta)
+                replaceRefVariables e = maybe empty (return . second (d \\)) $ runStateT (transformM replaceTransform e) []
+                
+                replaceTransform :: Expr -> (StateT Delta) Maybe Expr
+                replaceTransform (Abs name mt bod) = trace "Abs" $ findVarName False name >>= \nvname -> return (Abs nvname mt bod)
+                replaceTransform (Var name) =
+                    trace "Var" $ case readMaybe name :: Maybe Int of -- The variable might be a function like "add", it isn't necessarily a placeholder number
+                        Nothing -> return $ Var name
+                        Just _ -> Var <$> findVarName True name
+
+                replaceTransform e = return e
+
+                findVarName :: Bool -> Name -> (StateT Delta) Maybe String
+                findVarName shouldConsume name = do
+                    let refname = rctx !! read name
+                    case trace ("find " ++ show refname ++ " in " ++ show d) $ find ((refname ==) . snd) d of
+                      Just (vname, ft) -> do
+                          when shouldConsume $ modify ((vname, ft):) -- TODO: there is no alternative for choosing the variables to instantiate the type synthetised by the SMT, there's no backtracking, we always try to find in delta first and will always instantiate one when available
+                          return vname 
+                      Nothing ->
+                          case find ((\case
+                                        Left (Forall _ (RefinementType n' _ _ _)) -> n' == name
+                                        Left (Forall _ _) -> False
+                                        Right (RefinementType n' _ _ _) -> n' == name
+                                        Right _ -> False
+                                     ) . snd) g of
+                            Just (vname, _) -> return vname
+                            Nothing -> empty
+
 
 
         ---- * Left synchronous rules * -------------------

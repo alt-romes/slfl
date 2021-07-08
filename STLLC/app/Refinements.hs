@@ -1,16 +1,23 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Refinements (satunifyrefinements, getvc, renameR, composeVC, replaceName, addRefinementToCtxs, getModelExpr) where 
 
 import Control.Monad.State
+import Lexer
+import Parser (tylit)
+import Text.Parsec hiding (State)
 import Debug.Trace
 import Data.Maybe
-import Data.Set as Set hiding (map, foldr)
+import Data.Set as Set hiding (map, foldr, foldl)
 import qualified Data.Map as Map
 import Data.Bifunctor
 import Data.List (intercalate)
 import Data.SBV as SBV hiding (Predicate)
+import Data.SBV.Trans.Control (SMTOption(..))
+import Data.SBV.Control hiding (fresh, getModel)
+import Data.SBV.Internals hiding (State, Abs)
 
-import CoreSyntax
+import CoreSyntax hiding (Abs, Var)
 import Syntax
 import Util
 
@@ -31,7 +38,7 @@ instance Show VerificationCondition where
 
 
 addRefinementToCtxs :: Type -> Type -> Type
-addRefinementToCtxs r = transformType (\case RefinementType rn rt ls mp -> RefinementType rn rt (ls ++ [r]) mp; t' -> t')
+addRefinementToCtxs r = transformType (\case RefinementType rn rt ls mp -> RefinementType rn rt (r:ls) mp; t' -> t')
 
 replaceName :: Map.Map Name Name -> Predicate -> Predicate
 replaceName m p = case p of
@@ -229,44 +236,56 @@ getSValPred ls (PBool x) = if x then return $ Left sTrue else return $ Left sFal
 
 
 
-getModelExpr :: Type -> IO (Maybe SatResult)
-getModelExpr r = do
-    model <- getModel r
-    return $ Just model
+getModelExpr :: Type -> IO (Maybe Expr)
+getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3{verbose = True} problem
 
-
-getModel :: Type -> IO SatResult
-getModel r@(RefinementType rname rtype ls (Just pred)) = sat axiom
     where
-        axiom :: Symbolic ()
-        axiom = do
-            setTimeOut 500
-            addAxiom "refinement-type"
-                [
-                "(declare-fun " ++ rname ++ "(" ++ unwords (map (\(RefinementType _ ty' _ _) -> show ty') ls) ++ ") " ++ show rtype ++ ")",
-                makeAxiomFromPredicate r
-                ]
+        problem :: Symbolic (Maybe Expr)
+        problem = do
+            setTimeOut 300
+            query $ do
+                cs <- checkSat
+                case cs of
+                  Unk -> return Nothing
+                  Unsat -> return Nothing
+                  Sat -> do
+                      -- TODO: very prone to deprecation :)
+                      sendStringToSolver $ mparens $ "declare-fun " ++ rname ++ " " ++ mparens (unwords (map (\(RefinementType _ ty' _ _) -> show ty') ls)) ++ " " ++ show rtype
+                      sendStringToSolver $ makeAxiomFromPredicate r
+                      sendStringToSolver "(check-sat)"
+                      s <- retrieveResponseFromSolver "*1" Nothing
+                      let satres = last s
+                      if satres == "sat" then do
+                          sendStringToSolver "(get-model)"
+                          s' <- retrieveResponseFromSolver "*2" Nothing
+                          return $ Just $ parseSMTExpr $ concat s'
+                      else if satres == "unsat" || satres == "unknown" then
+                          return Nothing
+                      else
+                          error $ "[Refinements] Received weird response from the solver: " ++ show satres 
+
 
         makeAxiomFromPredicate :: Type -> String
         makeAxiomFromPredicate (RefinementType name rtype ls (Just pred)) =
-            "(assert (forall (" ++ -- init
-            unwords (map (\(RefinementType name' ty' _ _) -> "(" ++ name' ++ " " ++ show ty' ++ ")") ls) ++ -- variables quantified universally
-            ")" ++ -- close universal quantification
-             makePredicateString (foldr (\(RefinementType _ _ _ mp) -> ((case mp of Nothing -> []; Just p -> [p]) ++)) [pred] ls) ++ -- predicate
-             "))" -- close forall, close assert
+            mparens ("assert " ++
+                mparens ("forall " ++
+                mparens (unwords (map (\(RefinementType name' ty' _ _) -> mparens (name' ++ " " ++ show ty')) ls)) ++ " " ++ -- variables quantified universally
+                makePredicateString (foldr (\(RefinementType _ _ _ mp) -> ((case mp of Nothing -> []; Just p -> [p]) ++)) [pred] ls) -- predicate
+             ))
 
 
         makePredicateString :: [Predicate] -> String
         makePredicateString [] = error "Shouldn't be making a predicate string from an empty list of predicates"
         makePredicateString [PVar vname] = if vname == rname
-                                              then "(" ++ vname ++ " " ++ unwords (map (\(RefinementType n' _ _ _) -> n') ls) ++ ")" -- Use function call instead of variable by itself
+                                              then mparens $
+                                                  vname ++ " " ++ unwords (map (\(RefinementType n' _ _ _) -> n') ls) -- Use function call instead of variable by itself
                                               else vname
         makePredicateString [PBool b] = if b then "true" else "false"
         makePredicateString [PNum i] = show i
-        makePredicateString [BinaryOp opn p1 p2] = let core = "(" ++ getSMTLibName opn ++ " " ++ makePredicateString [p1] ++ " " ++ makePredicateString [p2] ++ ")" in
-                                                       if opn == "!=" then "(not " ++ core ++ ")"
+        makePredicateString [BinaryOp opn p1 p2] = let core = mparens $ getSMTLibName opn ++ " " ++ makePredicateString [p1] ++ " " ++ makePredicateString [p2] in
+                                                       if opn == "!=" then mparens $ "not " ++ core
                                                                       else core
-        makePredicateString (p:xs) = "(=>" ++ makePredicateString [p] ++ " " ++ makePredicateString xs ++ ")"
+        makePredicateString (p:xs) = mparens $ "=> " ++ makePredicateString [p] ++ " " ++ makePredicateString xs
 
 
         getSMTLibName :: String -> String
@@ -275,3 +294,50 @@ getModel r@(RefinementType rname rtype ls (Just pred)) = sat axiom
             | n == "&&" = "and"
             | n == "||" = "or"
             | otherwise = n
+
+
+
+
+parseSMTExpr :: String -> Expr
+parseSMTExpr s = case runParser (contents $ parens pexpr) 0 "smt-exp-parse" s of
+                Left x -> errorWithoutStackTrace $ "[Expr Parse] Failed: " ++ show x
+                Right x -> x
+
+
+pexpr :: Parser Expr
+pexpr = parens $ do
+    reserved "define-fun"
+    name <- identifier
+    args <- parens $ many pargument
+    returnty <- tylit
+    body <- paexp
+    return $ foldr (\(i,t) bod -> Abs (show i) (Just t) bod) body args
+
+
+pargument :: Parser (Integer, Type)
+pargument = parens $ do
+    string "x!"
+    i <- natural
+    t <- tylit
+    return (i, t)
+
+
+paexp :: Parser Expr
+paexp =  litexp
+     <|> parens (do
+             funname <- operator
+             exps <- many1 paexp
+             return $ foldl Syntax.App (Var funname) exps)
+
+
+litexp :: Parser Expr
+litexp =  (Var . show <$> (string "x!" >> natural))
+      <|> (Syntax.Lit . LitInt <$> natural)
+
+
+operator :: Parser Name
+operator =  (reservedOp "+" >> return "add")
+        <|> (reservedOp "-" >> return "sub")
+        <|> (reservedOp "*" >> return "mult")
+
+

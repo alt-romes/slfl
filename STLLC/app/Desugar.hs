@@ -154,6 +154,9 @@ psub = TypeBinding "sub" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (t
 psum :: TypeBinding
 psum = TypeBinding "add" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "+" (PVar "x") (PVar "y"))))))
 
+builtinfs :: [TypeBinding]
+builtinfs = [psum, psub, pmult]
+
 addPrelude :: [TypeBinding] -> [TypeBinding]
 addPrelude ts = ts ++ [psum, psub, pmult]
 

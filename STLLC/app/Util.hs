@@ -28,3 +28,7 @@ getName i = if i < 0 then '-' : letters !! (-i) else letters !! i
 
 getNumCode :: String -> Int
 getNumCode n = fromJust $ lookup n [("a", 0), ("b", 1), ("c", 2), ("d", 3), ("e", 4), ("f", 5), ("g", 6), ("h", 7), ("i", 8), ("j", 9), ("k", 10)] -- TODO: find way to parse type vars and to get their value
+
+
+mparens :: String -> String
+mparens s = "(" ++ s ++ ")"

@@ -44,3 +44,6 @@ contents p = do
   r <- p
   eof
   return r
+
+symbol :: String -> Parser String
+symbol = Tok.symbol lexer
