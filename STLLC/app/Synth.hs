@@ -323,7 +323,7 @@ synth c@(g, d, (n, Plus a b):o) t = addtrace (LeftPlus c (Plus a b) t) $ do
     (expa, d') <- memoizesynth synth (g, d, (n1, a):o) t
     (expb, d'')  <- memoizesynth synth (g, d, (n2, b):o) t
     guard (d' == d'')
-    guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
+    guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d''))
     return (CaseOfPlus (Var n) n1 expa n2 expb, d')
 
 ---- sumL
@@ -377,7 +377,7 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> 
 synth c@(g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do
     nname <- fresh
     (exp, d') <- memoizesynth synth ((nname, Right a):g, d, o) t
-    guard (nname `notElem` map fst d')
+    guard (nname `notElem` map fst d') -- Useless?
     return (LetBang nname (Var n) exp, d')
 
 ---- refinementL
@@ -582,9 +582,7 @@ focus c goal =
         focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace (LeftFun c (Fun a b) goal) $ do
             nname <- fresh
             (expb, d') <- memoizefocus' focus' (Just (nname, b)) c goal
-            guard (nname `notElem` map fst d')
-            -- subs <- getsubs
-            -- (expa, d'') <- synth (g, apply subs d', []) (apply subs a) -- TODO?
+            guard (nname `notElem` map fst d') -- TODO: Useless? make sure the focusL rule makes sure the proposition is not left synchronous
             (expa, d'') <- memoizesynth synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
@@ -593,13 +591,13 @@ focus c goal =
             do
                 nname <- fresh
                 (lf, d') <- memoizefocus' focus' (Just (nname, a)) c goal
-                guard (nname `notElem` map fst d')
+                guard (nname `notElem` map fst d') -- TODO: useless :)
                 return (substitute nname (Fst (Var n)) lf, d')
             <|>
             do
                 nname <- fresh
                 (rt, d') <- memoizefocus' focus' (Just (nname, b)) c goal
-                guard (nname `notElem` map fst d')
+                guard (nname `notElem` map fst d') --TODO: Useless
                 return (substitute nname (Snd (Var n)) rt, d')
 
         ---- ∃L (?)

@@ -328,7 +328,7 @@ calculus system, for it simplifies the work to be done in the
 synthesizer.
 
 
-\mypara{Resource-Management}
+\mypara{Resource-Management}\label{sec:background_resource_management}
 Be it from the perspective of proof \emph{checking} (i.e.~type checking) or
 proof \emph{search} linear logic poses a key challenge when compared
 to the non-linear setting:
@@ -356,7 +356,7 @@ remaining resources $\Delta''$; finally, after having proven
 $A\tensor B$, output $\Delta''$, for subsequent derivations.
 
 
-\mypara{Focusing}
+\mypara{Focusing}\label{sec:background_focusing}
 
 Even with everything mentioned so far, non-determinism is still very
 present in proof-search, e.g. at any given point, many proof
@@ -416,38 +416,238 @@ types: -- polimorfic, refinements, adts parametrizáveis...  todo
 
 \section{Architecture}
 
+\subsection{The \synname\ language}
+
 \subsection{Implementation}
 
-A implementação foi feita em haskell e o código está disponível em X e há um
-live demo com exemplos pré-feitos em Y?
+% A implementação foi feita em haskell e o código está disponível em X e há um
+% live demo com exemplos pré-feitos em Y?
 
 
 \section{Formal System}\label{sec:formal_system}
 
 The development of \synname\ was initially found on an almost direct reading of
-concrete inference rules and theoretical principles; and work on its environment
+concrete inference rules and theoretical principles (~\cite{frank pfenning notes}); and work on its environment
 was also guided by formal systems and methods (e.g. the Hindley-Milner type
-inference~\cite{}).  However, with the addition of recursion and richer types to the synth and
-language, formal guidelines to support the implementation become scarcer, or
-more complex. Accordingly, rather than derived from explicit rules,
-solutions appear first to tame the extensions' inherent complex
-problems (such as infinite recursion) and from them emerge implicit rules.
+inference~\cite{}).  However, with the addition of recursion and richer types to
+the synth and language, formal guidelines to support the implementation become
+scarcer, or more complex. Accordingly, rather than derived from explicit rules,
+solutions appear first to tame the extensions' inherent complex problems (such
+as infinite recursion), and implicit rules come only as a byproduct.
 
 With this section we intend to formalize the implicit rules that guide the
-synthesis of more expressive programs, alongside the already explicit rules that
-model the core of the synth process, resulting in a \emph{sound} set of rules
-that hopes to serve as a source of thoughts on taming synthesis of recursive
-functions with richer types in a linear context, as well as describe the system
-in enough detail for the synthetiser to be reproducible by a theory-driven
-different implementation.
+synthesis of more expressive specifications, alongside the already explicit
+rules that model the core of the synth process, resulting in a \emph{sound} set
+of rules that hopes to serve as a source of ideas on taming synthesis of
+recursive functions with richer types in a linear context, as well as describe
+the system in enough detail for the synthetiser to be reproducible by a
+theory-driven implementation.
 
-Note that \emph{sound} and \emph{complete} mean two very different
-things, and that this set of rules is only sound, meaning it might generate
-correct results but simultaneously hiding an infinite amount of valid programs,
-and that it reflects the quite subjective trade-offs we decided on, and that
-different synths might take completely different approaches.
+Even so, note that \emph{soundness} and \emph{completeness} have two very
+different meanings, and our \emph{sound} set of rules only guarantees we won't
+synth incorrect programs, but still hides a possibly infinite number of correct
+proofs; and that the valid programs derivable through it reflect the somewhat
+subjective trade-offs we decided on. Different choices and approaches outside
+the core might lead to completely distinct synths and spaces of valid programs.
+
+\mypara{Core Rules} The core system comprises of the sequent calculus rules for
+linear logic connectives with resource-management and focusing. As seen
+previously\ref{sec:background}, focusing separates the proof search into two
+phases: inversion ($\Uparrow$) in which we apply invertible rules eagerly, and
+focusing ($\Downarrow$) in which we decide a proposition to focus on, and then
+apply non-invertible rules, staying focused until either the focus is again an
+asynchronous, i.e. invertible, proposition, or the proof is complete.  For the
+invertible rules, a third, ordered, context ($\Omega$) is needed to hold
+propositions resulting from decomposing connectives, that we'll later try to
+invert, moving them to the linear ($\Delta$) context when we fail to.
+
+Putting together linear logic, the Curry-Howard correspondence, resource
+management, and focusing, we get the following formal system (heavily inspired
+by Frank Pfenning's notes on focusing for linear logic~\cite{FPnotes...}) -- in which the
+first rule is read: to synth a program of type $A \lolli B$ while inverting
+right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
+context $\Delta$, and ordered context $\Omega$, synth a program of type $B$ with
+an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
+resulting in the program $M$ and in the output\ref{sec:background} linear
+context $\Delta'$ that cannot contain the added hypothesis $x{:}A$. Finally, the
+resulting program is $\lambda x \rightarrow M$ and the output linear context is
+$\Delta'$.
+
+We begin with the right invertible rules:
+
+\begin{mathpar}
+
+    % -o R
+    \infer*[right=($\lolli R$)]
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \vdash M : B \Uparrow \and x
+    \not\in \Delta'}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x \rightarrow M : A
+    \lolli B \Uparrow}
+
+\and
+
+    % & R
+    \infer*[right=($\with R$)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega \vdash M : A \Uparrow \and \Gamma ;
+    \Delta/ \Delta'' ; \Omega \vdash N : B \Uparrow \and \Delta' = \Delta''}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash  (M \with N) : A
+    \with B \Uparrow}
+
+\end{mathpar}
+
+When we reach a non-invertible proposition on the right, we start inverting the
+$\Omega$ context. The rule to transition to inversion on the left is:
+
+\begin{mathpar}
+    \infer*[right=($\Uparrow R$)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C \and C\ \textrm{not
+    right asynchronous}}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash M : C \Uparrow}
+\end{mathpar}
+
+Followed by the left invertible rules:
+
+% * L
+\begin{mathpar}
+
+    \infer*[right=($\tensor L$)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega, y{:}A, z{:}B \Uparrow\ \vdash M : C
+    \and y,z \not\in \Delta'}
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \tensor B \Uparrow\ \vdash\
+    \textrm{let}\ y \tensor z = x\ \textrm{in}\ M : C}
 
 
+\and
+
+    \infer*[right=($1 L$)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}1 \Uparrow\ \vdash\ \textrm{let}\
+    \star =
+    x\ \textrm{in}\ M : C}
+
+\and
+
+    \mprset{flushleft}
+    \infer*[right=($\oplus L$)]
+    {
+    \Gamma ; \Delta/ \Delta' ; \Omega, y{:}A \Uparrow\ \vdash M : C \and
+    y \not\in \Delta' \\
+    \Gamma ; \Delta/ \Delta'' ; \Omega, z{:}B \Uparrow\ \vdash N : C \\
+    z \not\in \Delta'' \\
+    \Delta' = \Delta''
+    }
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \oplus B \Uparrow\ \vdash\
+    \textrm{case}\ x\ \textrm{of}\ \textrm{inl}\ y \rightarrow M\ |\
+    \textrm{inr}\ z \rightarrow N : C}
+
+\and
+
+    % {TODO: Nao ha restrições sobre este? no código tinha que x não podia estar em
+    % delta mas não faz muito sentido hah}
+    \infer*[right=($\bang L$)]
+    {\Gamma, y{:}A ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
+    {\Gamma ; \Delta/\Delta ; \Omega, x{:}\bang A \Uparrow\ \vdash\
+    \textrm{let}\ \bang y = x\ \textrm{in}\ M : C}
+
+\end{mathpar}
+
+When we find a synchronous (i.e. non-invertible) proposition in $\Omega$,
+we simply move it to the linear context $\Delta$, and keep inverting on the left:
+
+\begin{mathpar}
+    \infer*[right=($\Uparrow L$)]
+    {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
+    \textrm{not left asynchronous}}
+    {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
+\end{mathpar}
+
+After inverting all the asynchronous propositions in $\Omega$ we'll reach a state
+where there are no more propositions to invert ($\Gamma'; \Delta'; \cdot
+\Uparrow\ \vdash C$). At this point, we want to \emph{focus} on a proposition.
+The focus object can be any of the three: the proposition on the right (the
+goal), a proposition from the linear $\Delta$ context, or a proposition from the
+unrestricted $\Gamma$ context. For these options we have three \emph{decision}
+rules:
+
+\begin{mathpar}
+    \infer*[right=(decideR)]
+    {\Gamma; \Delta/\Delta' \vdash C \Downarrow \and C\ \textrm{not atomic}}
+    {\Gamma; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+\and
+    \infer*[right=(decideL)]
+    {\Gamma; \Delta/\Delta' ; A \Downarrow\ \vdash C}
+    {\Gamma; \Delta, A/\Delta';\cdot \Uparrow\ \vdash C}
+\and
+    \infer*[right=(decideL!)]
+    {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash C}
+    {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+\end{mathpar}
+
+The decision rules are naturally followed by either left or right focus rules:
+
+\begin{mathpar}
+    \infer*[right=($\tensor R$)]
+    {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
+    : B \Downarrow}
+    {\Gamma; \Delta/\Delta'' \vdash (M \tensor N) : A \tensor B \Downarrow}
+\and
+    \infer*[right=($1 R$)]
+    {\and}
+    {\Gamma; \Delta/\Delta \vdash \star : 1 \Downarrow}
+\and
+    \infer*[right=($\oplus R_1$)]
+    {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow}
+    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inl}\ M : A \oplus B \Downarrow}
+\and
+    \infer*[right=($\oplus R_2$)]
+    {\Gamma; \Delta/\Delta' \vdash M : B \Downarrow}
+    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inr}\ M : A \oplus B \Downarrow}
+\and
+    \infer*[right=($\bang R$)]
+    {\Gamma; \Delta/\Delta'; \cdot \vdash M : A \Uparrow \and \Delta = \Delta'}
+    {\Gamma; \Delta/\Delta \vdash \bang M : \bang A \Downarrow}
+\and
+%TODO: eu tenho uma assertion que garante que y não sai com Delta', mas agora
+%parece-me inutil?
+    \infer*[right=($\lolli L$)]
+    {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C \and \Gamma;
+    \Delta'/\Delta''; \cdot \vdash N : A \Uparrow}
+    {\Gamma; \Delta/\Delta''; x{:}A \lolli B \Downarrow\ \vdash M\{(x\,N)/y\} : C}
+\and
+    \infer*[right=($\with L_1$)]
+    {\Gamma; \Delta/\Delta'; y{:}A \Downarrow\ \vdash M : C}
+    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{fst}\ x)/y\} : C}
+\and
+    \infer*[right=($\with L_2$)]
+    {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C}
+    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{snd}\ x)/y\} : C}
+\end{mathpar}
+
+Eventually, the focus proposition will no longer be synchronous, i.e. it's atomic or
+asynchronous. If we're left focused on an atomic proposition we either instance
+the goal or fail. Otherwise the left focus is asynchronous and we can start
+inverting it. If we're right focused on a proposition that isn't right
+synchronous, we switch to inversion as well. Three rules model these conditions:
+
+\begin{mathpar}
+    \infer*[right=(init)]
+    {\and}
+    {\Gamma; \Delta/\Delta'; x{:}A \Downarrow\ \vdash x : A}
+\and
+    \infer*[right=($\Downarrow L$)]
+    {\Gamma; \Delta/\Delta'; A \Uparrow\ \vdash C \and A\ \textrm{not atomic and not left synchronous}}
+    {\Gamma; \Delta/\Delta'; A \Downarrow\ \vdash C}
+\and
+    \infer*[right=($\Downarrow R$)]
+    {\Gamma; \Delta/\Delta'; \cdot \vdash A \Uparrow}
+    {\Gamma; \Delta/\Delta' \vdash A \Downarrow}
+\end{mathpar}
+
+The rules written above together make the core of our synthetiser. Ahead, we'll
+present new rules that align and build on top of these to synth recursive
+programs from more expressive (richer) types.
+
+\mypara{Recursion}
 
 \section{Related Work}
 
