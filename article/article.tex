@@ -381,6 +381,8 @@ backtracking is necessary.
 
 \section{Overview}
 
+Escrever introdução melhor que tenha isto como seguimento...
+
 At the core of the synthesis process, and of the developed synthetiser \synname,
 is a \emph{sound} and \emph{complete?} system of focusing for linear logic with
 resource management. It connects the concepts seen above -- a type system
@@ -404,10 +406,11 @@ context, that is, with knowledge of other functions and eventual structures
 defined in the same program.
 
 However, a programming language only with the canonical linear types lacks
-expressiveness. To enhance \synname\ and its language, and consequently synth
-more interesting programs -- and thus empirically prove the feasability of
-more relevant synthesis in a linear context, we extend the syntax and type
-system with richer types: -- polimorfic, refinements, adts parametrizáveis...  todo
+expressiveness. To enhance \synname\ and its language, synth more interesting
+programs -- and thus empirically proving the feasability of more relevant
+synthesis in a linear context, we extend the syntax and type system with
+recursiveness and richer
+types: -- polimorfic, refinements, adts parametrizáveis...  todo
 
 
 
@@ -420,6 +423,30 @@ live demo com exemplos pré-feitos em Y?
 
 
 \section{Formal System}\label{sec:formal_system}
+
+The development of \synname\ was initially found on an almost direct reading of
+concrete inference rules and theoretical principles; and work on its environment
+was also guided by formal systems and methods (e.g. the Hindley-Milner type
+inference~\cite{}).  However, with the addition of recursion and richer types to the synth and
+language, formal guidelines to support the implementation become scarcer, or
+more complex. Accordingly, rather than derived from explicit rules,
+solutions appear first to tame the extensions' inherent complex
+problems (such as infinite recursion) and from them emerge implicit rules.
+
+With this section we intend to formalize the implicit rules that guide the
+synthesis of more expressive programs, alongside the already explicit rules that
+model the core of the synth process, resulting in a \emph{sound} set of rules
+that hopes to serve as a source of thoughts on taming synthesis of recursive
+functions with richer types in a linear context, as well as describe the system
+in enough detail for the synthetiser to be reproducible by a theory-driven
+different implementation.
+
+Note that \emph{sound} and \emph{complete} mean two very different
+things, and that this set of rules is only sound, meaning it might generate
+correct results but simultaneously hiding an infinite amount of valid programs,
+and that it reflects the quite subjective trade-offs we decided on, and that
+different synths might take completely different approaches.
+
 
 
 \section{Related Work}
