@@ -338,7 +338,12 @@ paexp =  litexp
              let exps' = if funname == "sub" && length exps == 1    -- the subtraction might be a prefix meaning 0 - x
                             then Syntax.Lit (LitInt 0):exps
                             else exps
-             return $ foldl Syntax.App (Var funname) exps')
+             traceShow exps $ return $ applyToParams (Var funname) exps')
+    where
+        -- assumes all available functions are binary
+        applyToParams vf [] = error "[Refinements] Reached empty list"
+        applyToParams vf [e] = e
+        applyToParams vf (e:xs) = Syntax.App (Syntax.App vf e) (applyToParams vf xs)
 
 
 litexp :: Parser Expr
