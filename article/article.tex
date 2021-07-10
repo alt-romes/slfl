@@ -15,6 +15,7 @@
 \newcommand{\llet}[2]{\mathsf{let}\,#1\,\mathsf{in}\,#2}
 
 \newcommand{\synname}{\emph{SILI}}
+\newcommand{\te}[1]{\textrm{\emph{#1}}}
 
 \title{Synthesis of Linear Functional Programs}
 \author{Rodrigo Mesquita \and Bernardo Toninho}
@@ -420,6 +421,22 @@ types: -- polimorfic, refinements, adts parametrizáveis...  todo
 
 \subsection{Implementation}
 
+\mypara{Debugging} The rules described in the formal
+system\ref{sec:formal_system} to handle infinite recursion might seem obvious in
+retrospective, however, when faced with a program that doesn't terminate, what
+went wrong is not so clear. While we were able to figure out a solution for the
+first couple of "infinite examples", the following problems were much harder,
+taking sometimes full days to solve (and as of now, some still remain unsolved,
+e.g. List (List a) -o List a). To make the debugging experience better, we
+developed a tracing system that prints information whenever a rule is applied,
+alongside the stack of rules applied up until that one. This improved our
+debugging speed considerably, especially when put together with a correct
+derivation done by hand, with which we could match what was happening against
+what was supposed to happen.
+
+Unfortunately, it seems that sometimes in the process of backtracking, stack
+information is "lost", and the trace logs lose useability.
+
 % A implementação foi feita em haskell e o código está disponível em X e há um
 % live demo com exemplos pré-feitos em Y?
 
@@ -458,8 +475,8 @@ focusing ($\Downarrow$) in which we decide a proposition to focus on, and then
 apply non-invertible rules, staying focused until either the focus is again an
 asynchronous, i.e. invertible, proposition, or the proof is complete.  For the
 invertible rules, a third, ordered, context ($\Omega$) is needed to hold
-propositions resulting from decomposing connectives, that we'll later try to
-invert, moving them to the linear ($\Delta$) context when we fail to.
+propositions resulting from decomposing connectives; propositions we'll later try to
+invert, moving them to the linear context ($\Delta$) when we fail to.
 
 Putting together linear logic, the Curry-Howard correspondence, resource
 management, and focusing, we get the following formal system (heavily inspired
@@ -468,7 +485,7 @@ first rule is read: to synth a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
 context $\Delta$, and ordered context $\Omega$, synth a program of type $B$ with
 an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
-resulting in the program $M$ and in the output\ref{sec:background} linear
+resulting in the program $M$ and output\ref{sec:background} linear
 context $\Delta'$ that cannot contain the added hypothesis $x{:}A$. Finally, the
 resulting program is $\lambda x \rightarrow M$ and the output linear context is
 $\Delta'$.
@@ -592,7 +609,7 @@ The decision rules are naturally followed by either left or right focus rules:
     {\Gamma; \Delta/\Delta'' \vdash (M \tensor N) : A \tensor B \Downarrow}
 \and
     \infer*[right=($1 R$)]
-    {\and}
+    {  }
     {\Gamma; \Delta/\Delta \vdash \star : 1 \Downarrow}
 \and
     \infer*[right=($\oplus R_1$)]
@@ -631,7 +648,7 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
 
 \begin{mathpar}
     \infer*[right=(init)]
-    {\and}
+    {  }
     {\Gamma; \Delta/\Delta'; x{:}A \Downarrow\ \vdash x : A}
 \and
     \infer*[right=($\Downarrow L$)]
@@ -647,7 +664,131 @@ The rules written above together make the core of our synthetiser. Ahead, we'll
 present new rules that align and build on top of these to synth recursive
 programs from more expressive (richer) types.
 
-\mypara{Recursion}
+\mypara{Recursion} The main idea behind synthesis of recursive programs is the
+labeling of the main goal and the addition of its type, under that name, to the
+unrestricted context. That is, to synth a function of type $A \lolli B$ named
+\emph{foo}, the initial judgment can be written as
+
+\begin{mathpar}
+    \infer
+    {\vdots}
+    {\Gamma, \textrm{\emph{foo}}{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M :
+    A \lolli B \Uparrow}
+\end{mathpar}
+and, by definition, all subsequent inference rules will have
+($\textrm{\emph{foo}}{:}A \lolli B$) in the $\Gamma$ context too.
+
+We can force the usage of the recursive call by adding it not only to the
+unrestricted context, but to the linear one as well.
+
+% TODO: E como evitamos coisas trivialmente estúpidas?
+
+
+\mypara{Algebraic Data Types} In its simplest form, an algebraic data type (ADT)
+is a named sum type of any type, i.e. a named type instanceable by one of many
+tags (also known as constructors) that take exactly one fixed type, which might
+be, e.g., a product type ($A \tensor B$), or unit ($1$), in practice allowing
+for constructors with an arbitrary number of parameters. In the \synname\
+language, the programmer can define custom ADTs; as an example, we show the
+definition of an ADT which might be constructed with zero, one, or two
+propositions of type $A$, using its syntax: $\textrm{data Container} =
+\textrm{None}\ 1\ \vert\ \textrm{One}\ A\ \vert\ \textrm{Two}\ (A * A)$.
+
+The semantics of the simple ADT relate to those of the plus ($\oplus$) type --
+both are additive disjunctions.  A proof of an ADT requires only a proof of one
+of the types that a constructor takes, similar to the way $\oplus$ requires only
+proof of either the left or right type it consists of. Analogously, a proof of
+$C$ by deconstructing an ADT stipulates that all types that can construct the
+ADT can prove $C$, akin to the left rule for the $\oplus$ connective. In effect,
+the inference rules for a simple ADT mimic the $\oplus$ rules, for an
+arbitrary ($> 1$) number of types, rather than exactly two. Therefore, there's one
+left rule for ADTs, and an arbitrary number of right rules, one for each
+constructor:
+
+\begin{mathpar}
+    \infer*[right=(adtR)]
+    {\Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow}
+    {\Gamma; \Delta/\Delta' \vdash\ \textrm{Bar}_n \ M : \te{Foo} \Downarrow}
+\and
+    \mprset{flushleft}
+    \infer*[right=(adtL)]
+    { \Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C \and
+    y_1 \not\in \Delta'_1
+    \\ \Gamma ; \Delta/ \Delta'_2 ; \Omega, y_2{:}X_2 \Uparrow\ \vdash M_2 : C
+    \\ y_2 \not\in \Delta'_2
+    \\\\ \\ \dots
+    \\ \Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
+    \\ y_n \not\in \Delta'_n
+    \\ \Delta'_1 = \Delta'_2 = \dots = \Delta'_n }
+    {\Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}\te{Foo} \Uparrow\
+    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ \textrm{Bar}_n\ y_n
+    \rightarrow M_n : C}
+\end{mathpar}
+
+where the ADT \emph{Foo} and its definition stand for any ADT with form
+\[
+    \textrm{data Foo} = \textrm{Bar}_1\ X_1\ \vert\ \textrm{Bar}_2\ X_2\ \vert\
+\dots\ \vert\ \textrm{Bar}_n\ X_n
+\]
+
+A more general (and interesting) formulation of ADTs says an ADT can be
+recursive (or "indutively defined"), meaning the type a constructor needs might
+be the type the constructor constructs. Seemingly small, this change has a big
+impact in the synthesis process. Take, for instance, the ADT defined as
+$\textrm{data Foo} = \textrm{Bar Foo}$, the synth goal $\te{Foo}
+\lolli C$, and its derivation:
+
+\begin{mathpar}
+    \infer*[right=($\lolli R$)]
+    {
+        \infer*[right=($\Uparrow R$)]
+        {
+            \infer*[right=(adtL)]
+            {
+                \infer*[right=(adtL)]
+                {
+                    \infer*[right=(adtL)]
+                    {\dots}
+                    {\Gamma; \Delta/\Delta'; \Omega, z{:}\te{Foo} \Uparrow\ \vdash \textrm{case}\ z\ 
+                    \textrm{of Bar}\ k \rightarrow \dots : C}
+                }
+                {\Gamma; \Delta/\Delta'; \Omega, y{:}\te{Foo} \Uparrow\ \vdash \textrm{case}\ y\ 
+                \textrm{of Bar}\ z \rightarrow \dots : C}
+            }
+            {\Gamma; \Delta/\Delta'; \Omega, x{:}\te{Foo} \Uparrow\ \vdash \textrm{case}\ x\ 
+            \textrm{of Bar}\ y \rightarrow \dots : C}
+        }
+        {\Gamma; \Delta/\Delta'; \Omega, x{:}\te{Foo} \vdash \dots : C
+        \Uparrow}
+    }
+    {\Gamma; \Delta/\Delta'; \Omega \vdash \lambda x \rightarrow \dots :
+    \te{Foo} \lolli C \Uparrow}
+\end{mathpar}
+
+Using our current system, we are to apply an infinite number of times the left
+ADT rule, never reaching a final state for the proof. Simetrically, the
+derivation for the synth goal $\te{Foo}$ doesn't have an end either.
+
+\begin{mathpar}
+    \infer*[left=(adtR)]
+    {
+        \infer*[left=(adtR)]
+        {
+            \infer*[left=(adtR)]
+            {
+                \infer*[left=(adtR)]
+                {\dots}
+                {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo} \Downarrow}
+            }
+            {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo} \Downarrow}
+        }
+        {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo} \Downarrow}
+    }
+    {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo}
+    \Downarrow}
+\end{mathpar}
+
+\mypara{Polimorfic Types} 
 
 \section{Related Work}
 
