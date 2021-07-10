@@ -1,1 +1,1 @@
-forall d . (d -> d)
+forall d . (d -o d)

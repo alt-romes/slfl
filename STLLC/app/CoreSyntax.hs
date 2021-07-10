@@ -147,7 +147,7 @@ instance (Show CoreExpr) where
 
 instance (Show Type) where 
     show (TyLit l) = show l
-    show (Fun t1 t2) = "(" ++ show t1 ++ " -> " ++ show t2 ++ ")"
+    show (Fun t1 t2) = "(" ++ show t1 ++ " -o " ++ show t2 ++ ")"
     show (Tensor t1 t2) = "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
     show Unit = "1"
     show (With t1 t2) = "(" ++ show t1 ++ " & " ++ show t2 ++ ")"

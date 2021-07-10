@@ -1,42 +1,42 @@
-a :: ((A -> (B -> C)) -> ((A * B) -> C));
+a :: ((A -o (B -o C)) -o ((A * B) -o C));
 a a b = let c*d = b in a c d;
 
-b :: (((A * B) -> C) -> (A -> (B -> C)));
+b :: (((A * B) -o C) -o (A -o (B -o C)));
 b a b c = a (b, c);
 
-c :: ((A -> (B & C)) -> ((A -> B) & (A -> C)));
+c :: ((A -o (B & C)) -o ((A -o B) & (A -o C)));
 c a = ( (λb -> (fst (a b))) | (λe -> (snd (a e))) );
 
-d :: (((A -> B) & (A -> C)) -> (A -> (B & C)));
+d :: (((A -o B) & (A -o C)) -o (A -o (B & C)));
 d a b = ( (fst a) b | (snd a) b );
 
-e :: (((A + B) -> C) -> ((A -> C) & (B -> C)));
+e :: (((A + B) -o C) -o ((A -o C) & (B -o C)));
 e a = ( (λb -> a inl b) | (λd -> a inr d) );
 
-f :: (((A -> C) & (B -> C)) -> ((A + B) -> C));
+f :: (((A -o C) & (B -o C)) -o ((A + B) -o C));
 f a b = case b of 
       inl c -> (fst a) c
     | inr d -> (snd a) d;
 
-g :: (!(A & B) -> (!A * !B));
+g :: (!(A & B) -o (!A * !B));
 g a = let !b = a in ((!(fst b)), (!(snd b)));
 
-h :: ((!A * !B) -> !(A & B));
+h :: ((!A * !B) -o !(A & B));
 h a = let b*c = a in 
     let !d = c in 
         let !e = b in (!( e | d ));
 
-i :: ((A * 1) -> A);
+i :: ((A * 1) -o A);
 i a = let b*c = a in 
     let _ = c in b;
 
-j :: (A -> (A * 1));
+j :: (A -o (A * 1));
 j a = (a, ());
 
-k :: ((A & A) -> A);
+k :: ((A & A) -o A);
 k a = (fst a);
 
-l :: (A -> (A & A));
+l :: (A -o (A & A));
 l a = ( a | a );
 
 

@@ -1,18 +1,18 @@
-a = (λa : (A -> (B -> C)) ->
+a = (λa : (A -o (B -o C)) ->
     (λb : (A * B) ->
         let c*d = b in a c d));
-b = (λa : ((A * B) -> C) ->
+b = (λa : ((A * B) -o C) ->
     (λb : A ->
         (λc : B -> a ( b , c ))));
-c = (λa : (A -> (B & C)) -> (
+c = (λa : (A -o (B & C)) -> (
     (λb : A -> fst (a b)) |
     (λe : A -> snd (a e)) ));
-d = (λa : ((A -> B) & (A -> C)) ->
+d = (λa : ((A -o B) & (A -o C)) ->
     (λb : A -> ( (fst a) b | (snd a) b )));
-e = (λa : ((A + B) -> C) -> (
+e = (λa : ((A + B) -o C) -> (
     (λb : A -> a inl b : B) |
     (λd : B -> a inr A : d) ));
-f = (λa : ((A -> C) & (B -> C)) ->
+f = (λa : ((A -o C) & (B -o C)) ->
     (λb : (A + B) ->
         case b of
               inl c -> (fst a) c
