@@ -350,7 +350,7 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> 
                 (if isrectype -- TODO: make restrictions not dependent
                    then addrestriction DeconstructADT (ADT tyn tps)           -- For recursive types, restrict deconstruction of this type in further computations
                    else id) $
-                   (if t /= ADT tyn tps
+                   (if t /= ADT tyn tps -- TODO!!! para que exemplos preciso disto?? talvez já não seja preciso com as modificações que fiz entretanto
                        then addrestriction ConstructADT (ADT tyn tps)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
                        else id) $
                         case vtype of
@@ -363,7 +363,6 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> 
                             (exp, d') <- memoizesynth synth (g, d, (varid, argty):o) t
                             guard $ varid `notElem` map fst d'
                             return (name, varid, exp, d')
-                  -- TODO: polymorphic ADT
                 ) adtds
             let (n1, varid1, e1, d1') = head ls
             guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
@@ -371,7 +370,7 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> 
     ) <|> (
     lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (MoveLeftADT res c (ADT tyn tps) t) $ do
     checkrestrictions DeconstructADT (ADT tyn tps) >>= guard . not          -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)
-    memoizesynth synth (g, p:d, o) t)                                                    -- So if we failed above because a restriction didn't allow us to invert this ADT, try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
+    memoizesynth synth (g, p:d, o) t)                                       -- So if we failed above because a restriction didn't allow us to invert this ADT, try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
 
 ---- !L
 synth c@(g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do

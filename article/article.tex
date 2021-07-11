@@ -15,6 +15,7 @@
 \newcommand{\llet}[2]{\mathsf{let}\,#1\,\mathsf{in}\,#2}
 
 \newcommand{\synname}{\emph{SILI}}
+\def\Rho{P}
 \newcommand{\te}[1]{\textrm{\emph{#1}}}
 
 \title{Synthesis of Linear Functional Programs}
@@ -467,6 +468,10 @@ proofs; and that the valid programs derivable through it reflect the somewhat
 subjective trade-offs we decided on. Different choices and approaches outside
 the core might lead to completely distinct synths and spaces of valid programs.
 
+This section presents the rules while explaining them, modifying some along the
+process. For a 
+
+
 \mypara{Core Rules} The core system comprises of the sequent calculus rules for
 linear logic connectives with resource-management and focusing. As seen
 previously\ref{sec:background}, focusing separates the proof search into two
@@ -497,7 +502,7 @@ We begin with the right invertible rules:
     % -o R
     \infer*[right=($\lolli R$)]
     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \vdash M : B \Uparrow \and x
-    \not\in \Delta'}
+    \notin \Delta'}
     {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x \rightarrow M : A
     \lolli B \Uparrow}
 
@@ -517,9 +522,9 @@ $\Omega$ context. The rule to transition to inversion on the left is:
 
 \begin{mathpar}
     \infer*[right=($\Uparrow R$)]
-    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C \and C\ \textrm{not
+    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
     right asynchronous}}
-    {\Gamma ; \Delta/\Delta' ; \Omega \vdash M : C \Uparrow}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
 \end{mathpar}
 
 Followed by the left invertible rules:
@@ -529,7 +534,7 @@ Followed by the left invertible rules:
 
     \infer*[right=($\tensor L$)]
     {\Gamma ; \Delta/ \Delta' ; \Omega, y{:}A, z{:}B \Uparrow\ \vdash M : C
-    \and y,z \not\in \Delta'}
+    \and y,z \notin \Delta'}
     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \tensor B \Uparrow\ \vdash\
     \textrm{let}\ y \tensor z = x\ \textrm{in}\ M : C}
 
@@ -548,9 +553,9 @@ Followed by the left invertible rules:
     \infer*[right=($\oplus L$)]
     {
     \Gamma ; \Delta/ \Delta' ; \Omega, y{:}A \Uparrow\ \vdash M : C \and
-    y \not\in \Delta' \\
+    y \notin \Delta' \\
     \Gamma ; \Delta/ \Delta'' ; \Omega, z{:}B \Uparrow\ \vdash N : C \\
-    z \not\in \Delta'' \\
+    z \notin \Delta'' \\
     \Delta' = \Delta''
     }
     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \oplus B \Uparrow\ \vdash\
@@ -671,14 +676,14 @@ unrestricted context. That is, to synth a function of type $A \lolli B$ named
 
 \begin{mathpar}
     \infer
-    {\vdots}
+    {\dots}
     {\Gamma, \textrm{\emph{foo}}{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M :
     A \lolli B \Uparrow}
 \end{mathpar}
 and, by definition, all subsequent inference rules will have
 ($\textrm{\emph{foo}}{:}A \lolli B$) in the $\Gamma$ context too.
 
-We can force the usage of the recursive call by adding it not only to the
+We can also force the usage of the recursive call by adding it not only to the
 unrestricted context, but to the linear one as well.
 
 % TODO: E como evitamos coisas trivialmente estúpidas?
@@ -712,20 +717,29 @@ constructor:
 \and
     \mprset{flushleft}
     \infer*[right=(adtL)]
-    { \Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C \and
-    y_1 \not\in \Delta'_1
-    \\ \Gamma ; \Delta/ \Delta'_2 ; \Omega, y_2{:}X_2 \Uparrow\ \vdash M_2 : C
-    \\ y_2 \not\in \Delta'_2
-    \\\\ \\ \dots
-    \\ \Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
-    \\ y_n \not\in \Delta'_n
-    \\ \Delta'_1 = \Delta'_2 = \dots = \Delta'_n }
+    {
+        \Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
+        \and
+        y_1 \notin \Delta'_1
+        \\
+        \Gamma ; \Delta/ \Delta'_2 ; \Omega, y_2{:}X_2 \Uparrow\ \vdash M_2 : C
+        \\
+        y_2 \notin \Delta'_2
+        \\\\
+        \\ \dots
+        \\
+        \Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
+        \\
+        y_n \notin \Delta'_n
+        \\
+        \Delta'_1 = \Delta'_2 = \dots = \Delta'_n
+    }
     {\Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}\te{Foo} \Uparrow\
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ \textrm{Bar}_n\ y_n
     \rightarrow M_n : C}
 \end{mathpar}
 
-where the ADT \emph{Foo} and its definition stand for any ADT with form
+where the ADT \emph{Foo} and its constructors stand for any ADT with form
 \[
     \textrm{data Foo} = \textrm{Bar}_1\ X_1\ \vert\ \textrm{Bar}_2\ X_2\ \vert\
 \dots\ \vert\ \textrm{Bar}_n\ X_n
@@ -787,6 +801,96 @@ derivation for the synth goal $\te{Foo}$ doesn't have an end either.
     {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo}
     \Downarrow}
 \end{mathpar}
+
+To handle this situation, we impede the decomposition of an ADT in subsequent
+proofs of its branches, and to impede the construction of an ADT in a subsequent
+proof of a type to construct it. For this, we need two more contexts, $\Rho_C$
+for restrictions on construction and $\Rho_D$ for restrictions on
+deconstruction. For convenience, they are represented by a single $\Rho$ if
+unused. All rules must trivially propagate these. The ADT rules are explicitly
+modified to take this into consideration:
+
+\begin{mathpar}
+    \infer*[right=(adtR)]
+    {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
+    \te{Foo} \notin \Rho_C}
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ \textrm{Bar}_n \ M : \te{Foo} \Downarrow}
+\and
+    \mprset{flushleft}
+    \infer*[right=(adtL)]
+    {
+        \te{Foo} \notin \Rho_D
+        \and
+        \Delta'_1 = \dots = \Delta'_n 
+        \\
+        (\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
+        \and
+        y_1 \notin \Delta'_1
+        \\\\
+        \\ \dots
+        \\\\
+        (\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
+        \and
+        y_n \notin \Delta'_n
+    }
+    {(\Rho_C; \Rho_D); \Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}\te{Foo} \Uparrow\
+    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ \textrm{Bar}_n\ y_n
+    \rightarrow M_n : C}
+\end{mathpar}
+where
+\begin{mathpar}
+    \Rho'_C = \textrm{\textbf{if}}\ \te{Foo}\ \textrm{is recursive \textbf{then}}\ \Rho_C,
+    \te{Foo}\ \textrm{\textbf{else}}\ \Rho_C
+
+    \Rho'_D = \textrm{likewise}
+\end{mathpar}
+
+These modifications prevent the derivation from not ending for the two seen
+situations, however, they also greatly limit the derivable valid programs space,
+leaving the synthetiser pretty much unable to synth specifications with
+recursive types, which is so undesirable that we add two rules to complement the
+restrictions on construction and destruction of recursive types.
+
+First, after decomposing a recursive ADT, we must consume all constructor
+parameters, and since we can't decompose the self type any further because of a
+restriction, we should be able to use it from the linear context; even though,
+non-restricted types are not to take that course since they weren't unnaturally
+restricted, and because it would result in additional non-determinism and
+infinite recursion. Second, without any additional rules, an ADT in the linear
+context will loop back to the inversion context, and then loop again, going back and
+forth between the two contexts for infinity; instead, when focused on an ADT, we should
+either instance the goal (provided they're the same type), fail if the
+decomposition is restricted, or switch to inversion if it's not. The three
+following rules ensure this:
+
+\begin{mathpar}
+    \infer*[right=(adt$\Uparrow$L)]
+    {
+        (\Rho_C; \Rho_D);\Gamma; \Delta, x{:}\te{Foo}/\Delta'; \Omega \Uparrow\ \vdash M : C
+        \and
+        \te{Foo} \in \Rho_D
+    }
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}\te{Foo} \Uparrow\ \vdash M : C}
+    \and
+    \infer*[right=(adt-init)]
+    {  }
+    {\Rho; \Gamma; \Delta/\Delta'; x{:}\te{Foo} \Downarrow\ \vdash x : \te{Foo}}
+    \and
+    \infer*[right=(adt$\Downarrow$L)]
+    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}\te{Foo} \Uparrow\ \vdash M :
+    \te{Foo} \and \te{Foo} \notin \Rho_D}
+    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}\te{Foo} \Downarrow\ \vdash M : \te{Foo}}
+\end{mathpar}
+
+
+% TODO: Adicionar regra que diz que se for ADT Rec -o A então a construção de
+% ADT Rec é logo restrita?? parece que acelera minimamente mas não arranjo um
+% exemplo em que seja crucial. pode ser uma coisa que tenha ficado para resolver
+% uma coisa antiga que ficou resolvida mais tarde com outra modificação e então
+% é agora inutil. Talvez seja demais adicionar à regra
+
+conclude...
+
 
 \mypara{Polimorfic Types} 
 
