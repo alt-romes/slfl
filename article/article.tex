@@ -496,7 +496,6 @@ resulting program is $\lambda x \rightarrow M$ and the output linear context is
 $\Delta'$.
 
 We begin with the right invertible rules:
-
 \begin{mathpar}
 
     % -o R
@@ -519,7 +518,6 @@ We begin with the right invertible rules:
 
 When we reach a non-invertible proposition on the right, we start inverting the
 $\Omega$ context. The rule to transition to inversion on the left is:
-
 \begin{mathpar}
     \infer*[right=($\Uparrow R$)]
     {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
@@ -528,8 +526,6 @@ $\Omega$ context. The rule to transition to inversion on the left is:
 \end{mathpar}
 
 Followed by the left invertible rules:
-
-% * L
 \begin{mathpar}
 
     \infer*[right=($\tensor L$)]
@@ -575,7 +571,6 @@ Followed by the left invertible rules:
 
 When we find a synchronous (i.e. non-invertible) proposition in $\Omega$,
 we simply move it to the linear context $\Delta$, and keep inverting on the left:
-
 \begin{mathpar}
     \infer*[right=($\Uparrow L$)]
     {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
@@ -590,7 +585,6 @@ The focus object can be any of the three: the proposition on the right (the
 goal), a proposition from the linear $\Delta$ context, or a proposition from the
 unrestricted $\Gamma$ context. For these options we have three \emph{decision}
 rules:
-
 \begin{mathpar}
     \infer*[right=(decideR)]
     {\Gamma; \Delta/\Delta' \vdash C \Downarrow \and C\ \textrm{not atomic}}
@@ -606,7 +600,6 @@ rules:
 \end{mathpar}
 
 The decision rules are naturally followed by either left or right focus rules:
-
 \begin{mathpar}
     \infer*[right=($\tensor R$)]
     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
@@ -644,13 +637,11 @@ The decision rules are naturally followed by either left or right focus rules:
     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C}
     {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{snd}\ x)/y\} : C}
 \end{mathpar}
-
 Eventually, the focus proposition will no longer be synchronous, i.e. it's atomic or
 asynchronous. If we're left focused on an atomic proposition we either instance
 the goal or fail. Otherwise the left focus is asynchronous and we can start
 inverting it. If we're right focused on a proposition that isn't right
 synchronous, we switch to inversion as well. Three rules model these conditions:
-
 \begin{mathpar}
     \infer*[right=(init)]
     {  }
@@ -664,7 +655,6 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
     {\Gamma; \Delta/\Delta'; \cdot \vdash A \Uparrow}
     {\Gamma; \Delta/\Delta' \vdash A \Downarrow}
 \end{mathpar}
-
 The rules written above together make the core of our synthetiser. Ahead, we'll
 present new rules that align and build on top of these to synth recursive
 programs from more expressive (richer) types.
@@ -673,7 +663,6 @@ programs from more expressive (richer) types.
 labeling of the main goal and the addition of its type, under that name, to the
 unrestricted context. That is, to synth a function of type $A \lolli B$ named
 \emph{foo}, the initial judgment can be written as
-
 \begin{mathpar}
     \infer
     {\dots}
@@ -682,7 +671,6 @@ unrestricted context. That is, to synth a function of type $A \lolli B$ named
 \end{mathpar}
 and, by definition, all subsequent inference rules will have
 ($\textrm{\emph{foo}}{:}A \lolli B$) in the $\Gamma$ context too.
-
 We can also force the usage of the recursive call by adding it not only to the
 unrestricted context, but to the linear one as well.
 
@@ -709,7 +697,6 @@ the inference rules for a simple ADT mimic the $\oplus$ rules, for an
 arbitrary ($> 1$) number of types, rather than exactly two. Therefore, there's one
 left rule for ADTs, and an arbitrary number of right rules, one for each
 constructor:
-
 \begin{mathpar}
     \infer*[right=(adtR)]
     {\Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow}
@@ -738,7 +725,6 @@ constructor:
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ \textrm{Bar}_n\ y_n
     \rightarrow M_n : C}
 \end{mathpar}
-
 where the ADT \emph{Foo} and its constructors stand for any ADT with form
 \[
     \textrm{data Foo} = \textrm{Bar}_1\ X_1\ \vert\ \textrm{Bar}_2\ X_2\ \vert\
@@ -751,7 +737,6 @@ be the type the constructor constructs. Seemingly small, this change has a big
 impact in the synthesis process. Take, for instance, the ADT defined as
 $\textrm{data Foo} = \textrm{Bar Foo}$, the synth goal $\te{Foo}
 \lolli C$, and its derivation:
-
 \begin{mathpar}
     \infer*[right=($\lolli R$)]
     {
@@ -778,11 +763,9 @@ $\textrm{data Foo} = \textrm{Bar Foo}$, the synth goal $\te{Foo}
     {\Gamma; \Delta/\Delta'; \Omega \vdash \lambda x \rightarrow \dots :
     \te{Foo} \lolli C \Uparrow}
 \end{mathpar}
-
 Using our current system, we are to apply an infinite number of times the left
 ADT rule, never reaching a final state for the proof. Simetrically, the
 derivation for the synth goal $\te{Foo}$ doesn't have an end either.
-
 \begin{mathpar}
     \infer*[left=(adtR)]
     {
@@ -801,7 +784,6 @@ derivation for the synth goal $\te{Foo}$ doesn't have an end either.
     {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo}
     \Downarrow}
 \end{mathpar}
-
 To handle this situation, we impede the decomposition of an ADT in subsequent
 proofs of its branches, and to impede the construction of an ADT in a subsequent
 proof of a type to construct it. For this, we need two more contexts, $\Rho_C$
@@ -809,7 +791,6 @@ for restrictions on construction and $\Rho_D$ for restrictions on
 deconstruction. For convenience, they are represented by a single $\Rho$ if
 unused. All rules must trivially propagate these. The ADT rules are explicitly
 modified to take this into consideration:
-
 \begin{mathpar}
     \infer*[right=(adtR)]
     {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
@@ -844,11 +825,10 @@ where
 
     \Rho'_D = \textrm{likewise}
 \end{mathpar}
-
 These modifications prevent the derivation from not ending for the two seen
 situations, however, they also greatly limit the derivable valid programs space,
 leaving the synthetiser pretty much unable to synth specifications with
-recursive types, which is so undesirable that we add two rules to complement the
+recursive types, which is so undesirable that we add three rules to complement the
 restrictions on construction and destruction of recursive types.
 
 First, after decomposing a recursive ADT, we must consume all constructor
@@ -859,10 +839,9 @@ restricted, and because it would result in additional non-determinism and
 infinite recursion. Second, without any additional rules, an ADT in the linear
 context will loop back to the inversion context, and then loop again, going back and
 forth between the two contexts for infinity; instead, when focused on an ADT, we should
-either instance the goal (provided they're the same type), fail if the
-decomposition is restricted, or switch to inversion if it's not. The three
+either instance the goal (provided they're the same type), or switch to
+inversion if and only if its decomposition isn't restricted. The three
 following rules ensure this:
-
 \begin{mathpar}
     \infer*[right=(adt$\Uparrow$L)]
     {
@@ -881,18 +860,103 @@ following rules ensure this:
     \te{Foo} \and \te{Foo} \notin \Rho_D}
     {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}\te{Foo} \Downarrow\ \vdash M : \te{Foo}}
 \end{mathpar}
-
-
 % TODO: Adicionar regra que diz que se for ADT Rec -o A então a construção de
 % ADT Rec é logo restrita?? parece que acelera minimamente mas não arranjo um
 % exemplo em que seja crucial. pode ser uma coisa que tenha ficado para resolver
 % uma coisa antiga que ficou resolvida mais tarde com outra modificação e então
 % é agora inutil. Talvez seja demais adicionar à regra
+The ADT rules draw closer to a final form, but will still need a revision
+after the introduction of polymorfism and polymorfic parametrization on ADTs.
 
-conclude...
 
+\mypara{Polimorfic Types} A polymorfic specification is a type $X$ and a set of
+bound variables that quantify universally the type variables in $X$, called a
+\emph{scheme} ($\forall \overline{\alpha}.\ \tau$). Synthesis of a scheme is straightforward.
+First, \textbf{type variables are considered atomic types}, then, instantiate
+the bound vars of the scheme as described by the Hindley-Milner inference
+method's~\cite{HM-infer} instantiation rule (put simply, generate fresh names for
+each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha \lolli \alpha$ could be instanced to
+$\alpha0 \lolli \alpha0$. We add a rule for this:
+\begin{mathpar}
+    \infer*[right=($\forall R$)]
+    { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \tau' \Uparrow \and \forall
+    \overline{\alpha}.\ \tau
+    \sqsubseteq \tau'}
+    {\Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \forall \overline{\alpha}.\
+    \tau \Uparrow}
+\end{mathpar}
+where
+\[
+    \forall \overline{\alpha}.\ \tau \sqsubseteq \tau'\ \textrm{indicates type}\
+    \tau'\ \textrm{is an \emph{instantiation} of type scheme}\ \forall
+    \overline{\alpha}.\ \tau
+\]
+As such, the construction of a derivation in which, to some types, no specific rules can be applied (except for the \textsc{init} rule,
+a type variable can instance a goal that's a type variable of the same name),
+corresponds to the synthesis of a program where some expressions are treated
+agnostically -- nothing constrains their type, meaning the program is
+polymorphic * TODO: rewrite this?.
 
-\mypara{Polimorfic Types} 
+The interesting challenge of polymorphism in synthesis is the usage of schemes
+from the unrestricted context.  To begin with, $\Gamma$ now holds both types and
+schemes. Consequently, after the rule \textsc{decideLeft!} is applied, we become
+left focused on either a type or a scheme. Since left focus on a type is already
+well formulated, only rules for left focus on a scheme are needed. Our algorithm
+instances bound type vars of the focused scheme with existential type variables,
+and the instanced type becomes the left focus. Inspired by the Hindley-Milner
+system, we also generate inference constraints on the existential type variables
+(postponing the decision of what type it should be to be used in the proof), and
+collect them in a new constraints context (TODO: should be a substitution not a
+context?) $\Theta$ that is propagated across derivation branches the same way
+the linear context is (by havin an input and output context ($\Theta/\Theta'$)).
+In contrast to HM, everytime a constraint is added it is solved against all
+other constraints -- a branch of the proof search is desired to fail as soon as
+possible; and more, two different existential vars do not unify against
+one another ($?\alpha \mapsto ?\beta$ fails). Note that we instance the scheme with \emph{existential} type
+variables ($\alpha$) rather than just type variables since the latter represent
+universal types in the synth, and the first represent an existential instance of
+a scheme, that might inclusively constraint normal type variables. Additionally,
+it's required that all existential type variables were assigned a type, and
+provided they were, we can forget the constraints generated from the usage of
+the scheme. These concepts are formalized with the rules:
+\begin{mathpar}
+    \infer*[right=($\forall L$)]
+    {
+        \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash C
+        \\
+        \forall \overline{\alpha}.\ \tau \sqsubseteq_E \tau'
+        \\
+        \textrm{ftv}_E(\tau') \cap \{ ?\alpha\ \vert\ (?\alpha \mapsto \tau_x) \in \Theta'\} = \emptyset
+    }
+    {\Theta/\Theta; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
+    \and
+    \infer*[right=($?L$)]
+    {\textsc{solve}(?\alpha
+    \mapsto C, \Theta)}
+    {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
+    x{:}?\alpha \Downarrow\ \vdash x : C}
+    \and
+    \infer*[right=($\Downarrow L?$)]
+    {\textsc{solve}(?\alpha
+    \mapsto A, \Theta)}
+    {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
+    x{:}A \Downarrow\ \vdash x : ?\alpha}
+\end{mathpar}
+where
+\begin{mathpar}
+    \forall \overline{\alpha}.\ \tau \sqsubseteq_E \tau'\ \textrm{means type}\
+    \tau'\ \textrm{is an \emph{existential instantiation} of scheme}\ \forall
+    \overline{\alpha}.\ \tau
+    \and
+    \textrm{ftv}_E(\tau')\ \textrm{is the set of free \emph{existential} type variables in type}\ \tau'
+    \and
+    ?\alpha \mapsto \tau_x\ \textrm{is a mapping from \emph{existential} type}\ ?\alpha\
+    \textrm{to type}\ \tau_x
+    \\
+    \textsc{solve}(c, \Theta)\ \textrm{indicates wether constraint}\ c\
+    \textrm{can be solved with those in}\ \Theta
+\end{mathpar}
+
 
 \section{Related Work}
 
@@ -974,103 +1038,103 @@ types).
 % a functional specification and a symbolic resource bound in the sense
 % of amortized analysis, but can provide technical insights.
 
-\section{Goals and Work Plan}
+%\section{Goals and Work Plan}
 
-We start with the definition of our type system and simply-typed
-functional language with linear function, sum and product types
-($\lolli$, $\tensor$, $\one$, $\with$, $\oplus$, $\bang$).  Through
-the Curry-Howard correspondence, we'll formulate the synthesis of
-typed programs in our functional language as bottom-up proof-search in
-linear logic.
+%We start with the definition of our type system and simply-typed
+%functional language with linear function, sum and product types
+%($\lolli$, $\tensor$, $\one$, $\with$, $\oplus$, $\bang$).  Through
+%the Curry-Howard correspondence, we'll formulate the synthesis of
+%typed programs in our functional language as bottom-up proof-search in
+%linear logic.
 
-Since proof rules in \emph{natural deduction} do not entail a
-proof-search strategy, we will use the equivalent \emph{sequent
-calculus} system to formulate our typing rules in a way that is
-amenable to proof search.
-%
-In sequent calculus, rules can be naturally understood in a
-\emph{bottom-up} manner, simplifying the reasoning for the
-synthesizer. Moreover, the linear nature of our system requires a way
-to algorithmically reason about resource contexts: for instance, if we
-read rule $\tensor I$ from Section~\ref{sec:background} bottom-up, we
-must non-deterministically guess how to correctly split ambient
-resources into $\Delta_1$ and $\Delta_2$ to separately prove $A$ and
-$B$. The resource-management approach we'll adopt to solve this has been 
-previously explained in more detail.
+%Since proof rules in \emph{natural deduction} do not entail a
+%proof-search strategy, we will use the equivalent \emph{sequent
+%calculus} system to formulate our typing rules in a way that is
+%amenable to proof search.
+%%
+%In sequent calculus, rules can be naturally understood in a
+%\emph{bottom-up} manner, simplifying the reasoning for the
+%synthesizer. Moreover, the linear nature of our system requires a way
+%to algorithmically reason about resource contexts: for instance, if we
+%read rule $\tensor I$ from Section~\ref{sec:background} bottom-up, we
+%must non-deterministically guess how to correctly split ambient
+%resources into $\Delta_1$ and $\Delta_2$ to separately prove $A$ and
+%$B$. The resource-management approach we'll adopt to solve this has been 
+%previously explained in more detail.
 
-With the use of input/output contexts, and the sequent calculus
-formulation of the inference rules, we draw closer to an effective
-strategy for bottom-up proof search and so of program synthesis.
-%
-%
-However, the search process still encompasses significant
-non-determinism. To address this we draw on the technique of
-focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05} as
-discussed above.
+%With the use of input/output contexts, and the sequent calculus
+%formulation of the inference rules, we draw closer to an effective
+%strategy for bottom-up proof search and so of program synthesis.
+%%
+%%
+%However, the search process still encompasses significant
+%non-determinism. To address this we draw on the technique of
+%focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05} as
+%discussed above.
 
-With the basic framework in place, we will consider additional
-(simply-typed) language constructs and synthesis of program fragments
-or \emph{partial synthesis} -- given a program with a typed hole,
-synthesize a term to fill out the hole accordingly. We will
-subsequently also consider synthesis of recursive functions and,
-might, later on, add refinement types also as a way to constrain the
-valid programs space.
+%With the basic framework in place, we will consider additional
+%(simply-typed) language constructs and synthesis of program fragments
+%or \emph{partial synthesis} -- given a program with a typed hole,
+%synthesize a term to fill out the hole accordingly. We will
+%subsequently also consider synthesis of recursive functions and,
+%might, later on, add refinement types also as a way to constrain the
+%valid programs space.
 
-Putting together everything above, and the more detailed information
-in the background section -- linear types, sequent calculus, resource
-management, and focusing, we have a set of inference rules (written
-out in the appendix) that define how the synthesis process will
-progress.
+%Putting together everything above, and the more detailed information
+%in the background section -- linear types, sequent calculus, resource
+%management, and focusing, we have a set of inference rules (written
+%out in the appendix) that define how the synthesis process will
+%progress.
 
-This is the theory we're interested in and have studied so far,
-which will allow us to build the actual synthetizer. From here,
-our work plan gives an overview of the steps we'll take.
+%This is the theory we're interested in and have studied so far,
+%which will allow us to build the actual synthetizer. From here,
+%our work plan gives an overview of the steps we'll take.
 
-\subsection{Work Plan}
+%\subsection{Work Plan}
 
-The end goal is to have a synthetizer capable of
-taking a type (possibly refined) as input, and to produce (possibly
-interactively) one or more functions with that type, if any exist.
+%The end goal is to have a synthetizer capable of
+%taking a type (possibly refined) as input, and to produce (possibly
+%interactively) one or more functions with that type, if any exist.
 
-As mentioned above, we will begin with (both partial and full)
-synthesis for the linear $\lambda$-calculus. We will then extend the
-language with additional type constructs (e.g. base types, records,
-algebraic data types) and consider synthesis in that setting. Finally,
-we will consider synthesis of recursive functions, and,
-time-permitting, we will consider simple forms of type refinements
-(e.g. arithmetic refinements).
+%As mentioned above, we will begin with (both partial and full)
+%synthesis for the linear $\lambda$-calculus. We will then extend the
+%language with additional type constructs (e.g. base types, records,
+%algebraic data types) and consider synthesis in that setting. Finally,
+%we will consider synthesis of recursive functions, and,
+%time-permitting, we will consider simple forms of type refinements
+%(e.g. arithmetic refinements).
 
-We've already implemented a parser and a type-checker for a linear
-$\lambda$-calculus using the resource management technique described
-in the previous section -- more than
-good preparation for the development of the synthesizer, they will be
-useful to \emph{validate} the synthesized functions, and to enable
-the synthesis of partial programs.
-%
-The implementations have been carried out in Haskell since it's easier
-to model and implement inference rules in a functional setting.
+%We've already implemented a parser and a type-checker for a linear
+%$\lambda$-calculus using the resource management technique described
+%in the previous section -- more than
+%good preparation for the development of the synthesizer, they will be
+%useful to \emph{validate} the synthesized functions, and to enable
+%the synthesis of partial programs.
+%%
+%The implementations have been carried out in Haskell since it's easier
+%to model and implement inference rules in a functional setting.
 
-\mypara{Step by step} Our work so far has been constantly accompanied
-by the study of somewhat dense theoretical material, state of the art,
-which we must understand to overcome challenges in these fields, in
-order to develop a more scalable synthetizer -- we want to display
-concrete results to prove the feasability of program synthesis from
-linear types, and thus open the possibility for future application to
-related fields, such as program synthesis based on session types for
-message-passing concurrency.
+%\mypara{Step by step} Our work so far has been constantly accompanied
+%by the study of somewhat dense theoretical material, state of the art,
+%which we must understand to overcome challenges in these fields, in
+%order to develop a more scalable synthetizer -- we want to display
+%concrete results to prove the feasability of program synthesis from
+%linear types, and thus open the possibility for future application to
+%related fields, such as program synthesis based on session types for
+%message-passing concurrency.
 
-Apart from the theory, when we started studying type systems, we
-created a simple type-checker for the simply-typed $\lambda$-calculus.
-While learning about linear type systems, and the simply-typed linear
-$\lambda$-calculus, we developed a parser, a desugaring module, and an
-evaluation module to write, analyze and execute simple programs in the
-language; culminating in writing a type-checker for the linear
-$\lambda$-calculus. At this point, we can parse, typecheck, and
-execute this small linear functional language.  The next step is to
-start developing the actual synthetizer, embedding it with all the
-techniques we've seen. Following work will be done to augment
-usability, expand the language domain, and add features such as those
-mentioned above.
+%Apart from the theory, when we started studying type systems, we
+%created a simple type-checker for the simply-typed $\lambda$-calculus.
+%While learning about linear type systems, and the simply-typed linear
+%$\lambda$-calculus, we developed a parser, a desugaring module, and an
+%evaluation module to write, analyze and execute simple programs in the
+%language; culminating in writing a type-checker for the linear
+%$\lambda$-calculus. At this point, we can parse, typecheck, and
+%execute this small linear functional language.  The next step is to
+%start developing the actual synthetizer, embedding it with all the
+%techniques we've seen. Following work will be done to augment
+%usability, expand the language domain, and add features such as those
+%mentioned above.
 
 \mypara{Evaluation} Validation and evaluation of our work is fairly
 easy. Simple questions such as \emph{does it typecheck}? \emph{can
