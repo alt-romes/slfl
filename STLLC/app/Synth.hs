@@ -194,8 +194,8 @@ getsubs :: Synth Subst
 getsubs = (\(a,b,c) -> b) <$> lift get
 
 
-clearsubs :: Synth ()
-clearsubs = modify (\(m, s, i) -> (m, Map.empty, i))
+clearsubs :: Subst -> Synth ()
+clearsubs previousSubst = modify (\(m, s, i) -> (m, previousSubst, i))
 
 
 removerecself :: Gamma -> Synth Gamma
@@ -240,7 +240,6 @@ isAtomic t =
     case t of
        TyLit _              -> True
        TypeVar _            -> True
-       ExistentialTypeVar _ -> True
        _                    -> False
 
 
@@ -350,9 +349,9 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> 
                 (if isrectype -- TODO: make restrictions not dependent
                    then addrestriction DeconstructADT (ADT tyn tps)           -- For recursive types, restrict deconstruction of this type in further computations
                    else id) $
-                   (if t /= ADT tyn tps -- TODO!!! para que exemplos preciso disto?? talvez já não seja preciso com as modificações que fiz entretanto
-                       then addrestriction ConstructADT (ADT tyn tps)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
-                       else id) $
+                   -- (if t /= ADT tyn tps -- TODO!!! para que exemplos preciso disto?? talvez já não seja preciso com as modificações que fiz entretanto
+                   --     then addrestriction ConstructADT (ADT tyn tps)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
+                   --     else id) $
                         case vtype of
                           Unit -> do
                             g' <- removerecself g -- !TODO: Verificar correto: Eliminar do branch sem elementos a chamada recursiva
@@ -446,19 +445,19 @@ focus c goal =
 
         ---- VL
         focusSch (n, sch@(Forall ns t)) ctxt goal = do
-            (et, etvars) <- existencialInstantiate sch                                          -- tipo com existenciais
+            (et, etvars) <- existencialInstantiate sch                                              -- tipo com existenciais
             addtrace (FocusLeftScheme (n, et) ctxt goal) $ do
                 -- can only try scheme if current constraints are still safe
                 -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
                 -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
-                -- TODO: Verify and explain resoning to make sure it's correct (e.g. let id = (\x -o x); let main = {{ ... }} loops infintely without this)
-                -- (et, etvars) <- existencialInstantiate sch                                          -- tipo com existenciais
-                (se, d') <- memoizefocus' focus' (Just (n, et)) ctxt goal                                         -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
+                -- (et, etvars) <- existencialInstantiate sch                                       -- tipo com existenciais
+                previousSubst <- getsubs
+                (se, d') <- memoizefocus' focus' (Just (n, et)) ctxt goal                           -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
                 unifysubs <- getsubs
                                                                                                     -- resolve ou falha -- por conflito ou falta informação
                                                                                                     -- por conflicto durante o processo
                 guard (Set.disjoint (Set.fromList etvars) (ftv $ apply unifysubs et))               -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
-                clearsubs                                                                           -- after making sure no instantiated variables escaped, clear the current substitution so that it doesn't complicate further scheme computations
+                clearsubs previousSubst                                                             -- after making sure no instantiated variables escaped, clear the constraints added to the substitution so that it doesn't complicate further scheme computations
                 return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
                     where
                         existencialInstantiate (Forall ns t) = do
@@ -665,9 +664,9 @@ focus c goal =
 
 
 
-        ---- right focus is not synchronous, unfocus.
-
         focus' Nothing c (ExistentialTypeVar _) = empty
+
+        ---- right focus is not synchronous, unfocus.
 
         focus' Nothing c@(g, d) goal = addtrace (DefaultFocusRight c goal) $
             memoizesynth synth (g, d, []) goal -- <|> if t refined then smt solve t with join context refined with && else empty
