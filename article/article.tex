@@ -30,31 +30,27 @@
 \section{Introduction}
 
 % General motivation?
-Program synthesis is an automated or semi-automated process of
-deriving a program (i.e.~generating code) from a high-level
-specification.  
+Program synthesis is an automated or semi-automated process of deriving a
+program (i.e.~generating code) from a high-level specification.
 %
-Synthesis can be seen as a means to improve a programmer's
-productivity and/or program correctness (i.e. through suggestion
-and/or autocompletion), or as a tool to automate certain parts of the
-programming process (e.g. in the same way AI might generate some
-boilerplate text to aid a journalist, rather than to replace the
-journalist outright), just to name a few examples.
+Synthesis can be seen as a means to improve a programmer's productivity and/or
+program correctness (i.e. through suggestion and/or autocompletion), or as a
+tool to automate certain parts of the programming process, to name a few
+examples.
 
 Specifications can take many forms (e.g.  polymorphic refinement
 types~\cite{DBLP:conf/pldi/PolikarpovaKS16},
 examples~\cite{DBLP:conf/popl/FrankleOWZ16}, graded linear
-types~\cite{DBLP:conf/lopstr/HughesO20}).  Regardless of the kind
-of specification, program synthesizers have to deal with two main
-inherent sources of complexity: searching over a vast space of
-(potentially) valid programs, and interpreting user intent.
+types~\cite{DBLP:conf/lopstr/HughesO20}).  Regardless of the kind of
+specification, program synthesizers have to deal with two main inherent sources
+of complexity: searching over a vast space of (potentially) valid programs, and
+interpreting user intent.
 %
-In this work we will explore type-based synthesis where specifications
-take the form of linear types, which are types that limit resource
-usage in programs.  Concretely, we will explore the proof-theoretic
-foundations of linear types via the Curry-Howard correspondence with
-linear logic, viewing program synthesis under the lens of (linear
-logic) bottom-up proof search.
+In this work we'll explore type-based synthesis where specifications take the
+form of linear types, which limit resource usage in programs, in combination
+with polymorphism.  Concretely, we will explore the proof-theoretic foundations
+of linear types via the Curry-Howard correspondence with linear logic, viewing
+program synthesis under the lens of (linear logic) bottom-up proof search.
 
 %
 
@@ -77,7 +73,7 @@ of these type systems is to ensure that \emph{fewer} programs are
 deemed well-typed, which can pose additional challenges to the
 development process. Type-based synthesis leverages rich types as a
 way of pruning the search space, and by using types the user 
-is given a more ``familiar'' specification. For instance, the type
+is given a more ``familiar'' specification interface. For instance, the type
 $\mathsf{Int} \rightarrow \mathsf{Int} \rightarrow \mathsf{Int}$
 specifies a (curried) function that takes two integers and produces an
 integer. Viewed as a specification, it is extremely imprecise (there
@@ -90,15 +86,17 @@ and $y$ and returns an integer $z$ that is the sum of $x$ and $y$.
 %
 This work explores the synthesis of linear functional
 programs from types based on linear logic propositions (i.e.~linear
-types) by leveraging the Curry-Howard correspondence. It
-states that propositions in a logic have a direct
-mapping to types, and well-typed programs correspond to proofs of
-those propositions.  As such, having a type be a proposition in linear
-logic, we can relate a proof of it directly to a linear
-functional program — finding a proof is finding a program with that
-type. Formulating synthesis as proof search in linear logic
-allows us to inform our work with approaches from the relevant 
-literature.
+types) by leveraging the Curry-Howard correspondence. 
+
+% It
+% states that propositions in a logic have a direct
+% mapping to types, and well-typed programs correspond to proofs of
+% those propositions.  As such, having a type be a proposition in linear
+% logic, we can relate a proof of it directly to a linear
+% functional program — finding a proof is finding a program with that
+% type. Formulating synthesis as proof search in linear logic
+% allows us to inform our work with approaches from the relevant 
+% literature.
 
 Linear types differ from more traditional types in
 that they constrain resource usage in programs by \emph{statically}
@@ -124,270 +122,16 @@ types).
 %measurements (i.e. how fast can we synthesize a term of type $T$?').
 
 
-\section{Background}\label{sec:background}
-
-\mypara{Type Systems} A type system can be formally described through
-a set of inference rules that inductively define a judgment of the
-form $\Gamma \vdash M : A$, stating that program expression $M$ has
-type $A$ according to the \emph{typing assumptions} for variables
-tracked in $\Gamma$. For instance,
-$x{:}\mathsf{Int}, y{:}\mathsf{Int} \vdash x+y : \mathsf{Int}$ states
-that $x+y$ has type $\mathsf{Int}$ under the assumption that $x$ and
-$y$ have type $\mathsf{Int}$.  An expression $M$ is deemed well-typed
-with a given type $A$ if one can construct a typing derivation with $M :
-A$ as its conclusion, by repeated application of the inference rules.
-
-The simply-typed $\lambda$-calculus is a typed core functional
-language~\cite{10.5555/509043} that captures the essence of a type system in a simple and familiar environment. Its syntax consists of
-functional abstraction, written $\lambda x{:}A.M$, denoting
-an (anonymous) function that takes an argument of type $A$, bound to
-$x$ in $M$; and application $M\,N$, with the standard meaning, and
-variables $x$. For instance, the term $\lambda x{:}A.x$, denoting the identity function, is a functional abstraction
-taking an argument of type $A$ and returning it back.
-
-\mypara{Propositions as Types}
-%
-It turns out that the inference rules of the simply-typed
-$\lambda$-calculus are closely related to those of a system of natural
-deduction for intuitionistic logic~\cite{prawitznd65}. This
-relationship, known as the Curry-Howard
-correspondence~(see~\cite{DBLP:journals/cacm/Wadler15} for a
-historical survey),
-identifies that the propositions of intuitionistic logic can be read
-as types for the simply-typed $\lambda$-calculus (``propositions as
-types''), their proofs are exactly the program with the given type
-(``proofs as programs''), and checking a proof is type checking a
-program (``proof checking as type checking'').
-
-Inference rules in natural deduction are categorized as introduction
-or elimination rules; these correspond, respectively, to rules for
-constructors and destructors in programming languages (e.g. function
-abstraction vs application, construction of a pair vs projection).
-
-We introduce select typing rules to both show how a type system can be
-formalized and to show the relationship with (intuitionistic)
-propositional logic. The following rule captures the nature of a
-hypothetical judgment, allowing for reasoning from assumptions:
-\[
-    \infer*[right=(var)]
-    {  }
-    {\Gamma, u: A \vdash u : A}
-\]
-When seen as a typing rule for the $\lambda$-calculus, it
-corresponds to the rule for typing variables -- variable $u$ has
-type $A$ if the typing environment contains a variable $u$ of
-type $A$.
-
-As another concrete example, let us consider the rule for
-implication ($A\rightarrow~B$):
-\[
-    \infer*[right=($\rightarrow I$)]
-    {\Gamma, u: A \vdash M : B}
-    {\Gamma \vdash \lambda u. M : A \rightarrow B}
-\]
-Logically, the rule states that to prove $A\rightarrow B$, we assume $A$
-and prove $B$. Through the Curry-Howard correspondence, implication
-corresponds to the function type -- the program $\lambda u. M$ has
-type $A \rightarrow B$, provided $M$ has type
-$B$ under the assumption that $u$ is a variable of type $A$. The rule
-shown above is an \emph{introduction} rule, that introduces the
-``implication'' connective.
- 
-Finally, let us consider an \emph{elimination} rule, also for implication:
-\[
-    \infer*[right=($\rightarrow E$)]
-    {\Gamma \vdash M : A \rightarrow B \and \Gamma \vdash N : A}
-    {\Gamma \vdash M\,N : B}
-\]
-Elimination rules are easier to think of in a top-down
-manner. Logically, this rule states that if we prove $A \rightarrow B$
-and $A$ we can prove $B$. Through the Curry-Howard correspondence,
-implication elimination corresponds to function application, and its
-type is the function return type -- the application $M N$ has type
-$B$, provided $M$ has type $A \rightarrow B$ and $N$ has type $A$.
-
-The Curry-Howard correspondence generalizes beyond the simply-typed
-$\lambda$-calculus and propositional intuitionistic logic. It extends
-to the realms of polymorphism (second-order
-logic), dependent types (first-order
-logic), and various other extensions of natural deduction and
-simply-typed $\lambda$-calculus -- which include linear logic and
-linear types.
-
-
-\mypara{Linear Logic}
-
-Linear logic \cite{DBLP:journals/tcs/Girard87} can be seen as a
-resource-aware logic, where propositions are interpreted as resources
-that are consumed during the inference process.  Where in standard
-propositional logic we are able to use an assumption as many times as
-we want, in linear logic every resource (i.e., every assumption) must
-be used \emph{exactly once}, or \emph{linearly}. This usage
-restriction gives rise to new logical connectives, based on the way
-the ambient resources are used. For instance, conjunction, usually
-written as $A\wedge B$, appears in two forms in linear logic:
-multiplicative or simultaneous conjunction (written $A\tensor B$); and
-additive or alternative conjunction (written $A\with
-B$). Multiplicative conjunction denotes the simultaneous availability
-of resources $A$ and $B$, requiring both of them to be
-used. Alternative conjunction denotes the availability of $A$ and $B$,
-but where only one of the two resources may be used. Similarly,
-implication becomes linear implication, written $A\lolli B$,
-denoting a resource that will consume (exactly one) resource $A$ to
-produce a resource $B$.
-
-To present the formalization of this logic, besides the new
-connectives, we need to introduce the \emph{resource-aware context}
-$\Delta$.  In contrast to the previously seen $\Gamma$, $\Delta$ is
-also a list of variables and their types, but where each and every
-variable must be used exactly once during inference.  So, to introduce
-the connective $\tensor$ which defines a multiplicative pair of
-propositions, we must use exactly all the resources
-($\Delta_1, \Delta_2$) needed to realize the ($\Delta_1$) 
-proposition $A$, and ($\Delta_2$) proposition $B$:
-\[
-    \infer*[right=($\tensor I$)]
-    {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
-    {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
-\]
-Out of the logical connectives, we need to mention one more, since it
-augments the form of the judgment and it's the one that ensures
-logical strength i.e. we're able to translate intuitionistic logic
-into linear logic.  The proposition $\bang A$ (read \emph{of course}
-$A$) is used (under certain conditions) to make a resource
-``infinite'' i.e. to make it useable an arbitrary number of times. To
-distinguish the ``infinite'' variables, a separate, unrestricted,
-context is used -- $\Gamma$. So $\Gamma$ holds the ``infinite''
-resources, and $\Delta$ the resources that can only be used once.  The
-linear typing judgment for the introduction of the exponential $\bang A$
-takes the form: 
-\[
-    \infer*[right=($\bang I$)]
-    {\Gamma ; \emptyset \vdash M : A}
-    {\Gamma ; \emptyset \vdash \bang M : \bang A}
-\]
-Logically, a proof of $\bang A$ cannot use linear resources since
-$\bang A$ denotes an unbounded (potentially $0$) number of copies of
-$A$. Proofs of $\bang A$ may use other unrestricted or exponential
-resources, tracked by context $\Gamma$.
-From a computational perspective, the type $\bang A$
-internalizes the simply-typed $\lambda$-calculus in the linear
-$\lambda$-calculus.
-
-The elimination form for the exponential, written $\llet{ !u
-= M}{ N}$, warrants the use of resource $A$ an unbounded
-number of times in $N$ via the variable $u$:  
-\[
-    \infer*[right=($\bang E$)]
-    {\Gamma ; \Delta_1 \vdash M : \bang A \and \Gamma, u{:}A ; \Delta_2 \vdash N : C}
-    {\Gamma ; \Delta_1, \Delta_2 \vdash \llet{ !u = M}{ N} : C}
-\]
-Again, through the Curry-Howard correspondence, we can view the process
-of finding a proof of a proposition in linear logic as the process of synthesizing a
-linear functional program of the given type.
-
-
-\mypara{Sequent Calculus} Inference rules in natural deduction (the
-ones we have considered so far) are ill-suited for bottom-up
-proof-search since elimination rules work top-down and introduction
-rules work bottom-up.  A more suited candidate is the equivalent
-\emph{sequent calculus} system in which \emph{all} inference rules can
-be understood naturally in a \emph{bottom-up} manner.  The
-introduction and elimination rules from natural deduction disappear,
-and their place is taken by right and left rules, respectively.
-%
-Right rules correspond exactly to the introduction rules of natural
-deduction, which were already understood bottom-up. The inference rule
-for implication introduction ($\supset$ is used instead of
-$\rightarrow$), seen above in natural deduction under the
-\emph{propositions as types} subsection, corresponds to the following
-right rule in sequent calculus:
-\[
-    \infer*[right=($\supset R$)]
-    {\Gamma, u: A \vdash M : B}
-    {\Gamma \vdash \lambda u. M : A \supset B}
-  \]
-
-Intuitively, left rules act as the elimination rules of natural deduction, but are altered
-to work bottom-up, instead of top-down.
-The inference rule for the also seen above implication elimination is
-as follows:
-\[
-    \infer*[right=($\supset L$)]
-    {\Gamma , u:B\vdash M : C \and \Gamma, u{:}A\supset B \vdash N : A}
-    {\Gamma, u{:}A\supset B\vdash M\{(u\,N)/u\} : C}
-\]
-As implied by their name, left rules define how to decompose or make
-use of a connective on the left of the turnstile $\vdash$. To use an
-assumption of $A\supset B$ while attempting to show some proposition
-$C$ we produce a proof of $A$, which allows us to use an assumption
-of $B$ to prove $C$. In terms of the corresponding $\lambda$-terms,
-the $\supset L$ rule corresponds to applying the variable $u$ to the
-argument $N$ but potentially deep in the structure of $M$.
-
-We'll define our inference rules for synthesis under the sequent
-calculus system, for it simplifies the work to be done in the
-synthesizer.
-
-
-\mypara{Resource-Management}\label{sec:background_resource_management}
-Be it from the perspective of proof \emph{checking} (i.e.~type checking) or
-proof \emph{search} linear logic poses a key challenge when compared
-to the non-linear setting:
-When constructing a derivation (bottom-up), we are seemingly forced to
-guess how to correctly split the linear context such that the
-sub-derivations have access to the correct resources (e.g.~the
-$\tensor I$ rule above).
-%
-%
-
-To solve this issue we will adopt the resource-management
-approach
-of~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:conf/lics/LiangM09},
-which generalizes the judgment  from $\Delta \vdash M : A$ to
-$\Delta_I \ \Delta_O \vdash M : A$, where $\Delta_I$ is an input
-context and $\Delta_O$ is an output context.
-Instead of requiring non-deterministic guesses of resource splits
-during proof search, we track which resources are used and which are
-remaining via the two contexts, leading to the following general strategy: to
-prove $A\tensor B$ using (input) resources $\Delta$, prove $A$ with
-input context $\Delta$,
-consuming some subset of $\Delta$, and produce as output the leftover
-resources $\Delta'$; prove $B$ using $\Delta'$ as its input context and then output the
-remaining resources $\Delta''$; finally, after having proven
-$A\tensor B$, output $\Delta''$, for subsequent derivations.
-
-
-\mypara{Focusing}\label{sec:background_focusing}
-
-Even with everything mentioned so far, non-determinism is still very
-present in proof-search, e.g. at any given point, many proof
-rules are applicable in general. The technique of focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05}
-has been previously studied as a way to discipline proof search in
-linear logic -- a method created to trim down the search space of
-valid proofs in linear logic, by eagerly applying invertible rules
-(i.e.~rules whose conclusion implies the premises), and then by
-``focusing'' on a single connective when no more direct (invertible)
-rules can be applied, that is, only applying rules that breakdown
-the connective under focus or its subformulas. If the search is not
-successful, the procedure backtracks and another connective is
-chosen as the focus.
-
-Focusing eliminates all of the ``don't care'' non-determinism from
-proof search, since the order in which invertible rules are applied
-does not affect the outcome of the search, leaving only the
-non-determinism that pertains to unknowns (or ``don't know''
-non-determinism), identifying precisely the points at which
-backtracking is necessary.
-
 
 \section{Overview}
 
-Escrever introdução melhor que tenha isto como seguimento...
+Escrever introdução melhor que tenha isto como seguimento...e que siga duma
+introdução extendida
 
 At the core of the synthesis process, and of the developed synthetiser \synname,
 is a \emph{sound} and \emph{complete?} system of focusing for linear logic with
-resource management. It connects the concepts seen above -- a type system
+resource management. It connects the concepts seen in
+background~\ref{sec:background} -- a type system
 consisting of inference rules in sequent calculus for linear logic connectives;
 with resource management, and focusing, as formalized techniques to,
 respectively, solve resource related non-determinism, and to eliminate from the
@@ -413,33 +157,6 @@ programs -- and thus empirically proving the feasability of more relevant
 synthesis in a linear context, we extend the syntax and type system with
 recursiveness and richer
 types: -- polimorfic, refinements, adts parametrizáveis...  todo
-
-
-
-\section{Architecture}
-
-\subsection{The \synname\ language}
-
-\subsection{Implementation}
-
-\mypara{Debugging} The rules described in the formal
-system\ref{sec:formal_system} to handle infinite recursion might seem obvious in
-retrospective, however, when faced with a program that doesn't terminate, what
-went wrong is not so clear. While we were able to figure out a solution for the
-first couple of "infinite examples", the following problems were much harder,
-taking sometimes full days to solve (and as of now, some still remain unsolved,
-e.g. List (List a) -o List a). To make the debugging experience better, we
-developed a tracing system that prints information whenever a rule is applied,
-alongside the stack of rules applied up until that one. This improved our
-debugging speed considerably, especially when put together with a correct
-derivation done by hand, with which we could match what was happening against
-what was supposed to happen.
-
-Unfortunately, it seems that sometimes in the process of backtracking, stack
-information is "lost", and the trace logs lose useability.
-
-% A implementação foi feita em haskell e o código está disponível em X e há um
-% live demo com exemplos pré-feitos em Y?
 
 
 \section{Formal System}\label{sec:formal_system}
@@ -473,8 +190,7 @@ process. For a
 
 
 \mypara{Core Rules} The core system comprises of the sequent calculus rules for
-linear logic connectives with resource-management and focusing. As seen
-previously\ref{sec:background}, focusing separates the proof search into two
+linear logic connectives with resource-management and focusing. As explained in\ref{sec:background}, focusing separates the proof search into two
 phases: inversion ($\Uparrow$) in which we apply invertible rules eagerly, and
 focusing ($\Downarrow$) in which we decide a proposition to focus on, and then
 apply non-invertible rules, staying focused until either the focus is again an
@@ -958,6 +674,95 @@ where
 \end{mathpar}
 
 
+
+\mypara{Polymorfic ADTs}
+
+\mypara{Refinement Types}
+
+
+
+\section{Architecture}
+
+The \synname\ synthetiser operates as part of the pipeline that processes a
+full program in the \synname\ language, and is called to generate parts marked
+(by the syntax \emph{\{\{ ... \}\}}) for
+synthesis of said program. The main pipeline consists of:
+\[
+    \textrm{Parsing} \rightarrow \textrm{Desugaring} \rightarrow \textrm{Inference} \rightarrow \textrm{Synthesis}
+\]
+
+The parsing module converts ADT declarations and top level functions written in
+the language's syntax to a list of abstract syntax trees (ASTs) understood by the rest of the
+pipeline.
+
+The desugaring module converts the frontend AST to a core AST without syntatic
+sugar and using the locally-nameless~\cite{locally nameless} representation for
+all bound variables. This way inference can be done without worrying about name
+conflicts.
+
+The inference module will traverse the list of ASTs in order (top-down), and
+infer the type of all functions defined by the user, checking the inferred
+type against a possible user given type annotation. Whenever a synth mark is
+found in the AST, all the inferrence context up to that point is added to the
+mark, and if not explicit, its type is inferred, essentially defining the synth
+context and synth goal.
+
+The synthesis module iterates over the synth marks and runs the synthetiser with
+its context and goal for each, minimizing the resulting expression, and
+replacing the mark in the frontend AST with the synthed program.
+
+
+\subsection{Implementation}
+
+\mypara{General} The complete implementation of the synthetiser and environment
+pipeline was done in Haskell...
+
+\mypara{Backtracking} Even though the synthetiser formal system helps, there's
+still non-determinism in the synth process. At diverse times in the proof
+construction we must choose one of multiple rules to apply, and in the event of
+not being able to construct the proof following that choice, we want to
+backtrack to the decision point and attempt to create a proof taking a different
+route. To this effect, our prototype synthetiser depends on \emph{logict}, "a backtracking logic-programming
+monad"~\cite{logict}.
+
+\mypara{SMT Solving} To typecheck and synth refinement types and dependent
+functions, we need to contact an SMT solver to check satisfiability. For this,
+we use the library \emph{sbv}~\cite{sbv}. Unfortunately, this library does not
+support the usage of the SMT solvers to satisfy and output more complicated
+first-order logic solutions -- since this is needed to synth refinement types
+when right focused, we instead use unsafe library primitives to communicate with
+the solver directly, constructing the logical formulas ourselves. For 
+satisfying formulas, for instance, when typechecking, or left focused on a
+refinement type, we use the library api successfully to get a veridct on
+satisfiability.
+
+\mypara{Debugging} The rules described in the formal
+system\ref{sec:formal_system} to handle infinite recursion might seem obvious in
+retrospective, however, when faced with a program that doesn't terminate, what
+went wrong is not so clear. While we were able to figure out a solution for the
+first couple of "infinite examples", the following problems were much harder,
+taking sometimes full days to solve (and as of now, some still remain unsolved,
+e.g. List (List a) -o List a). To make the debugging experience better, we
+developed a tracing system that prints information whenever a rule is applied,
+alongside the stack of rules applied up until that one. This improved our
+debugging speed considerably, especially when put together with a correct
+derivation done by hand, with which we could match what was happening against
+what was supposed to happen.
+
+Unfortunately, it seems that sometimes in the process of backtracking, stack
+information is "lost", and the trace logs lose useability.
+
+\mypara{Interface} A simple, syntax-highlighted, web interface was developed
+alongside a server to make possible experimenting with the \synname\ 
+language without having to download and compile the complete toolchain. The web
+interface is available from the repository~\cite{github repo}.
+
+% A implementação foi feita em haskell e o código está disponível em X e há um
+% live demo com exemplos pré-feitos em Y?
+
+
+
+
 \section{Related Work}
 
 Type-based program synthesis is a vast field of study and so it
@@ -1168,6 +973,263 @@ in the user process, and the resulting function following it.
 
 
 % Adicionar já exemplos do que consigo
+
+\section{Background}\label{sec:background}
+
+\mypara{Type Systems} A type system can be formally described through
+a set of inference rules that inductively define a judgment of the
+form $\Gamma \vdash M : A$, stating that program expression $M$ has
+type $A$ according to the \emph{typing assumptions} for variables
+tracked in $\Gamma$. For instance,
+$x{:}\mathsf{Int}, y{:}\mathsf{Int} \vdash x+y : \mathsf{Int}$ states
+that $x+y$ has type $\mathsf{Int}$ under the assumption that $x$ and
+$y$ have type $\mathsf{Int}$.  An expression $M$ is deemed well-typed
+with a given type $A$ if one can construct a typing derivation with $M :
+A$ as its conclusion, by repeated application of the inference rules.
+
+The simply-typed $\lambda$-calculus is a typed core functional
+language~\cite{10.5555/509043} that captures the essence of a type system in a simple and familiar environment. Its syntax consists of
+functional abstraction, written $\lambda x{:}A.M$, denoting
+an (anonymous) function that takes an argument of type $A$, bound to
+$x$ in $M$; and application $M\,N$, with the standard meaning, and
+variables $x$. For instance, the term $\lambda x{:}A.x$, denoting the identity function, is a functional abstraction
+taking an argument of type $A$ and returning it back.
+
+\mypara{Propositions as Types}
+%
+It turns out that the inference rules of the simply-typed
+$\lambda$-calculus are closely related to those of a system of natural
+deduction for intuitionistic logic~\cite{prawitznd65}. This
+relationship, known as the Curry-Howard
+correspondence~(see~\cite{DBLP:journals/cacm/Wadler15} for a
+historical survey),
+identifies that the propositions of intuitionistic logic can be read
+as types for the simply-typed $\lambda$-calculus (``propositions as
+types''), their proofs are exactly the program with the given type
+(``proofs as programs''), and checking a proof is type checking a
+program (``proof checking as type checking'').
+
+Inference rules in natural deduction are categorized as introduction
+or elimination rules; these correspond, respectively, to rules for
+constructors and destructors in programming languages (e.g. function
+abstraction vs application, construction of a pair vs projection).
+
+We introduce select typing rules to both show how a type system can be
+formalized and to show the relationship with (intuitionistic)
+propositional logic. The following rule captures the nature of a
+hypothetical judgment, allowing for reasoning from assumptions:
+\[
+    \infer*[right=(var)]
+    {  }
+    {\Gamma, u: A \vdash u : A}
+\]
+When seen as a typing rule for the $\lambda$-calculus, it
+corresponds to the rule for typing variables -- variable $u$ has
+type $A$ if the typing environment contains a variable $u$ of
+type $A$.
+
+As another concrete example, let us consider the rule for
+implication ($A\rightarrow~B$):
+\[
+    \infer*[right=($\rightarrow I$)]
+    {\Gamma, u: A \vdash M : B}
+    {\Gamma \vdash \lambda u. M : A \rightarrow B}
+\]
+Logically, the rule states that to prove $A\rightarrow B$, we assume $A$
+and prove $B$. Through the Curry-Howard correspondence, implication
+corresponds to the function type -- the program $\lambda u. M$ has
+type $A \rightarrow B$, provided $M$ has type
+$B$ under the assumption that $u$ is a variable of type $A$. The rule
+shown above is an \emph{introduction} rule, that introduces the
+``implication'' connective.
+ 
+Finally, let us consider an \emph{elimination} rule, also for implication:
+\[
+    \infer*[right=($\rightarrow E$)]
+    {\Gamma \vdash M : A \rightarrow B \and \Gamma \vdash N : A}
+    {\Gamma \vdash M\,N : B}
+\]
+Elimination rules are easier to think of in a top-down
+manner. Logically, this rule states that if we prove $A \rightarrow B$
+and $A$ we can prove $B$. Through the Curry-Howard correspondence,
+implication elimination corresponds to function application, and its
+type is the function return type -- the application $M N$ has type
+$B$, provided $M$ has type $A \rightarrow B$ and $N$ has type $A$.
+
+The Curry-Howard correspondence generalizes beyond the simply-typed
+$\lambda$-calculus and propositional intuitionistic logic. It extends
+to the realms of polymorphism (second-order
+logic), dependent types (first-order
+logic), and various other extensions of natural deduction and
+simply-typed $\lambda$-calculus -- which include linear logic and
+linear types.
+
+
+\mypara{Linear Logic}
+
+Linear logic \cite{DBLP:journals/tcs/Girard87} can be seen as a
+resource-aware logic, where propositions are interpreted as resources
+that are consumed during the inference process.  Where in standard
+propositional logic we are able to use an assumption as many times as
+we want, in linear logic every resource (i.e., every assumption) must
+be used \emph{exactly once}, or \emph{linearly}. This usage
+restriction gives rise to new logical connectives, based on the way
+the ambient resources are used. For instance, conjunction, usually
+written as $A\wedge B$, appears in two forms in linear logic:
+multiplicative or simultaneous conjunction (written $A\tensor B$); and
+additive or alternative conjunction (written $A\with
+B$). Multiplicative conjunction denotes the simultaneous availability
+of resources $A$ and $B$, requiring both of them to be
+used. Alternative conjunction denotes the availability of $A$ and $B$,
+but where only one of the two resources may be used. Similarly,
+implication becomes linear implication, written $A\lolli B$,
+denoting a resource that will consume (exactly one) resource $A$ to
+produce a resource $B$.
+
+To present the formalization of this logic, besides the new
+connectives, we need to introduce the \emph{resource-aware context}
+$\Delta$.  In contrast to the previously seen $\Gamma$, $\Delta$ is
+also a list of variables and their types, but where each and every
+variable must be used exactly once during inference.  So, to introduce
+the connective $\tensor$ which defines a multiplicative pair of
+propositions, we must use exactly all the resources
+($\Delta_1, \Delta_2$) needed to realize the ($\Delta_1$) 
+proposition $A$, and ($\Delta_2$) proposition $B$:
+\[
+    \infer*[right=($\tensor I$)]
+    {\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
+    {\Delta_1 , \Delta_2 \vdash (M \tensor N) : A \tensor B}
+\]
+Out of the logical connectives, we need to mention one more, since it
+augments the form of the judgment and it's the one that ensures
+logical strength i.e. we're able to translate intuitionistic logic
+into linear logic.  The proposition $\bang A$ (read \emph{of course}
+$A$) is used (under certain conditions) to make a resource
+``infinite'' i.e. to make it useable an arbitrary number of times. To
+distinguish the ``infinite'' variables, a separate, unrestricted,
+context is used -- $\Gamma$. So $\Gamma$ holds the ``infinite''
+resources, and $\Delta$ the resources that can only be used once.  The
+linear typing judgment for the introduction of the exponential $\bang A$
+takes the form: 
+\[
+    \infer*[right=($\bang I$)]
+    {\Gamma ; \emptyset \vdash M : A}
+    {\Gamma ; \emptyset \vdash \bang M : \bang A}
+\]
+Logically, a proof of $\bang A$ cannot use linear resources since
+$\bang A$ denotes an unbounded (potentially $0$) number of copies of
+$A$. Proofs of $\bang A$ may use other unrestricted or exponential
+resources, tracked by context $\Gamma$.
+From a computational perspective, the type $\bang A$
+internalizes the simply-typed $\lambda$-calculus in the linear
+$\lambda$-calculus.
+
+The elimination form for the exponential, written $\llet{ !u
+= M}{ N}$, warrants the use of resource $A$ an unbounded
+number of times in $N$ via the variable $u$:  
+\[
+    \infer*[right=($\bang E$)]
+    {\Gamma ; \Delta_1 \vdash M : \bang A \and \Gamma, u{:}A ; \Delta_2 \vdash N : C}
+    {\Gamma ; \Delta_1, \Delta_2 \vdash \llet{ !u = M}{ N} : C}
+\]
+Again, through the Curry-Howard correspondence, we can view the process
+of finding a proof of a proposition in linear logic as the process of synthesizing a
+linear functional program of the given type.
+
+
+\mypara{Sequent Calculus} Inference rules in natural deduction (the
+ones we have considered so far) are ill-suited for bottom-up
+proof-search since elimination rules work top-down and introduction
+rules work bottom-up.  A more suited candidate is the equivalent
+\emph{sequent calculus} system in which \emph{all} inference rules can
+be understood naturally in a \emph{bottom-up} manner.  The
+introduction and elimination rules from natural deduction disappear,
+and their place is taken by right and left rules, respectively.
+%
+Right rules correspond exactly to the introduction rules of natural
+deduction, which were already understood bottom-up. The inference rule
+for implication introduction ($\supset$ is used instead of
+$\rightarrow$), seen above in natural deduction under the
+\emph{propositions as types} subsection, corresponds to the following
+right rule in sequent calculus:
+\[
+    \infer*[right=($\supset R$)]
+    {\Gamma, u: A \vdash M : B}
+    {\Gamma \vdash \lambda u. M : A \supset B}
+  \]
+
+Intuitively, left rules act as the elimination rules of natural deduction, but are altered
+to work bottom-up, instead of top-down.
+The inference rule for the also seen above implication elimination is
+as follows:
+\[
+    \infer*[right=($\supset L$)]
+    {\Gamma , u:B\vdash M : C \and \Gamma, u{:}A\supset B \vdash N : A}
+    {\Gamma, u{:}A\supset B\vdash M\{(u\,N)/u\} : C}
+\]
+As implied by their name, left rules define how to decompose or make
+use of a connective on the left of the turnstile $\vdash$. To use an
+assumption of $A\supset B$ while attempting to show some proposition
+$C$ we produce a proof of $A$, which allows us to use an assumption
+of $B$ to prove $C$. In terms of the corresponding $\lambda$-terms,
+the $\supset L$ rule corresponds to applying the variable $u$ to the
+argument $N$ but potentially deep in the structure of $M$.
+
+We'll define our inference rules for synthesis under the sequent
+calculus system, for it simplifies the work to be done in the
+synthesizer.
+
+
+\mypara{Resource-Management}
+Be it from the perspective of proof \emph{checking} (i.e.~type checking) or
+proof \emph{search} linear logic poses a key challenge when compared
+to the non-linear setting:
+When constructing a derivation (bottom-up), we are seemingly forced to
+guess how to correctly split the linear context such that the
+sub-derivations have access to the correct resources (e.g.~the
+$\tensor I$ rule above).
+%
+%
+
+To solve this issue we will adopt the resource-management
+approach
+of~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:conf/lics/LiangM09},
+which generalizes the judgment  from $\Delta \vdash M : A$ to
+$\Delta_I \ \Delta_O \vdash M : A$, where $\Delta_I$ is an input
+context and $\Delta_O$ is an output context.
+Instead of requiring non-deterministic guesses of resource splits
+during proof search, we track which resources are used and which are
+remaining via the two contexts, leading to the following general strategy: to
+prove $A\tensor B$ using (input) resources $\Delta$, prove $A$ with
+input context $\Delta$,
+consuming some subset of $\Delta$, and produce as output the leftover
+resources $\Delta'$; prove $B$ using $\Delta'$ as its input context and then output the
+remaining resources $\Delta''$; finally, after having proven
+$A\tensor B$, output $\Delta''$, for subsequent derivations.
+
+
+\mypara{Focusing}
+
+Even with everything mentioned so far, non-determinism is still very
+present in proof-search, e.g. at any given point, many proof
+rules are applicable in general. The technique of focusing~\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05}
+has been previously studied as a way to discipline proof search in
+linear logic -- a method created to trim down the search space of
+valid proofs in linear logic, by eagerly applying invertible rules
+(i.e.~rules whose conclusion implies the premises), and then by
+``focusing'' on a single connective when no more direct (invertible)
+rules can be applied, that is, only applying rules that breakdown
+the connective under focus or its subformulas. If the search is not
+successful, the procedure backtracks and another connective is
+chosen as the focus.
+
+Focusing eliminates all of the ``don't care'' non-determinism from
+proof search, since the order in which invertible rules are applied
+does not affect the outcome of the search, leaving only the
+non-determinism that pertains to unknowns (or ``don't know''
+non-determinism), identifying precisely the points at which
+backtracking is necessary.
+
 
 \bibliographystyle{splncs04}
 \bibliography{references}
