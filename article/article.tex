@@ -276,11 +276,9 @@ Followed by the left invertible rules:
 
 \and
 
-    % {TODO: Nao ha restrições sobre este? no código tinha que x não podia estar em
-    % delta mas não faz muito sentido hah}
     \infer*[right=($\bang L$)]
     {\Gamma, y{:}A ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
-    {\Gamma ; \Delta/\Delta ; \Omega, x{:}\bang A \Uparrow\ \vdash\
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}\bang A \Uparrow\ \vdash\
     \textrm{let}\ \bang y = x\ \textrm{in}\ M : C}
 
 \end{mathpar}
@@ -338,8 +336,6 @@ The decision rules are naturally followed by either left or right focus rules:
     {\Gamma; \Delta/\Delta'; \cdot \vdash M : A \Uparrow \and \Delta = \Delta'}
     {\Gamma; \Delta/\Delta \vdash \bang M : \bang A \Downarrow}
 \and
-%TODO: eu tenho uma assertion que garante que y não sai com Delta', mas agora
-%parece-me inutil?
     \infer*[right=($\lolli L$)]
     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C \and \Gamma;
     \Delta'/\Delta''; \cdot \vdash N : A \Uparrow}
@@ -374,24 +370,6 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
 The rules written above together make the core of our synthetiser. Ahead, we'll
 present new rules that align and build on top of these to synth recursive
 programs from more expressive (richer) types.
-
-\mypara{Recursion} The main idea behind synthesis of recursive programs is the
-labeling of the main goal and the addition of its type, under that name, to the
-unrestricted context. That is, to synth a function of type $A \lolli B$ named
-\emph{foo}, the initial judgment can be written as
-\begin{mathpar}
-    \infer
-    {\dots}
-    {\Gamma, \textrm{\emph{foo}}{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M :
-    A \lolli B \Uparrow}
-\end{mathpar}
-and, by definition, all subsequent inference rules will have
-($\textrm{\emph{foo}}{:}A \lolli B$) in the $\Gamma$ context too.
-We can also force the usage of the recursive call by adding it not only to the
-unrestricted context, but to the linear one as well.
-
-% TODO: E como evitamos coisas trivialmente estúpidas?
-
 
 \mypara{Algebraic Data Types} In its simplest form, an algebraic data type (ADT)
 is a named sum type of any type, i.e. a named type instanceable by one of many
@@ -584,6 +562,24 @@ following rules ensure this:
 The ADT rules draw closer to a final form, but will still need a revision
 after the introduction of polymorfism and polymorfic parametrization on ADTs.
 
+\mypara{Recursion} The main idea behind synthesis of recursive programs is the
+labeling of the main goal and the addition of its type, under that name, to the
+unrestricted context. That is, to synth a function of type $A \lolli B$ named
+\emph{foo}, the initial judgment can be written as
+\begin{mathpar}
+    \infer
+    {\dots}
+    {\Gamma, \textrm{\emph{foo}}{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M :
+    A \lolli B \Uparrow}
+\end{mathpar}
+and, by definition, all subsequent inference rules will have
+($\textrm{\emph{foo}}{:}A \lolli B$) in the $\Gamma$ context too.
+We can also force the usage of the recursive call by adding it not only to the
+unrestricted context, but to the linear one as well.
+
+% TODO: E como evitamos coisas trivialmente estúpidas?
+
+
 
 \mypara{Polimorfic Types} A polymorfic specification is a type $X$ and a set of
 bound variables that quantify universally the type variables in $X$, called a
@@ -622,8 +618,7 @@ instances bound type vars of the focused scheme with existential type variables,
 and the instanced type becomes the left focus. Inspired by the Hindley-Milner
 system, we also generate inference constraints on the existential type variables
 (postponing the decision of what type it should be to be used in the proof), and
-collect them in a new constraints context (TODO: should be a substitution not a
-context?) $\Theta$ that is propagated across derivation branches the same way
+collect them in a new constraints context $\Theta$ that is propagated across derivation branches the same way
 the linear context is (by havin an input and output context ($\Theta/\Theta'$)).
 In contrast to HM, everytime a constraint is added it is solved against all
 other constraints -- a branch of the proof search is desired to fail as soon as

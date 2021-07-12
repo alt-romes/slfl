@@ -580,7 +580,6 @@ focus c goal =
         focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace (LeftFun c (Fun a b) goal) $ do
             nname <- fresh
             (expb, d') <- memoizefocus' focus' (Just (nname, b)) c goal
-            guard (nname `notElem` map fst d') -- TODO: Useless? make sure the focusL rule makes sure the proposition is not left synchronous
             (expa, d'') <- memoizesynth synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
@@ -589,13 +588,11 @@ focus c goal =
             do
                 nname <- fresh
                 (lf, d') <- memoizefocus' focus' (Just (nname, a)) c goal
-                guard (nname `notElem` map fst d') -- TODO: useless :)
                 return (substitute nname (Fst (Var n)) lf, d')
             <|>
             do
                 nname <- fresh
                 (rt, d') <- memoizefocus' focus' (Just (nname, b)) c goal
-                guard (nname `notElem` map fst d') --TODO: Useless
                 return (substitute nname (Snd (Var n)) rt, d')
 
         ---- ∃L (?)
