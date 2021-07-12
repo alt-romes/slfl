@@ -63,7 +63,7 @@ runSynth n (g, d) t st adtds = do
 
     where
         synthComplete (g, d, o) t = do
-            (e, d') <- memoizesynth synth (recf, d, o) t <|> memoizesynth synth (g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
+            (e, d') <- memoizesynth synth (tail recf, d, o) t <|> memoizesynth synth (tail g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
             guard $ null d'
             return (e, d')
 
@@ -139,8 +139,8 @@ addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t, e) -> ((tag, Left (
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    -- trace ("D" ++ show depth ++ ": " ++ show t ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-    local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
+    trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+        local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -285,7 +285,10 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 ---- -oR
 synth c@(г, d, o) (Fun a b) = addtrace (RightFun c (Fun a b)) $ do
     name <- fresh
-    (exp, d') <- memoizesynth synth (г, d, (name, a):o) b
+    let b' = if isRefType a
+                then traceShow (a, b, addRefinementToCtxs a b) $ addRefinementToCtxs a b    -- Everytime we decompose a dependent function, we must add it to the rest's refinement context... we need to change the core rules for this...
+                else b
+    (exp, d') <- memoizesynth synth (г, d, (name, a):o) b'
     guard (name `notElem` map fst d')
     return (Abs name (Just a) exp, d')
 
@@ -379,9 +382,11 @@ synth c@(g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do
     return (LetBang nname (Var n) exp, d')
 
 ---- refinementL
-synth c@(g, d, rn@(n, r@RefinementType {}):o) t = addtrace (LeftRefinement c rn t) $ do
-    let t' = addRefinementToCtxs r t    -- Add this refinement to the context of refinement types in t
-    synth (g, rn:d, o) t'
+-- not used because we add the refinements to the context in the RightFunction rule
+-- synth c@(g, d, rn@(n, r@RefinementType {}):o) t = addtrace (LeftRefinement c rn t) $ do
+--     -- let t' = addRefinementToCtxs r t    -- Add this refinement to the context of refinement types in t
+--     -- let d' = map (second (addRefinementToCtxs r)) d -- TODO: Either add this type to all linear context, or add to the goal when inverting the function, not only when moving to delta - but that would contaminate the rules :P
+       -- synth (g, rn:d, o) t
 
 
 ---- * Synchronous left propositions to Δ * -------
@@ -560,7 +565,7 @@ focus c goal =
                     delta <- get
                     case find ((refname ==) . getRefName . snd) delta of
                       Just (vname, ft) -> do
-                          put $ delete (vname, ft) delta        -- TODO: there is no alternative for choosing the variables to instantiate the type synthetised by the SMT, there's no backtracking, we always try to find in delta first and will always instantiate one when available
+                          put $ delete (vname, ft) delta        -- !!!TODO: there is no alternative for choosing the variables to instantiate the type synthetised by the SMT, there's no backtracking, we always try to find in delta first and will always instantiate one when available
                           return vname 
                       Nothing ->
                           case find ((\case
@@ -580,6 +585,10 @@ focus c goal =
         focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace (LeftFun c (Fun a b) goal) $ do
             nname <- fresh
             (expb, d') <- memoizefocus' focus' (Just (nname, b)) c goal
+            let b' = if isRefType a
+                        then addRefinementToCtxs a b    -- Everytime we decompose a dependent function, we must add it to the rest's refinement context... we need to change the core rules for this...
+                        else b
+            (expb, d') <- memoizefocus' focus' (Just (nname, b')) c goal
             (expa, d'') <- memoizesynth synth (g, d', []) a
             return (substitute nname (App (Var n) expa) expb, d'')
             
@@ -635,9 +644,13 @@ focus c goal =
 
 
         ---- refinementLFocus
-        focus' (Just nh@(n, RefinementType rname ty rctx mpred)) c@(g, d) goal = addtrace (FocusLeftRefinement c nh goal) $
+        focus' (Just nh@(n, r@(RefinementType rname ty rctx mpred))) c@(g, d) goal = addtrace (FocusLeftRefinement c nh goal) $
             case goal of
-              RefinementType {} -> empty    -- using proposition to instance a refinement type requires extra logic
+              RefinementType _ _ ls _ -> do                               -- using proposition to instance a refinement type requires extra logic
+                guard $ length ls == length rctx               -- no way to instanciating refinements that have different number of variables : TODO OK?
+                satunify <- liftIO $ satinstanceref r goal     -- we need to make sure it satisfy all constraints
+                guard satunify
+                return (Var n, d)
               _ -> focus' (Just (n, ty)) c goal -- using the focus proposition to instance any other type is the same as using the type without the refinements
 
 

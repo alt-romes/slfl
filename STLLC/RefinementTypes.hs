@@ -4,6 +4,7 @@ nat = add 6 3;
 
 sum2 = add 6 3;
 
+sum3 = add 3;
 
 wplus :: (x { Int } -o y { Int | x == y } -o z { Int | z >= x + y });
 wplus x y = add x y;

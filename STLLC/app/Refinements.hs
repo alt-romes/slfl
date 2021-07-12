@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Refinements (satunifyrefinements, getvc, renameR, composeVC,
-    replaceName, addRefinementToCtxs, getModelExpr, getRefName) where 
+    replaceName, addRefinementToCtxs, getModelExpr, getRefName, isRefType, satinstanceref) where 
 
 import Control.Monad.State
 import Lexer
@@ -37,9 +37,15 @@ instance Show VerificationCondition where
     show (VCConj v1 v2) = show v1 ++ " /\\ " ++ show v2
 
 
+isRefType :: Type -> Bool
+isRefType RefinementType {} = True
+isRefType _ = False
 
 getRefName :: Type -> Name
 getRefName (RefinementType n _ _ _) = n
+
+getRefType :: Type -> Type
+getRefType (RefinementType _ t _ _) = t
 
 addRefinementToCtxs :: Type -> Type -> Type
 addRefinementToCtxs r = transformType (\case RefinementType rn rt ls mp -> RefinementType rn rt (r:ls) mp; t' -> t')
@@ -128,10 +134,17 @@ getvc t = case t of
     t' -> VCTrue empty  -- TODO: What to do with other types inside a dependent function?
 
 
-satunifyrefinements :: Type -> Type -> IO Bool
-satunifyrefinements t t' = do -- Rename to match the refinement variables in the two types so that the composition is useful
+satunifyrefinements :: Type -> Type -> IO Bool -- 
+satunifyrefinements t t' = -- Rename to match the refinement variables in the two types so that the composition is useful
     satvc (getvc (renameR t) `composeVC` getvc (renameR t'))
 
+satinstanceref :: Type -> Type -> IO Bool -- Satisfy the instance of one refinement by other, that is, assuming they're the same value
+satinstanceref t@(RefinementType rn rt rl mp) t'@(RefinementType rn' rt' rl' mp') = do
+    let modmp' = case mp' of
+                   Nothing -> Just (BinaryOp "==" (PVar rn) (PVar rn'))
+                   Just p -> Just (BinaryOp "&&" (BinaryOp "==" (PVar rn) (PVar rn')) p) -- TODO: a = b => a > b é satisfazível?
+    let vc = getvc (renameR t) `composeVC` getvc (renameR (RefinementType rn' rt' rl' modmp'))
+    traceShow (t, t', vc) $ satvc vc
 
 
 satvc :: VerificationCondition -> IO Bool
@@ -241,7 +254,7 @@ getSValPred ls (PBool x) = if x then return $ Left sTrue else return $ Left sFal
 
 
 getModelExpr :: Type -> IO (Maybe Expr)
-getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3 problem -- z3{verbose = True}
+getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3{verbose = True} problem -- z3{verbose = True}
 
     where
         problem :: Symbolic (Maybe Expr)
