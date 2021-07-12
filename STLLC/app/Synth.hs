@@ -44,7 +44,7 @@ type SynthState = (MemoTable, Subst, Int)  -- (list of constraints added by the 
 type MemoTable = Map.Map Int (Maybe (Expr, Delta, Subst, Int))
 
 
-type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag], Name) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
+type SynthReaderState = (Restrictions, [ADTD], Int, [TraceTag], (Name, Bool)) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
 type Restriction = Either (Type, Type) Type
 type Restrictions = [(RestrictTag, Restriction)]
 
@@ -63,7 +63,7 @@ runSynth n (g, d) t st adtds = do
 
     where
         synthComplete (g, d, o) t = do
-            (e, d') <- memoizesynth synth (tail recf, d, o) t <|> memoizesynth synth (tail g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
+            (e, d') <- memoizesynth synth (recf, d, o) t <|> memoizesynth synth (g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
             guard $ null d'
             return (e, d')
 
@@ -77,7 +77,7 @@ initSynthState mt i = (mt, Map.empty, i)
 
 
 initSynthReaderState :: Name -> [ADTD] -> SynthReaderState
-initSynthReaderState n a = ([], a, 0, [], n)
+initSynthReaderState n a = ([], a, 0, [], (n, False))
 
 
 
@@ -120,6 +120,10 @@ memoizefocusSch :: ((String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta)
 memoizefocusSch syn fty c@(g, d) ty = memoize (Just (Just (Left fty))) (g, d, []) ty (syn fty c ty)
 
 
+allowrecursion :: Synth a -> Synth a
+allowrecursion = local (\(a,b,c,d,(fn, _)) -> (a,b,c,d,(fn, True)))
+
+
 addconstraint :: Constraint -> Synth ()
 addconstraint c = do
     (m, subs, i) <- lift get
@@ -139,8 +143,8 @@ addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t, e) -> ((tag, Left (
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-        local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
+    --trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -149,6 +153,10 @@ gettracestack = lift (lift ask) >>= \(a,b,c,d,e) -> return (d,c)
 
 getdepth :: Synth Int
 getdepth = lift (lift ask) >>= \(a,b,c,d,e) -> return c
+
+
+getRecInfo :: Synth (Name, Bool)
+getRecInfo = lift (lift ask) >>= \(a,b,c,d,ra) -> return ra
 
 
 checkrestrictions :: RestrictTag -> Type -> Synth Bool
@@ -196,15 +204,6 @@ getsubs = (\(a,b,c) -> b) <$> lift get
 
 clearsubs :: Subst -> Synth ()
 clearsubs previousSubst = modify (\(m, s, i) -> (m, previousSubst, i))
-
-
-removerecself :: Gamma -> Synth Gamma
-removerecself g = do
-    recself <- getrecself
-    return $ deleteBy (\ a b -> fst a == fst b) (recself, undefined) g
-        where
-            getrecself :: Synth Name
-            getrecself = lift (lift ask) >>= \(a,b,c,d,e) -> return e
 
 
 fresh :: Synth String
@@ -349,7 +348,7 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> 
        else do
             isrectype <- isRecursiveType (ADT tyn tps)
             ls <- mapM (\(name, vtype) ->
-                (if isrectype -- TODO: make restrictions not dependent
+                (if isrectype
                    then addrestriction DeconstructADT (ADT tyn tps)           -- For recursive types, restrict deconstruction of this type in further computations
                    else id) $
                    -- (if t /= ADT tyn tps -- TODO!!! para que exemplos preciso disto?? talvez já não seja preciso com as modificações que fiz entretanto
@@ -357,10 +356,9 @@ synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> 
                    --     else id) $
                         case vtype of
                           Unit -> do
-                            g' <- removerecself g -- !TODO: Verificar correto: Eliminar do branch sem elementos a chamada recursiva
-                            (exp, d') <- memoizesynth synth (g', d, o) t
+                            (exp, d') <- memoizesynth synth (g, d, o) t
                             return (name, "", exp, d')
-                          argty -> do
+                          argty -> (if isrectype then allowrecursion else id) $ do -- only allow recursion after having deconstructed a recursive ADT
                             varid <- fresh
                             (exp, d') <- memoizesynth synth (g, d, (varid, argty):o) t
                             guard $ varid `notElem` map fst d'
@@ -432,15 +430,17 @@ focus c goal =
                   (res, _, _, _, _) <- lift $ lift ask
                   foldr ((<|>) . (\case
                                     (n, Right x) -> addtrace (DecideLeftBang res x goal) $
-                                        managerestrictions x $
+                                        managerestrictions n x $
                                             memoizefocus' focus' (Just (n, x)) (g, din) goal;
                                     (n, Left sch) -> addtrace (DecideLeftBangSch res sch goal) $
-                                        managerestrictions (instantiateFrom 0 sch) $
+                                        managerestrictions n (instantiateFrom 0 sch) $
                                             memoizefocusSch focusSch (n, sch) (g, din) goal)) empty g
                                  where
-                                     managerestrictions :: Type -> Synth a -> Synth a
-                                     managerestrictions x s = do    -- Restrict re-usage of decide left bang to synth the same time a second time
-                                         checkbinaryrestrictions DecideLeftBangR (x, goal) >>= guard
+                                     managerestrictions :: Name -> Type -> Synth a -> Synth a
+                                     managerestrictions n x s = do    
+                                         (recname, recallowed) <- getRecInfo  -- Restrict usage of recursive function if it isn't allowed
+                                         guard $ recname /= n || recallowed
+                                         checkbinaryrestrictions DecideLeftBangR (x, goal) >>= guard -- Restrict re-usage of decide left bang to synth the same goal a second time
                                          addbinaryrestriction DecideLeftBangR x goal s
 
         
@@ -584,7 +584,6 @@ focus c goal =
         ---- -oL
         focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace (LeftFun c (Fun a b) goal) $ do
             nname <- fresh
-            (expb, d') <- memoizefocus' focus' (Just (nname, b)) c goal
             let b' = if isRefType a
                         then addRefinementToCtxs a b    -- Everytime we decompose a dependent function, we must add it to the rest's refinement context... we need to change the core rules for this...
                         else b
