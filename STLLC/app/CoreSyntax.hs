@@ -158,7 +158,7 @@ instance (Show Type) where
     show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
     show (ADT n ts) = n ++ concatMap ((" " ++) . (\case t@ADT {} -> "(" ++ show t ++ ")"; t -> show t)) ts
     show (RefinementType n t _ Nothing) = n ++ " { " ++ show t ++ " }"
-    show (RefinementType n t l (Just p)) = n ++ " { " ++ show t ++ " | " ++ foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> show p' ++ " => "}) ++)) "" l ++ show p ++ " }" ++ " LIST: " ++ show l
+    show (RefinementType n t l (Just p)) = n ++ " { " ++ show t ++ " | " ++ foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> show p' ++ " => "}) ++)) "" l ++ show p ++ " }"
 
 
 instance (Show Scheme) where

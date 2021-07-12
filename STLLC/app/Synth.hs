@@ -143,7 +143,7 @@ addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t, e) -> ((tag, Left (
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    --trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    -- trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
     local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
 
 
@@ -645,11 +645,15 @@ focus c goal =
         ---- refinementLFocus
         focus' (Just nh@(n, r@(RefinementType rname ty rctx mpred))) c@(g, d) goal = addtrace (FocusLeftRefinement c nh goal) $
             case goal of
-              RefinementType _ _ ls _ -> do                               -- using proposition to instance a refinement type requires extra logic
-                guard $ length ls == length rctx               -- no way to instanciating refinements that have different number of variables : TODO OK?
-                satunify <- liftIO $ satinstanceref r goal     -- we need to make sure it satisfy all constraints
-                guard satunify
-                return (Var n, d)
+              RefinementType _ _ ls goalpred ->
+                  case goalpred of
+                    Nothing -> focus' (Just (n, ty)) c goal    -- whatever requirement can instance non-requirement
+                    Just _ -> do                               -- using proposition to instance a refinement type requires extra logic
+                        guard $ not $ isJust mpred && isNothing goalpred
+                        guard $ length ls == length rctx               -- no way to instanciating refinements that have different number of variables : TODO OK?
+                        satunify <- liftIO $ satunifyrefinements r goal     -- we need to make sure it satisfy all constraints
+                        guard satunify
+                        return (Var n, d)
               _ -> focus' (Just (n, ty)) c goal -- using the focus proposition to instance any other type is the same as using the type without the refinements
 
 

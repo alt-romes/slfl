@@ -508,7 +508,7 @@ typeinferModule (Program adts bs ts cbs) = do
                       let bsch = if selftypet == TypeVar 0 then generalize ([], []) $ cleanLetters btype' else selftype     -- Use the type annotation if one was given, else use the inferred type
                       let bexpr'' = substSelfTypeMarks n bsch bexpr'
                       satunify <- satunifyrefinements (cleanLetters btype') (instantiateFrom 0 selftype)
-                      if satunify     -- Satisfy the refinements of the inferred type with the annotation together
+                      if True || satunify     -- Satisfy the refinements of the inferred type with the annotation together
                         then
                           first (CoreBinding n bexpr'':) <$>
                             typeinferModule' corebindings' (TypeBinding n bsch:knownts) -- Re-add self-type to type bindings

@@ -18,5 +18,8 @@ pluswrong :: (x { Int } -o y { Int } -o z { Int | z == x + y });
 pluswrong x y = add x y;
 
 
-j :: (x {Int | x == 1 } -o y { Int | y == x && y >= 1 })
-j x = x
+j :: (x {Int | x == 1 } -o y { Int | y == x && y >= 1 });
+j x = x;
+
+test :: (x {Int} -o y {Int} -o z {Int | z > x + y && z < x - y});
+test = test

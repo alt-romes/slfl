@@ -1,10 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Refinements (satunifyrefinements, getvc, renameR, composeVC,
-    replaceName, addRefinementToCtxs, getModelExpr, getRefName, isRefType, satinstanceref) where 
+    replaceName, addRefinementToCtxs, getModelExpr, getRefName, isRefType) where 
 
 import Control.Monad.State
 import Lexer
+import Data.Either (lefts)
 import Parser (tylit)
 import Text.Parsec hiding (State)
 import Debug.Trace
@@ -13,7 +14,7 @@ import Data.Set as Set hiding (map, foldr, foldl, null)
 import qualified Data.Map as Map
 import Data.Bifunctor
 import Data.List (intercalate)
-import Data.SBV as SBV hiding (Predicate)
+import Data.SBV as SBV hiding (Predicate, forall)
 import Data.SBV.Trans.Control (SMTOption(..))
 import Data.SBV.Control hiding (fresh, getModel)
 import Data.SBV.Internals hiding (State, Abs)
@@ -134,17 +135,9 @@ getvc t = case t of
     t' -> VCTrue empty  -- TODO: What to do with other types inside a dependent function?
 
 
-satunifyrefinements :: Type -> Type -> IO Bool -- 
+satunifyrefinements :: Type -> Type -> IO Bool -- Satisfy unifying two refinement types where t subtypes t'
 satunifyrefinements t t' = -- Rename to match the refinement variables in the two types so that the composition is useful
     satvc (getvc (renameR t) `composeVC` getvc (renameR t'))
-
-satinstanceref :: Type -> Type -> IO Bool -- Satisfy the instance of one refinement by other, that is, assuming they're the same value
-satinstanceref t@(RefinementType rn rt rl mp) t'@(RefinementType rn' rt' rl' mp') = do
-    let modmp' = case mp' of
-                   Nothing -> Just (BinaryOp "==" (PVar rn) (PVar rn'))
-                   Just p -> Just (BinaryOp "&&" (BinaryOp "==" (PVar rn) (PVar rn')) p) -- TODO: a = b => a > b é satisfazível?
-    let vc = getvc (renameR t) `composeVC` getvc (renameR (RefinementType rn' rt' rl' modmp'))
-    traceShow (t, t', vc) $ satvc vc
 
 
 satvc :: VerificationCondition -> IO Bool
@@ -163,9 +156,11 @@ satvc vc = case vc of
     VCImpl s ps -> modelExists <$> res
         where
             res :: IO SatResult
-            res = sat $ do
-                symls <- mapM (\(n,t) -> makeSVar (n,t) >>= \x' -> return (n, x')) (toList s)
-                mapM_ (getSValPred symls >=> \(Left sv) -> constrain sv) ps
+            res = satWith z3{verbose = True} $ do -- {verbose = True}
+                symls <- mapM (\(n,t) -> makeUnivSVar (n,t) >>= \x' -> return (n, x')) (toList s)
+                sympreds <- lefts <$> mapM (getSValPred symls) ps
+                when (length sympreds /= length ps) (error "All top level symvals should be predicates.")
+                constrain $ foldr1 (.=>) sympreds
         
     VCConj v1 v2 -> do
         s1 <- satvc v1
@@ -178,6 +173,10 @@ makeSVar (n, ADT _ _) = Left <$> sBool n
 makeSVar (n, TyLit TyInt) = Right <$> sInteger n
 makeSVar (n, t) = error ("[Refinement] Can't make symbolic variable " ++ show n ++ " of type " ++ show t)
 
+makeUnivSVar :: (Name, Type) -> Symbolic (Either SBool SInteger)
+makeUnivSVar (n, ADT _ _) = Left <$> forall n
+makeUnivSVar (n, TyLit TyInt) = Right <$> forall n
+makeUnivSVar (n, t) = error ("[Refinement] Can't make universal symbolic variable " ++ show n ++ " of type " ++ show t)
 
 getSVals :: [(Name, Either SBool SInteger)] -> Predicate -> Predicate -> Symbolic (Either SBool SInteger, Either SBool SInteger)
 getSVals ls p1 p2 = do
@@ -254,7 +253,7 @@ getSValPred ls (PBool x) = if x then return $ Left sTrue else return $ Left sFal
 
 
 getModelExpr :: Type -> IO (Maybe Expr)
-getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3{verbose = True} problem -- z3{verbose = True}
+getModelExpr r@(RefinementType rname rtype ls (Just pred)) = runSMTWith z3 problem -- z3{verbose = True}
 
     where
         problem :: Symbolic (Maybe Expr)
@@ -351,7 +350,7 @@ paexp =  litexp
              let exps' = if funname == "sub" && length exps == 1    -- the subtraction might be a prefix meaning 0 - x
                             then Syntax.Lit (LitInt 0):exps
                             else exps
-             traceShow exps $ return $ applyToParams (Var funname) exps')
+             return $ applyToParams (Var funname) exps')
     where
         -- assumes all available functions are binary
         applyToParams vf [] = error "[Refinements] Reached empty list"
