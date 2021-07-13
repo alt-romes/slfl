@@ -285,9 +285,9 @@ synth :: Ctxt -> Type -> Synth (Expr, Delta)
 synth c@(г, d, o) (Fun a b) = addtrace (RightFun c (Fun a b)) $ do
     name <- fresh
     let b' = if isRefType a
-                then traceShow (a, b, addRefinementToCtxs a b) $ addRefinementToCtxs a b    -- Everytime we decompose a dependent function, we must add it to the rest's refinement context... we need to change the core rules for this...
+                then addRefinementToCtxs a b    -- Everytime we decompose a dependent function, we must add it to the rest's refinement context... we need to change the core rules for this...
                 else b
-    (exp, d') <- memoizesynth synth (г, d, (name, a):o) b'
+    (exp, d') <- memoizesynth synth (г, d, o ++ [(name, a)]) b' -- TODO:! Não usar append ?
     guard (name `notElem` map fst d')
     return (Abs name (Just a) exp, d')
 

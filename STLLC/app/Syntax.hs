@@ -1,7 +1,10 @@
+{-# LANGUAGE LambdaCase, DeriveGeneric, DeriveAnyClass #-}
 module Syntax (Binding(..), Expr(..), Pattern(..), transformM, transform) where 
 
 import Data.Maybe
 import Prelude hiding (Bool)
+import GHC.Generics (Generic)
+import Control.DeepSeq
 import Data.Functor.Identity
 
 
@@ -14,6 +17,7 @@ import CoreSyntax (Type, Scheme, Name, Literal(..))
 -------------------------------------------------------------------------------
 
 data Binding = Binding Name Expr
+    deriving (Generic, NFData)
 
 
 data Expr
@@ -62,6 +66,7 @@ data Expr
     -- Added sugar :)
 
     | UnrestrictedAbs Name (Maybe Type) Expr
+    deriving (Generic, NFData)
 
 
 data Pattern

@@ -2,7 +2,8 @@
 module Program (Program(..), ADTD(..), trivialProgram, completeFrontendMarksCtx) where
 
 import qualified Data.Map as Map
-
+import GHC.Generics (Generic)
+import Control.DeepSeq
 
 import CoreSyntax
 import Util

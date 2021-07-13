@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, DeriveGeneric, DeriveAnyClass #-}
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
     Literal(..), TyLiteral(..), isInType, trivialInt, isExistentialType,
@@ -9,6 +9,8 @@ import Control.Monad
 import Data.Maybe
 import Data.Hashable
 import Control.Applicative
+import GHC.Generics (Generic)
+import Control.DeepSeq
 import Data.Bifunctor
 import Data.Functor.Identity
 
@@ -78,7 +80,7 @@ data CoreExpr
     deriving (Eq)
 
 
-newtype Literal = LitInt Integer deriving (Eq, Ord)
+newtype Literal = LitInt Integer deriving (Eq, Ord, Generic, NFData)
 
 
 
@@ -86,10 +88,10 @@ data Var = Var
     { varMult :: Mult 
     , unVar   :: Scheme
     } deriving (Eq, Show, Ord)
-data Mult = Lin | Unr deriving (Eq, Show, Ord)
+data Mult = Lin | Unr deriving (Eq, Show, Ord, Generic, NFData)
 
 
-data Scheme = Forall [Int] Type deriving (Eq, Ord)
+data Scheme = Forall [Int] Type deriving (Eq, Ord, Generic, NFData)
 
 
 data Type
@@ -110,9 +112,9 @@ data Type
 
     | RefinementType Name Type [Type] (Maybe Predicate)
     
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Generic, NFData)
 
-data TyLiteral = TyInt deriving (Eq, Ord)
+data TyLiteral = TyInt deriving (Eq, Ord, Generic, NFData)
 
 data Predicate
     = PVar Name
@@ -121,7 +123,7 @@ data Predicate
     | Conditional Predicate Predicate Predicate
     | UnaryOp Name Predicate
     | BinaryOp Name Predicate Predicate
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Generic, NFData)
 
 
 

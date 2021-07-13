@@ -2,16 +2,10 @@ data List a = Nil | Cons (a * List a);
 
 data Maybe a = Nothing | Just a;
 
-data Bool = True | False;
 
-
-
-# can't synth
-#synth isEmpty :: (List a -o Bool);
-# can't synth -- should it?
-# synth zip :: (!(a -o b -o c) -o List a -o List b -o List c)
 
 synth na :: (List Int -o List Int);
+
 
 synth singleton :: (a -o List a);
 

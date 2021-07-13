@@ -1,2 +1,5 @@
-main :: forall a b c d . ((! (a -o b)) -o (((! (a -o b)) -o (d -o c)) -o (d -o c)));
-main e f g = let !h = e in f ! (λk -o h k) g;
+data List1 a = Nil1 | Cons1 (a * List1 a);
+
+data List2 a = Nil2 | Cons2 (a * List2 a);
+
+synth conv :: (List1 a -o List2 a);

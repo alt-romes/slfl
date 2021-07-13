@@ -5,6 +5,7 @@
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{hyperref}
+\usepackage{multirow}
 
 \newcommand{\lolli}{\multimap}
 \newcommand{\tensor}{\otimes}
@@ -185,9 +186,6 @@ proofs; and that the valid programs derivable through it reflect the somewhat
 subjective trade-offs we decided on. Different choices and approaches outside
 the core might lead to completely distinct synths and spaces of valid programs.
 
-This section presents the rules while explaining them, modifying some along the
-process. For a 
-
 
 \mypara{Core Rules} The core system comprises of the sequent calculus rules for
 linear logic connectives with resource-management and focusing. As explained in\ref{sec:background}, focusing separates the proof search into two
@@ -204,7 +202,7 @@ management, and focusing, we get the following formal system (heavily inspired
 by Frank Pfenning's notes on focusing for linear logic~\cite{FPnotes...}) -- in which the
 first rule is read: to synth a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
-context $\Delta$, and ordered context $\Omega$, synth a program of type $B$ with
+context $\Delta$, and inversion context $\Omega$, synth a program of type $B$ with
 an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
 resulting in the program $M$ and output\ref{sec:background} linear
 context $\Delta'$ that cannot contain the added hypothesis $x{:}A$. Finally, the
@@ -313,7 +311,7 @@ rules:
     {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
 \end{mathpar}
 
-The decision rules are naturally followed by either left or right focus rules:
+The decision rules are followed by either left or right focus rules:
 \begin{mathpar}
     \infer*[right=($\tensor R$)]
     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
@@ -576,6 +574,19 @@ and, by definition, all subsequent inference rules will have
 ($\textrm{\emph{foo}}{:}A \lolli B$) in the $\Gamma$ context too.
 We can also force the usage of the recursive call by adding it not only to the
 unrestricted context, but to the linear one as well.
+
+Having said that, we won't allow the use of the recursive call in $\Gamma$ right
+away. If we did, every synth goal would have a trivial proof (a non-terminating
+function that just calls itself) that could even shadow other valid, relevant,
+solutions.  Instead, our framework only allows the use of recursion after having
+deconstructed a recursive ADT. To avoid complicating the rules, we'll add the
+invariant: the recursive hypothesis can only be \textbf{used in recursive branches of
+ADT deconstruction}, i.e. the recursive call should only take "smaller", recursive,
+hypothesis as arguments. To illustrate, having $\textrm{data List} =
+\textrm{Nil}\ \vert\ \textrm{Cons}\ (A * \textrm{List})$, recursion is only
+"available" when deconstructing ($\textrm {List} \vdash C$), and only in
+the \emph{Cons} branch. % (TODO: rewrite)
+
 
 % TODO: E como evitamos coisas trivialmente estúpidas?
 
@@ -968,8 +979,56 @@ in the user process, and the resulting function following it.
 
 \section{Evaluation}
 
+The benchmarks are separated into groups: theorems of linear logic, recursive
+ADTs, refinements. For each goal we analyze if the synthesis process terminated
+according to what was expected, the mean time and standard deviation, if the
+resulting program fullfills its intended purpose
 
-% Adicionar já exemplos do que consigo
+% TODO: Utilizamos qual argumento primeiro ??? para \omega com ++ ou : ?
+
+\begin{center}
+    \begin{tabular}{ |c|c|c|c|c| }
+        \hline
+        Group & Goal & Avg. time + $\sigma$ & Found & Is expected \\
+        \hline
+        \multirow{4}{4em}{Linear Logic Theor.} & uncurry & 1s & yes & yes \\ 
+        & curry & 2s & yes & yes \\ 
+        & call by name?? & 2s & yes & yes \\ 
+        & 0/1?? & 2s & yes & yes \\ 
+        \hline
+        \multirow{8}{4em}{List} & singleton & 3s & yes & yes \\ 
+        & insert & 2s & yes & unordered \\ 
+        & map & 1s & yes & yes \\ 
+        & append & 2s & yes & yes \\ 
+        & foldl & 2s & yes & got (foldl . reverse) \\ 
+        & foldr & 2s & yes & yes \\ 
+        & concat & $\infty$ & no & no \\ 
+        & uncons & 1s & yes & yes \\
+        \hline
+        \multirow{3}{4em}{Maybe} & return & 1s & yes & yes \\ 
+        & $>>=$ & 1s & yes & yes \\
+        & maybe & 1s & yes & yes \\
+        & list to maybe & 12s & no & yes \\
+        \hline
+        \multirow{5}{4em}{Binary Tree} & singleton & 1s & yes & yes \\ 
+        & insert & 1s & yes & unordered \\
+        & map & 1s & yes & yes \\
+        & append & 1s & yes & appends to rightmost leaf \\
+        & join node & 1s & yes & joins at rightmost leaf \\
+        \hline
+        \multirow{7}{4em}{Map} & singleton & 1s & yes & yes \\ 
+        & insert & 1s & yes & unordered \\
+        & insertWithKey & 1s & yes & ignores function \\
+        & union & 1s & yes & ignores keys \\
+        & mapAccum & 1s & no & ?? \\
+        & map & 1s & yes & yes \\
+        & mapKeys & 1s & yes & yes \\
+        \hline
+        \multirow{1}{4em}{Misc} & either & 1s & yes & yes \\ 
+        \hline
+    \end{tabular}
+\end{center}
+
 
 \section{Background}\label{sec:background}
 
