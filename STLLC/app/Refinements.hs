@@ -156,7 +156,7 @@ satvc vc = case vc of
     VCImpl s ps -> modelExists <$> res
         where
             res :: IO SatResult
-            res = satWith z3{verbose = True} $ do -- {verbose = True}
+            res = satWith z3 $ do -- {verbose = True}
                 symls <- mapM (\(n,t) -> makeUnivSVar (n,t) >>= \x' -> return (n, x')) (toList s)
                 sympreds <- lefts <$> mapM (getSValPred symls) ps
                 when (length sympreds /= length ps) (error "All top level symvals should be predicates.")

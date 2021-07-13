@@ -20,3 +20,4 @@
         f !(\k -o h k) g should consume g (?...) but !h works ?? =)
 30) type inference on refinement types - não é aplicada uma substituição às variáveis dentro do predicado ao entrar no "binder" da app e perde-se informação
 31) (z {Int} * Int) when decomposed adds z to its own refinement context for some reason :)
+32) fix refinement synth but refinement inference no longer works because of the universal quantifiers -- needs fixing

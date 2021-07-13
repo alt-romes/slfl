@@ -2,9 +2,11 @@ module Main (main) where
 
 import System.Environment
 import Debug.Trace
+import Control.Monad
 
 
 import CoreSyntax
+import Criterion.Main
 import Syntax
 import Program
 import Parser
@@ -95,23 +97,28 @@ mainsynthMarksModule fname = do
 main :: IO ()
 main = do
     (action:args) <- getArgs
-    let arg =
-            (case args of
-               [] -> if null action
-                        then "(A -o A)"
-                        else "llcprogs/main.llc"
-               (argx:_) -> argx)
-    case action of
-      "synth" -> print . Binding "main" =<< mainsynth arg
-      "all" -> print =<< mainsynthAll arg
-      "complete" -> mainsynthMarksModule arg >>= print
-      "fdesugar" -> print $ maindesugar arg
-      "desugar" -> maindesugarModule arg >>= print . _cbinds
-      "ftype" -> print $ maintypecheck arg
-      "type" -> maintypecheckModule arg >>= print
-      "feval" -> print $ maineval arg
-      "eval" -> mainevalModule arg >>= print
-      "fparse" -> print $ mainparse arg
-      "parse" -> mainparseModule arg >>= print
-      _ -> print . Binding "main" =<< mainsynth action
+    if action == "bench"
+    then do
+        let benchmarks = map (\x -> "bench/" ++ x ++ ".hs") ["llt1", "llt2", "llt3", "llt4", "list1", "list2", "list3", "list4", "list5", "list6", "list8", "maybe1", "maybe2", "maybe3", "tree1", "tree2", "tree3", "tree4", "tree5", "map2", "map3", "map5", "map6", "map7", "map8", "map9"]
+        cprogs <- mapM maindesugarModule benchmarks
+        synthed <- mapM (synthMarksModule >=> \(Program _ bs _ _) -> return bs) cprogs
+        defaultMain [bgroup "synth" (zipWith (\bs n -> bench n $ nfIO $ return bs) synthed benchmarks)]
+    else
+        let arg =
+                (case args of
+                   [] -> error "No second arg"
+                   (argx:_) -> argx) in
+        case action of
+          "synth" -> print . Binding "main" =<< mainsynth arg
+          "all" -> print =<< mainsynthAll arg
+          "complete" -> mainsynthMarksModule arg >>= print
+          "fdesugar" -> print $ maindesugar arg
+          "desugar" -> maindesugarModule arg >>= print . _cbinds
+          "ftype" -> print $ maintypecheck arg
+          "type" -> maintypecheckModule arg >>= print
+          "feval" -> print $ maineval arg
+          "eval" -> mainevalModule arg >>= print
+          "fparse" -> print $ mainparse arg
+          "parse" -> mainparseModule arg >>= print
+          _ -> print . Binding "main" =<< mainsynth action
 

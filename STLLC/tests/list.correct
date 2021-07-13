@@ -1,0 +1,54 @@
+data List a = Nil | Cons (a * List a);
+
+data Maybe a = Nothing | Just a;
+
+
+na :: (List Int -o List Int);
+na a = case a of 
+      Nil  -> Nil
+    | Cons b -> 
+        let c*d = b in Cons (c, d);
+
+singleton :: forall a . (a -o List a);
+singleton b = Cons (b, Nil);
+
+append :: forall a . (List a -o (List a -o List a));
+append b c = case b of 
+      Nil  -> c
+    | Cons d -> 
+        let e*f = d in Cons (e, append f c);
+
+map :: forall a b . (!(a -o b) -o (List a -o List b));
+map c d = let !e = c in 
+    case d of 
+          Nil  -> Nil
+        | Cons f -> 
+            let g*h = f in Cons (e g, map (!e) h);
+
+foldl :: forall a b . (!(b -o (a -o b)) -o (b -o (List a -o b)));
+foldl c d e = let !f = c in 
+    case e of 
+          Nil  -> d
+        | Cons g -> 
+            let h*i = g in f (foldl (!f) d i) h;
+
+uncons :: forall a . (List a -o Maybe (a * List a));
+uncons b = case b of 
+      Nil  -> Nothing
+    | Cons c -> 
+        let d*e = c in Just (d, e);
+
+foldr :: forall a b . (!(a -o (b -o b)) -o (b -o (List a -o b)));
+foldr c d e = let !f = c in 
+    case e of 
+          Nil  -> d
+        | Cons g -> 
+            let h*i = g in f h (foldr (!f) d i);
+
+insert :: forall a . (a -o (List a -o List a));
+insert b c = case c of 
+      Nil  -> Cons (b, Nil)
+    | Cons m -> 
+        let n*o = m in Cons (n, insert b o);
+
+
