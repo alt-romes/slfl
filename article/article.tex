@@ -192,7 +192,7 @@ richer types to the synthesis and language, formal guidelines
   estas features todas, essa parte é importante. Além de que 
 ao incluir estas coisas deixamos de estar completamente em proof
 search, pois muitas destas coisas (e.g. recursao) nao sao
-necessariamente sound logicamente.}
+necessariamente sound logicamente.
   Tenta usar termos 
   especificos. Richer types? Richer como?} to support
 the implementation become scarcer, or more complex \todo{nao existem
@@ -228,7 +228,10 @@ process. For a
 
 
 \mypara{Core Rules} The core system comprises of the sequent calculus rules for
-linear logic connectives with resource-management and focusing. As explained in\ref{sec:background}, focusing separates the proof search into two
+linear logic connectives with resource-management and focusing. As
+explained in\ref{sec:background} \todo{se o background nao vai ser
+  incluido no documento principal, nao deves referenciar assim tao
+  directamente para o conteudo principal.}, focusing separates the proof search into two
 phases: inversion ($\Uparrow$) in which we apply invertible rules eagerly, and
 focusing ($\Downarrow$) in which we decide a proposition to focus on, and then
 apply non-invertible rules, staying focused until either the focus is again an
@@ -237,6 +240,13 @@ invertible rules, a third, ordered, context ($\Omega$) is needed to hold
 propositions resulting from decomposing connectives; propositions we'll later try to
 invert, moving them to the linear context ($\Delta$) when we fail to.
 
+\todo{Primeiro explica os varios judgments (as ``formas'' das
+  conclusoes das regras) e o que significam as varias componentes,
+  nomeadamente a parte da gestao de recursos.  Depois podes explicar
+  regras concretas como fazes a seguir. Tambem seria util dizer quais
+  os tipos que sao invertiveis a esquerda/direita, pois o leitor nao
+  faz ideia do que estas a dizer.}
+
 Putting together linear logic, the Curry-Howard correspondence, resource
 management, and focusing, we get the following formal system (heavily inspired
 by Frank Pfenning's notes on focusing for linear logic~\cite{FPnotes...}) -- in which the
@@ -244,10 +254,13 @@ first rule is read: to synth a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
 context $\Delta$, and ordered context $\Omega$, synth a program of type $B$ with
 an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
-resulting in the program $M$ and output\ref{sec:background} linear
+resulting in the program $M$ and output linear
 context $\Delta'$ that cannot contain the added hypothesis $x{:}A$. Finally, the
 resulting program is $\lambda x \rightarrow M$ and the output linear context is
 $\Delta'$.
+
+\todo{a sintaxe $\lambda x \rightarrow M$ nao e mt standard, usa
+  $\lambda x . M$}
 
 We begin with the right invertible rules:
 \begin{mathpar}
@@ -388,7 +401,8 @@ The decision rules are naturally followed by either left or right focus rules:
     {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{snd}\ x)/y\} : C}
 \end{mathpar}
 Eventually, the focus proposition will no longer be synchronous, i.e. it's atomic or
-asynchronous. If we're left focused on an atomic proposition we either instance
+asynchronous. If we're left focused on an atomic proposition we either
+instance \todo{instantiate}
 the goal or fail. Otherwise the left focus is asynchronous and we can start
 inverting it. If we're right focused on a proposition that isn't right
 synchronous, we switch to inversion as well. Three rules model these conditions:
@@ -405,12 +419,12 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
     {\Gamma; \Delta/\Delta'; \cdot \vdash A \Uparrow}
     {\Gamma; \Delta/\Delta' \vdash A \Downarrow}
 \end{mathpar}
-The rules written above together make the core of our synthetiser. Ahead, we'll
+The rules written above together make the core of our synthetiser. Next, we'll
 present new rules that align and build on top of these to synth recursive
 programs from more expressive (richer) types.
 
 \mypara{Algebraic Data Types} In its simplest form, an algebraic data type (ADT)
-is a named sum type of any type, i.e. a named type instanceable by one of many
+is a named sum type of any type, i.e. a named type that can be instantiated by one of many
 tags (also known as constructors) that take exactly one fixed type, which might
 be, e.g., a product type ($A \tensor B$), or unit ($1$), in practice allowing
 for constructors with an arbitrary number of parameters. In the \synname\
@@ -419,7 +433,7 @@ definition of an ADT which might be constructed with zero, one, or two
 propositions of type $A$, using its syntax: $\textrm{data Container} =
 \textrm{None}\ 1\ \vert\ \textrm{One}\ A\ \vert\ \textrm{Two}\ (A * A)$.
 
-The semantics of the simple ADT relate to those of the plus ($\oplus$) type --
+The semantics of the ADTs relate to those of the plus ($\oplus$) type --
 both are additive disjunctions.  A proof of an ADT requires only a proof of one
 of the types that a constructor takes, similar to the way $\oplus$ requires only
 proof of either the left or right type it consists of. Analogously, a proof of
@@ -429,6 +443,10 @@ the inference rules for a simple ADT mimic the $\oplus$ rules, for an
 arbitrary ($> 1$) number of types, rather than exactly two. Therefore, there's one
 left rule for ADTs, and an arbitrary number of right rules, one for each
 constructor:
+
+\todo[inline]{Não uses Foo e Bar. $T_1$, $T_2$ , $\dots$ para
+  tipos. $C_1$, $C_2$, $\dots$ para os construtores.}
+
 \begin{mathpar}
     \infer*[right=(adtR)]
     {\Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow}
@@ -457,6 +475,8 @@ constructor:
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ \textrm{Bar}_n\ y_n
     \rightarrow M_n : C}
 \end{mathpar}
+
+
 where the ADT \emph{Foo} and its constructors stand for any ADT with form
 \[
     \textrm{data Foo} = \textrm{Bar}_1\ X_1\ \vert\ \textrm{Bar}_2\ X_2\ \vert\
@@ -465,7 +485,9 @@ where the ADT \emph{Foo} and its constructors stand for any ADT with form
 
 A more general (and interesting) formulation of ADTs says an ADT can be
 recursive (or "indutively defined"), meaning the type a constructor needs might
-be the type the constructor constructs. Seemingly small, this change has a big
+be the type the constructor constructs \todo{ Na escrita, repetition
+  does not legitimize. Constructors can take as arguments values of
+  the type they are defining, ou algo assim}. Seemingly small, this change has a big
 impact in the synthesis process. Take, for instance, the ADT defined as
 $\textrm{data Foo} = \textrm{Bar Foo}$, the synth goal $\te{Foo}
 \lolli C$, and its derivation:
@@ -496,8 +518,8 @@ $\textrm{data Foo} = \textrm{Bar Foo}$, the synth goal $\te{Foo}
     \te{Foo} \lolli C \Uparrow}
 \end{mathpar}
 Using our current system, we are to apply an infinite number of times the left
-ADT rule, never reaching a final state for the proof. Simetrically, the
-derivation for the synth goal $\te{Foo}$ doesn't have an end either.
+ADT rule, never reaching a final state for the proof. Symmetrically, the
+derivation for the synth goal $\te{Foo}$ is also infinite.
 \begin{mathpar}
     \infer*[left=(adtR)]
     {
@@ -516,10 +538,14 @@ derivation for the synth goal $\te{Foo}$ doesn't have an end either.
     {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo}
     \Downarrow}
 \end{mathpar}
-To handle this situation, we impede the decomposition of an ADT in subsequent
+To account for this situation, we impede the decomposition of an ADT in subsequent
 proofs of its branches, and to impede the construction of an ADT in a subsequent
-proof of a type to construct it. For this, we need two more contexts, $\Rho_C$
-for restrictions on construction and $\Rho_D$ for restrictions on
+proof of a type to construct it. \todo{Não se percebe muito bem a
+  segunda parte da frase, rephrase!}
+%
+%
+For this, we need two more contexts, $\Rho_C$
+for restrictions \todo{constraints} on construction and $\Rho_D$ for restrictions on
 deconstruction. For convenience, they are represented by a single $\Rho$ if
 unused. All rules must trivially propagate these. The ADT rules are explicitly
 modified to take this into consideration:
@@ -557,11 +583,14 @@ where
 
     \Rho'_D = \textrm{likewise}
 \end{mathpar}
-These modifications prevent the derivation from not ending for the two seen
-situations, however, they also greatly limit the derivable valid programs space,
-leaving the synthetiser pretty much unable to synth specifications with
-recursive types, which is so undesirable that we add three rules to complement the
-restrictions on construction and destruction of recursive types.
+These modifications prevent the derivation from not ending
+\todo{infinite derivations} for the scenarios described above,
+however, they also greatly limit the space of derivable programs,
+leaving the synthetiser effectively unable to synth specifications
+with recursive types\todo{refrasear tendo em conta que se sintetiza a
+  partir de specs e nao specs}, which is so undesirable that we add three rules
+to complement the restrictions on construction and destruction of
+recursive types.
 
 First, after decomposing a recursive ADT, we must consume all constructor
 parameters, and since we can't decompose the self type any further because of a
@@ -597,6 +626,8 @@ following rules ensure this:
 % exemplo em que seja crucial. pode ser uma coisa que tenha ficado para resolver
 % uma coisa antiga que ficou resolvida mais tarde com outra modificação e então
 % é agora inutil. Talvez seja demais adicionar à regra
+
+\todo[inline]{esta frase nao me parece muito necessaria}
 The ADT rules draw closer to a final form, but will still need a revision
 after the introduction of polymorfism and polymorfic parametrization on ADTs.
 
@@ -618,14 +649,20 @@ unrestricted context, but to the linear one as well.
 % TODO: E como evitamos coisas trivialmente estúpidas?
 
 
+\todo[inline]{Polymorphic}
 
-\mypara{Polimorfic Types} A polymorfic specification is a type $X$ and a set of
+\mypara{Polymorphic Types} A polymorphic specification is a type $X$ \todo{T} and a set of
 bound variables that quantify universally the type variables in $X$, called a
-\emph{scheme} ($\forall \overline{\alpha}.\ \tau$). Synthesis of a scheme is straightforward.
+\emph{scheme} ($\forall \overline{\alpha}.\ \tau$).
+\todo[inline]{Não é um tipo e um conjunto de variáveis bound. É um
+  tipo da forma $\forall \overline{\alpha}.\ T$ em que $\dots$ }
+Synthesis of a scheme is straightforward. \todo{Diria que nao e
+  especialmente straightforward.}
 First, \textbf{type variables are considered atomic types}, then, instantiate
-the bound vars of the scheme as described by the Hindley-Milner inference
+the bound vars\todo{variables} of the scheme as described by the Hindley-Milner inference
 method's~\cite{HM-infer} instantiation rule (put simply, generate fresh names for
-each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha \lolli \alpha$ could be instanced to
+each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha
+\lolli \alpha$ could be instanced \todo{instantiated} to
 $\alpha0 \lolli \alpha0$. We add a rule for this:
 \begin{mathpar}
     \infer*[right=($\forall R$)]
@@ -645,29 +682,36 @@ As such, the construction of a derivation in which, to some types, no specific r
 a type variable can instance a goal that's a type variable of the same name),
 corresponds to the synthesis of a program where some expressions are treated
 agnostically -- nothing constrains their type, meaning the program is
-polymorphic * TODO: rewrite this?.
+polymorphic * TODO: rewrite this?.\todo[inline]{Use an example.}
 
-The interesting challenge of polymorphism in synthesis is the usage of schemes
-from the unrestricted context.  To begin with, $\Gamma$ now holds both types and
-schemes. Consequently, after the rule \textsc{decideLeft!} is applied, we become
-left focused on either a type or a scheme. Since left focus on a type is already
-well formulated, only rules for left focus on a scheme are needed. Our algorithm
-instances bound type vars of the focused scheme with existential type variables,
-and the instanced type becomes the left focus. Inspired by the Hindley-Milner
-system, we also generate inference constraints on the existential type variables
-(postponing the decision of what type it should be to be used in the proof), and
-collect them in a new constraints context $\Theta$ that is propagated across derivation branches the same way
-the linear context is (by havin an input and output context ($\Theta/\Theta'$)).
-In contrast to HM, everytime a constraint is added it is solved against all
-other constraints -- a branch of the proof search is desired to fail as soon as
-possible; and more, two different existential vars do not unify against
-one another ($?\alpha \mapsto ?\beta$ fails). Note that we instance the scheme with \emph{existential} type
-variables ($\alpha$) rather than just type variables since the latter represent
-universal types in the synth, and the first represent an existential instance of
-a scheme, that might inclusively constraint normal type variables. Additionally,
-it's required that all existential type variables were assigned a type, and
-provided they were, we can forget the constraints generated from the usage of
-the scheme. These concepts are formalized with the rules:
+The interesting challenge of polymorphism in synthesis is the usage of
+schemes from the unrestricted context.  To begin with, $\Gamma$ now
+holds both types and schemes. Consequently, after the rule
+\textsc{decideLeft!} is applied, we become left focused on either a
+type or a scheme. Since left focus on a type is already well
+formulated, only rules for left focus on a scheme are needed. Our
+algorithm instances bound type vars of the focused scheme with
+existential type variables, and the instanced type becomes the left
+focus. Inspired by the Hindley-Milner system, we also generate
+inference constraints on the existential type variables (postponing
+the decision of what type it should be to be used in the proof), and
+collect them in a new constraints context $\Theta$ that is propagated
+across derivation branches the same way the linear context is (by
+havin an input and output context ($\Theta/\Theta'$)).  In contrast to
+HM, everytime a constraint is added it is solved against all other
+constraints -- a branch of the proof search is desired to fail as soon
+as possible; and more, two different existential vars do not unify
+against one another ($?\alpha \mapsto ?\beta$ fails) \todo{O que
+  significa $?\alpha$ ? Não foi explicado -- no Hindley-Milner nao ha
+  propriamente o problema de misturar variaveis existenciais com universais}. Note that we
+instance the scheme with \emph{existential} type variables ($\alpha$)
+rather than just type variables since the latter represent universal
+types in the synth, and the first represent an existential instance of
+a scheme, that might inclusively constraint normal type
+variables. Additionally, it's required that all existential type
+variables were assigned a type, and provided they were, we can forget
+the constraints generated from the usage of the scheme. These concepts
+are formalized with the rules:
 \begin{mathpar}
     \infer*[right=($\forall L$)]
     {
@@ -730,7 +774,7 @@ pipeline.
 
 The desugaring module converts the frontend AST to a core AST without syntatic
 sugar and using the locally-nameless~\cite{locally nameless} representation for
-all bound variables. This way inference can be done without worrying about name
+all bound variables. \todo{Explica o que e isto} This way inference can be done without worrying about name
 conflicts.
 
 The inference module will traverse the list of ASTs in order (top-down), and
