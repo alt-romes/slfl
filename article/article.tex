@@ -5,6 +5,7 @@
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{hyperref}
+\usepackage{todonotes}
 
 \newcommand{\lolli}{\multimap}
 \newcommand{\tensor}{\otimes}
@@ -19,8 +20,9 @@
 \newcommand{\te}[1]{\textrm{\emph{#1}}}
 
 \title{Synthesis of Linear Functional Programs}
-\author{Rodrigo Mesquita \and Bernardo Toninho}
-\date{April 2021}
+\author{Rodrigo Mesquita - Nº XXXXX \\
+    Supervisor: Bernardo Toninho}
+\date{July 2021}
 \institute{NOVA School of Science and Technology}
 
 \begin{document}
@@ -159,24 +161,60 @@ recursiveness and richer
 types: -- polimorfic, refinements, adts parametrizáveis...  todo
 
 
-\section{Formal System}\label{sec:formal_system}
+\section{Synthesis with Linear Types, Polymorphism and Refinements}\label{sec:formal_system}
+\todo[inline]{Encurtar titulo, mas algo nesta onda que descreve
+  ``tudo''}
 
-The development of \synname\ was initially found on an almost direct reading of
-concrete inference rules and theoretical principles (~\cite{frank pfenning notes}); and work on its environment
-was also guided by formal systems and methods (e.g. the Hindley-Milner type
-inference~\cite{}).  However, with the addition of recursion and richer types to
-the synth and language, formal guidelines to support the implementation become
-scarcer, or more complex. Accordingly, rather than derived from explicit rules,
-solutions appear first to tame the extensions' inherent complex problems (such
-as infinite recursion), and implicit rules come only as a byproduct.
+\todo[inline]{Aqui parece-me que deves comecar por explicar o que vais
+  fazer nesta seccao. Sinto falta da sintaxe da linguagem,
+  possivelmente incrementalmente. Comecava por listar os tipos/termos
+  do lambda linear ``simples'', depois em cada subseccao acrescentava
+  as construcoes novas e como a sintese funciona para esse
+  contexto. Enfatizar que a novelty é a combinacao destas features todas.}
 
-With this section we intend to formalize the implicit rules that guide the
-synthesis of more expressive specifications, alongside the already explicit
-rules that model the core of the synth process, resulting in a \emph{sound} set
-of rules that hopes to serve as a source of ideas on taming synthesis of
-recursive functions with richer types in a linear context, as well as describe
-the system in enough detail for the synthetiser to be reproducible by a
-theory-driven implementation.
+The development of \synname\ was based on an almost direct reading of
+concrete inference rules and theoretical principles (~\cite{frank
+  pfenning notes});
+\todo{aqui queres dizer que começaste por te basear
+  num sistema de focusing para a logica linear (era sequer linear a
+  formulacao que comecaste a seguir?) O que são theoretical
+  principles?}
+and work on its environment was also guided by formal
+systems and methods (e.g.~Hindley-Milner type
+inference~\cite{}).\todo{esta frase parece-me desnecessaria. O que
+  queres dizer neste paragrafo, parece-me, é que partes de um sistema
+  focused da literatura que depois vais extender, inspirando te em
+  tecnicas standard de proof search / inferencia.}
+
+However, with the addition of recursion and
+richer types to the synthesis and language, formal guidelines
+\todo{nao sao formal guidelines, nao existem trabalhos a combinar
+  estas features todas, essa parte é importante. Além de que 
+ao incluir estas coisas deixamos de estar completamente em proof
+search, pois muitas destas coisas (e.g. recursao) nao sao
+necessariamente sound logicamente.}
+  Tenta usar termos 
+  especificos. Richer types? Richer como?} to support
+the implementation become scarcer, or more complex \todo{nao existem
+  ou sao complicados? ambos? citacao?}. Accordingly,
+rather than derived from explicit rules, solutions appear first to
+tame the extensions' inherent complex problems (such as infinite
+recursion), and implicit rules come only as a byproduct. \todo{ Nao
+  percebo o que queres dizer aqui. O que sao explicit rules e implicit
+  rules? Ou há regras ou nao há. O que estas a dizer é que inventaste
+  tecnicas de sintese para estes casos, que correspondem as regras que
+  vais apresentar. E tao explicito ou implicito como o que esta na literatura.}
+
+With this section we aim to formalize the implicit \todo{mais uma vez\dots} rules that guide
+the synthesis of more \todo{nao se faz sintese de specs, mas sim a
+  partir de specs} expressive specifications, alongside the already
+explicit rules that model the core of the synth \todo{synthesis} process, resulting in
+a \emph{sound} set of rules that hopes to serve as a source of ideas
+\todo{ nao me parece\dots As regras caracterizam o que esta
+  implementado, e esse o objectivo, nao e ser uma fonte de ideias\dots }
+on taming synthesis of recursive functions with richer types in a
+linear context, as well as describe the system in enough detail for
+the synthetiser to be reproducible by a theory-driven implementation.
 
 Even so, note that \emph{soundness} and \emph{completeness} have two very
 different meanings, and our \emph{sound} set of rules only guarantees we won't
