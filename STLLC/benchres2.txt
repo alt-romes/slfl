@@ -1,0 +1,7 @@
+W/ Memoization
+map7 (fails) : 2.554 s ±  0.432 s
+maybe4 (fails) : 20.5 ms ±   1.5 ms
+
+Wout/ Memoization
+map7 (fails): 2.756 s ±  0.084 s
+maybe4 (fails) : 21.0 ms ±   1.3 ms

@@ -735,14 +735,40 @@ monad"~\cite{logict}.
 functions, we need to contact an SMT solver to check satisfiability. For this,
 we use the library \emph{sbv}~\cite{sbv}. Unfortunately, this library does not
 support the usage of the SMT solvers to satisfy and output more complicated
-first-order logic solutions -- since this is needed to synth refinement types
+first-order logic uninterpreted functions -- since this is needed to synth refinement types
 when right focused, we instead use unsafe library primitives to communicate with
 the solver directly, constructing the logical formulas ourselves. For 
 satisfying formulas, for instance, when typechecking, or left focused on a
 refinement type, we use the library api successfully to get a veridct on
 satisfiability.
 
-\mypara{Memoization} ...
+\mypara{Memoization} Some proofs attempt to synth the same sub-goal with the
+same premises more than once. Since these proof attempts might be expensive
+performance-wise, and we can rely on the program's determinism (equal calls to
+synth result in equal outcomes), we add to our synth memoization, an
+optimization technique that stores function calls and returns cached values for
+equal inputs. For our synth, two calls are equivalent when contexts $\Theta,
+\Rho, \Gamma, \Delta$, $\Omega$, (or alternatively the left focus), and the
+goal, are equivalent. Because comparing all of these is slow, our implementation
+hashes the relevant values and uses the result as the key. Using LogicT, a
+branch we want to memoize might fail -- it's desireable to also record that a
+synthesis fails, as it happens more than successful results. We capture failure
+of a logict computation using the $ifte$ function and represent failure or
+success information with the Maybe type. We ran benchmarks to measure the impact
+of memoization on the performance. It's more noticeable in synthesis with
+multiple functions in the unrestricted context, or more complex
+specifications:
+%
+\begin{center}
+    \begin{tabular}{ |c|c|c|c|c| }
+        \hline
+        Goal & Time + $\sigma$ & TimeM + $\sigma$ \\
+        \hline
+        insertWithKey & 13.31 s ± 593.4 ms & 2.667 s ± 284.3 ms
+    \end{tabular}
+\end{center}
+
+
 
 \mypara{Debugging} The rules described in the formal
 system\ref{sec:formal_system} to handle infinite recursion might seem obvious in

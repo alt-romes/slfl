@@ -1,0 +1,170 @@
+benchmarking synth/bench/llt1.hs
+time                 132.6 μs   (130.9 μs .. 134.3 μs)
+                     0.999 R²   (0.998 R² .. 0.999 R²)
+mean                 132.9 μs   (131.5 μs .. 136.1 μs)
+std dev              6.635 μs   (3.418 μs .. 12.26 μs)
+variance introduced by outliers: 51% (severely inflated)
+
+benchmarking synth/bench/llt2.hs
+time                 138.2 μs   (136.6 μs .. 140.0 μs)
+                     0.999 R²   (0.998 R² .. 0.999 R²)
+mean                 138.5 μs   (137.1 μs .. 140.5 μs)
+std dev              5.211 μs   (3.836 μs .. 8.053 μs)
+variance introduced by outliers: 37% (moderately inflated)
+
+benchmarking synth/bench/llt3.hs
+time                 164.7 μs   (163.0 μs .. 166.7 μs)
+                     0.999 R²   (0.999 R² .. 0.999 R²)
+mean                 165.5 μs   (164.0 μs .. 168.0 μs)
+std dev              6.869 μs   (5.055 μs .. 11.42 μs)
+variance introduced by outliers: 41% (moderately inflated)
+
+benchmarking synth/bench/llt4.hs
+time                 236.8 μs   (234.1 μs .. 240.4 μs)
+                     0.998 R²   (0.997 R² .. 1.000 R²)
+mean                 236.5 μs   (234.9 μs .. 239.7 μs)
+std dev              7.003 μs   (4.802 μs .. 10.08 μs)
+variance introduced by outliers: 24% (moderately inflated)
+
+benchmarking synth/bench/list1.hs
+time                 127.8 μs   (126.6 μs .. 129.2 μs)
+                     0.999 R²   (0.999 R² .. 0.999 R²)
+mean                 127.6 μs   (126.7 μs .. 129.0 μs)
+std dev              3.875 μs   (3.012 μs .. 5.635 μs)
+variance introduced by outliers: 27% (moderately inflated)
+
+benchmarking synth/bench/list2.hs
+time                 1.196 ms   (1.187 ms .. 1.209 ms)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 1.197 ms   (1.192 ms .. 1.205 ms)
+std dev              24.20 μs   (16.94 μs .. 34.05 μs)
+
+benchmarking synth/bench/list3.hs
+time                 251.0 μs   (248.5 μs .. 253.7 μs)
+                     0.999 R²   (0.998 R² .. 1.000 R²)
+mean                 251.2 μs   (249.3 μs .. 254.2 μs)
+std dev              8.111 μs   (5.501 μs .. 13.23 μs)
+variance introduced by outliers: 27% (moderately inflated)
+
+benchmarking synth/bench/list4.hs
+time                 224.4 μs   (222.5 μs .. 226.2 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 224.2 μs   (222.6 μs .. 227.8 μs)
+std dev              7.514 μs   (4.196 μs .. 14.94 μs)
+variance introduced by outliers: 29% (moderately inflated)
+
+benchmarking synth/bench/list5.hs
+time                 279.3 μs   (277.3 μs .. 281.2 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 278.8 μs   (276.7 μs .. 281.4 μs)
+std dev              7.651 μs   (5.808 μs .. 10.35 μs)
+variance introduced by outliers: 21% (moderately inflated)
+
+benchmarking synth/bench/list6.hs
+time                 703.4 μs   (697.4 μs .. 709.2 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 701.4 μs   (698.3 μs .. 705.8 μs)
+std dev              12.64 μs   (9.899 μs .. 16.09 μs)
+
+benchmarking synth/bench/list8.hs
+time                 184.6 μs   (183.1 μs .. 186.8 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 185.3 μs   (183.8 μs .. 186.5 μs)
+std dev              4.568 μs   (3.757 μs .. 6.056 μs)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking synth/bench/maybe1.hs
+time                 109.3 μs   (108.2 μs .. 110.4 μs)
+                     0.999 R²   (0.998 R² .. 0.999 R²)
+mean                 109.5 μs   (108.5 μs .. 111.0 μs)
+std dev              3.772 μs   (2.759 μs .. 4.954 μs)
+variance introduced by outliers: 33% (moderately inflated)
+
+benchmarking synth/bench/maybe2.hs
+time                 173.3 μs   (172.0 μs .. 175.1 μs)
+                     0.999 R²   (0.998 R² .. 1.000 R²)
+mean                 173.3 μs   (171.8 μs .. 175.0 μs)
+std dev              5.300 μs   (4.256 μs .. 6.800 μs)
+variance introduced by outliers: 27% (moderately inflated)
+
+benchmarking synth/bench/maybe3.hs
+time                 154.0 μs   (152.9 μs .. 155.3 μs)
+                     0.996 R²   (0.990 R² .. 0.999 R²)
+mean                 158.4 μs   (154.8 μs .. 166.3 μs)
+std dev              17.63 μs   (10.38 μs .. 29.38 μs)
+variance introduced by outliers: 83% (severely inflated)
+
+benchmarking synth/bench/tree1.hs
+time                 144.9 μs   (143.5 μs .. 146.2 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 144.6 μs   (143.3 μs .. 146.2 μs)
+std dev              4.933 μs   (3.423 μs .. 6.999 μs)
+variance introduced by outliers: 32% (moderately inflated)
+
+benchmarking synth/bench/tree2.hs
+time                 4.800 ms   (4.771 ms .. 4.838 ms)
+                     0.999 R²   (0.998 R² .. 1.000 R²)
+mean                 4.796 ms   (4.775 ms .. 4.832 ms)
+std dev              80.96 μs   (54.54 μs .. 131.0 μs)
+
+benchmarking synth/bench/tree3.hs
+time                 792.0 μs   (785.1 μs .. 800.8 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 789.4 μs   (785.4 μs .. 795.3 μs)
+std dev              16.37 μs   (12.18 μs .. 21.86 μs)
+variance introduced by outliers: 11% (moderately inflated)
+
+benchmarking synth/bench/tree4.hs
+time                 255.0 μs   (253.1 μs .. 256.5 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 254.2 μs   (252.8 μs .. 256.1 μs)
+std dev              5.289 μs   (3.957 μs .. 7.705 μs)
+variance introduced by outliers: 14% (moderately inflated)
+
+benchmarking synth/bench/tree5.hs
+time                 42.70 ms   (41.64 ms .. 44.89 ms)
+                     0.995 R²   (0.989 R² .. 1.000 R²)
+mean                 42.01 ms   (41.57 ms .. 42.88 ms)
+std dev              1.232 ms   (496.6 μs .. 1.928 ms)
+
+benchmarking synth/bench/map2.hs
+time                 185.2 μs   (182.9 μs .. 187.5 μs)
+                     0.999 R²   (0.998 R² .. 0.999 R²)
+mean                 184.6 μs   (182.6 μs .. 189.9 μs)
+std dev              9.899 μs   (5.460 μs .. 19.61 μs)
+variance introduced by outliers: 53% (severely inflated)
+
+benchmarking synth/bench/map3.hs
+time                 20.73 ms   (20.58 ms .. 20.85 ms)
+                     1.000 R²   (0.999 R² .. 1.000 R²)
+mean                 20.71 ms   (20.62 ms .. 20.92 ms)
+std dev              302.2 μs   (136.9 μs .. 530.2 μs)
+
+benchmarking synth/bench/map5.hs
+time                 14.29 s    (12.59 s .. 18.11 s)
+                     0.991 R²   (0.984 R² .. 1.000 R²)
+mean                 13.31 s    (12.95 s .. 13.94 s)
+std dev              593.4 ms   (123.6 ms .. 758.9 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+benchmarking synth/bench/map6.hs
+time                 304.7 μs   (302.0 μs .. 307.3 μs)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 302.3 μs   (299.7 μs .. 305.8 μs)
+std dev              9.165 μs   (7.068 μs .. 12.01 μs)
+variance introduced by outliers: 24% (moderately inflated)
+
+benchmarking synth/bench/map8.hs
+time                 963.1 μs   (922.8 μs .. 1.009 ms)
+                     0.990 R²   (0.982 R² .. 0.998 R²)
+mean                 921.8 μs   (908.2 μs .. 945.3 μs)
+std dev              57.92 μs   (38.75 μs .. 85.34 μs)
+variance introduced by outliers: 51% (severely inflated)
+
+benchmarking synth/bench/map9.hs
+time                 1.066 ms   (999.9 μs .. 1.168 ms)
+                     0.919 R²   (0.878 R² .. 0.967 R²)
+mean                 1.261 ms   (1.176 ms .. 1.378 ms)
+std dev              349.5 μs   (278.5 μs .. 436.9 μs)
+variance introduced by outliers: 95% (severely inflated)
+
