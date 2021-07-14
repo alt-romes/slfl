@@ -1,5 +1,5 @@
 all:
-	pdflatex article.tex
+	pdflatex -shell-escape article.tex
 
 preview:
 	open article.pdf

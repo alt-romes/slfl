@@ -6,6 +6,8 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 
+\usepackage{minted}
+
 \usepackage{todonotes}
 
 \usepackage{multirow}
@@ -22,8 +24,11 @@
 \def\Rho{P}
 \newcommand{\te}[1]{\textrm{\emph{#1}}}
 
+% \usemintedstyle{lovelace}
+\usemintedstyle{murphy}
+
 \title{Synthesis of Linear Functional Programs}
-\author{Rodrigo Mesquita - Nº XXXXX \\
+\author{Rodrigo Mesquita - Nº 55902 \\
     Supervisor: Bernardo Toninho}
 \date{July 2021}
 \institute{NOVA School of Science and Technology}
@@ -39,9 +44,11 @@ Program synthesis is an automated or semi-automated process of deriving a
 program (i.e.~generating code) from a high-level specification.
 %
 Synthesis can be seen as a means to improve a programmer's productivity and/or
-program correctness (i.e. through suggestion and/or autocompletion), or as a
+program correctness (e.g. through suggestion and/or autocompletion), or as a
 tool to automate certain parts of the programming process, to name a few
 examples.
+% TODO: Escrever um início melhor
+
 
 Specifications can take many forms (e.g.  polymorphic refinement
 types~\cite{DBLP:conf/pldi/PolikarpovaKS16},
@@ -53,7 +60,7 @@ interpreting user intent.
 %
 In this work we'll explore type-based synthesis where specifications take the
 form of linear types, which limit resource usage in programs, in combination
-with polymorphism.  Concretely, we will explore the proof-theoretic foundations
+with polymorphism and refinements.  Concretely, we will explore the proof-theoretic foundations
 of linear types via the Curry-Howard correspondence with linear logic, viewing
 program synthesis under the lens of (linear logic) bottom-up proof search.
 
@@ -142,10 +149,10 @@ with resource management, and focusing, as formalized techniques to,
 respectively, solve resource related non-determinism, and to eliminate from the
 proof search don't-care non-determinism.  Guided solely by this system's formal
 representation\ref{sec:formal_system}, we can (and did) create a very robust
-synthetiser for a select part of the linear types that's able to synth
+synthetiser for a select part of the linear types that's able to synthetise
 programs successfully from e.g. the major linear logic equivalences. For example,
 given the specification $(A \lolli (B \lolli C)) \lolli (A \tensor B) \lolli C$,
-the program $\lambda a \rightarrow \lambda b \rightarrow$ let $c \tensor d$ =
+the program $\lambda a .\ \lambda b .$ let $c \tensor d$ =
 $b$ in $a$ $c$ $d$ (commonly known as \emph{uncurry}) is synthetised.
 
 The \synname\ programming language is naturally born alongside the synthetiser
@@ -157,16 +164,18 @@ context, that is, with knowledge of other functions and eventual structures
 defined in the same program.
 
 However, a programming language only with the canonical linear types lacks
-expressiveness. To enhance \synname\ and its language, synth more interesting
+expressiveness. To enhance \synname\ and its language, synthetise more interesting
 programs -- and thus empirically proving the feasability of more relevant
 synthesis in a linear context, we extend the syntax and type system with
 recursiveness and richer
 types: -- polimorfic, refinements, adts parametrizáveis...  todo
 
 
-\section{Synthesis with Linear Types, Polymorphism and Refinements}\label{sec:formal_system}
-\todo[inline]{Encurtar titulo, mas algo nesta onda que descreve
-  ``tudo''}
+\section{Synthesis Framework}\label{sec:formal_system}
+% with Linear Types, Polymorphism and Refinements
+
+% \todo[inline]{Encurtar titulo, mas algo nesta onda que descreve
+%   ``tudo''}
 
 \todo[inline]{Aqui parece-me que deves comecar por explicar o que vais
   fazer nesta seccao. Sinto falta da sintaxe da linguagem,
@@ -209,29 +218,26 @@ recursion), and implicit rules come only as a byproduct. \todo{ Nao
   vais apresentar. E tao explicito ou implicito como o que esta na literatura.}
 
 With this section we aim to formalize the rules that guide
-synthesis from more expressive specifications, alongside the already
-well defined rules that model the core of the synthesis process, resulting in
-a \emph{sound} set of rules that hopes to serve as a source of ideas
-\todo{ nao me parece\dots As regras caracterizam o que esta
-  implementado, e esse o objectivo, nao e ser uma fonte de ideias\dots}
-  \todo{R: não parece ser sound ?}
-on taming synthesis of recursive functions with richer types in a
-linear context, as well as describe the system in enough detail for
+the synthesis process for more expressive specifications, alongside the already
+well defined rules that model the core of the synthetiser, resulting in
+a \emph{sound} set of rules that characterizes our framework for synthesis of
+recursive functions from polymorphic and refinement types in a linear context
+% TODO: Better?....
+, and describes the system in enough detail for
 the synthetiser to be reproducible by a theory-driven implementation.
 
 Even so, note that \emph{soundness} and \emph{completeness} have two very
 different meanings, and our \emph{sound} set of rules only guarantees we won't
-synth incorrect programs, but still hides a possibly infinite number of correct
+synthetise incorrect programs, but still hides a possibly infinite number of correct
 proofs; and that the valid programs derivable through it reflect the somewhat
 subjective trade-offs we decided on. Different choices and approaches outside
 the core might lead to completely distinct synths and spaces of valid programs.
 
 
 \mypara{Core Rules} The core system comprises of the sequent calculus rules for
-linear logic connectives with resource-management and focusing. As
-explained in\ref{sec:background} \todo{se o background nao vai ser
-  incluido no documento principal, nao deves referenciar assim tao
-  directamente para o conteudo principal.}, focusing separates the proof search into two
+linear logic connectives with resource-management and focusing.
+\todo{Introdução para focusing...}
+Focusing separates the proof search into two
 phases: inversion ($\Uparrow$) in which we apply invertible rules eagerly, and
 focusing ($\Downarrow$) in which we decide a proposition to focus on, and then
 apply non-invertible rules, staying focused until either the focus is again an
@@ -250,17 +256,14 @@ invert, moving them to the linear context ($\Delta$) when we fail to.
 Putting together linear logic, the Curry-Howard correspondence, resource
 management, and focusing, we get the following core formal system (heavily inspired
 by Frank Pfenning's notes on focusing for linear logic~\cite{FPnotes...}) -- in which the
-first rule is read: to synth a program of type $A \lolli B$ while inverting
+first rule is read: to synthetise a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
-context $\Delta$, and inversion context $\Omega$, synth a program of type $B$ with
+context $\Delta$, and inversion context $\Omega$, synthetise a program of type $B$ with
 an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
 resulting in the program $M$ and output linear
 context $\Delta'$ that cannot contain the added hypothesis $x{:}A$. Finally, the
-resulting program is $\lambda x \rightarrow M$ and the output linear context is
+resulting program is $\lambda x . M$ and the output linear context is
 $\Delta'$.
-
-\todo{a sintaxe $\lambda x \rightarrow M$ nao e mt standard, usa
-  $\lambda x . M$}
 
 We begin with the right invertible rules:
 \begin{mathpar}
@@ -269,7 +272,7 @@ We begin with the right invertible rules:
     \infer*[right=($\lolli R$)]
     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \vdash M : B \Uparrow \and x
     \notin \Delta'}
-    {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x \rightarrow M : A
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x . M : A
     \lolli B \Uparrow}
 
 \and
@@ -421,7 +424,7 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
     {\Gamma; \Delta/\Delta' \vdash A \Downarrow}
 \end{mathpar}
 The rules written above together make the core of our synthetiser. Next, we'll
-present new rules that align and build on top of these to synth recursive
+present new rules that align and build on top of these to synthetise recursive
 programs from more expressive (richer) types.
 
 \mypara{Algebraic Data Types} In its simplest form, an algebraic data type (ADT)
@@ -431,8 +434,8 @@ be, e.g., a product type ($A \tensor B$), or unit ($1$), in practice allowing
 for constructors with an arbitrary number of parameters. In the \synname\
 language, the programmer can define custom ADTs; as an example, we show the
 definition of an ADT which might be constructed with zero, one, or two
-propositions of type $A$, using its syntax: $\textrm{data Container} =
-\textrm{None}\ 1\ \vert\ \textrm{One}\ A\ \vert\ \textrm{Two}\ (A * A)$.
+propositions of type $A$, using its syntax: \mintinline{haskell}{data Container
+= None 1 | One A | Two (A * A)}
 
 The semantics of the ADTs relate to those of the plus ($\oplus$) type --
 both are additive disjunctions.  A proof of an ADT requires only a proof of one
@@ -444,9 +447,6 @@ the inference rules for a simple ADT mimic the $\oplus$ rules, for an
 arbitrary ($> 1$) number of types, rather than exactly two. Therefore, there's one
 left rule for ADTs, and an arbitrary number of right rules, one for each
 constructor:
-
-\todo[inline]{Não uses Foo e Bar. $T_1$, $T_2$ , $\dots$ para
-  tipos. $C_1$, $C_2$, $\dots$ para os construtores.}
 
 \begin{mathpar}
     \infer*[right=(adtR)]
@@ -479,20 +479,18 @@ constructor:
 
 
 where the ADT $T$ and its constructors stand for any ADT with form
-\[
-    \textrm{data}\ T = C_1\ X_1\ \vert\ C_2\ X_2\ \vert\
-\dots\ \vert\ C_n\ X_n
-\]
+\begin{minted}{haskell}
+    data T = C1 X1 | C2 X2 | ... | Cn Xn
+\end{minted}
 
 % repetition does not legitimize :p
 
 A more general (and interesting) formulation of ADTs says an ADT can be
-recursive (or "indutively defined"), meaning the type a constructor needs might
-be the type the constructor constructs \todo{ Na escrita, repetition does not
-legitimize. Constructors can take as arguments values of the type they are
-defining, ou algo assim}. Seemingly small, this change has a big impact in the
-synthesis process. Take, for instance, the ADT defined as $\textrm{data}\ T =
-C_1\ T$, the synth goal $T \lolli C$, and its derivation:
+recursive (or "indutively defined"), meaning constructors can take as arguments
+values of the type they are defining. Seemingly small, this change has a big
+impact in the synthesis process. Take, for instance, the ADT defined as
+\mintinline{haskell}{data T = C1 T}, the synth goal $T \lolli C$, and its
+derivation:
 %
 \begin{mathpar}
     \infer*[right=($\lolli R$)]
@@ -517,7 +515,7 @@ C_1\ T$, the synth goal $T \lolli C$, and its derivation:
         {\Gamma; \Delta/\Delta'; \Omega, x{:}T \vdash \dots : C
         \Uparrow}
     }
-    {\Gamma; \Delta/\Delta'; \Omega \vdash \lambda x \rightarrow \dots :
+    {\Gamma; \Delta/\Delta'; \Omega \vdash \lambda x . \dots :
     T \lolli C \Uparrow}
 \end{mathpar}
 %
@@ -544,14 +542,14 @@ derivation for the synth goal $T$ is also infinite.
 \end{mathpar}
 %
 To account for this situation, we impede the decomposition of an ADT in subsequent
-proofs of its branches, and, simetrically, don't allow construction of an
-ADT when trying to synth an argument for its constructor. \todo{R: A segunda parte confusa era da frase de
-  cima?, está melhor?}
+proofs of its branches, and, symetrically, don't allow construction of an
+ADT when trying to synthetise an argument for its constructor.
 %
 %
 For this, we need two more contexts, $\Rho_C$
 for constraints on construction and $\Rho_D$ for constraints on
-deconstruction. For convenience, they are represented by a single $\Rho$ if
+deconstruction. Together, they hold a list of ADTs that can not be constructed or
+deconstructed at some point in the proof. For convenience, they are represented by a single $\Rho$ if
 unused. All rules must trivially propagate these. The ADT rules are explicitly
 modified to take this into consideration:
 %
@@ -592,9 +590,8 @@ where
 %
 These modifications prevent the infinite derivations in the scenarios described
 above, however, they also greatly limit the space of derivable programs, leaving
-the synthetiser effectively unable to synth from specifications with recursive
-types\todo{refrasear tendo em conta que se sintetiza a partir de specs e nao
-specs R: refrasear mas só com "from" não fica bem?}, which is so undesirable that we add three rules to complement the
+the synthetiser effectively unable to synthetise from specifications with recursive
+types, which is undesirable, so we add three rules to complement the
 restrictions on construction and destruction of recursive types.
 
 First, after decomposing a recursive ADT, we must consume all constructor
@@ -634,7 +631,7 @@ following rules ensure this:
 
 \mypara{Recursion} The main idea behind synthesis of recursive programs is the
 labeling of the main goal and the addition of its type, under that name, to the
-unrestricted context. That is, to synth a function of type $A \lolli B$ named
+unrestricted context. That is, to synthetise a function of type $A \lolli B$ named
 \emph{f}, the initial judgment can be written as
 \begin{mathpar}
     \infer
@@ -660,21 +657,17 @@ hypothesis as arguments. To illustrate, having $\textrm{data List} =
 the \emph{Cons} branch. % (TODO: rewrite? O bold é meio estranho não?)
 
 
-\todo[inline]{Polymorphic R: ??}
-
 \mypara{Polymorphic Types} A polymorphic specification is a type of form
-$\forall \overline{\alpha}.\ \tau$ where $\overline{\alpha}$ is a set of
-bound variables that quantify universally the type variables in $\tau$, which is
-also called a \emph{scheme}.
-Synthesis of a scheme comprises of turning it into a non-quantified type, and
-then treating its type variables agnostically. \todo{R: Melhor que
-straightforward?}
-First, \textbf{type variables are considered atomic types}, then, instantiate
-the bound variables of the scheme as described by the Hindley-Milner inference
-method's~\cite{HM-infer} instantiation rule (put simply, generate fresh names for
-each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha
-\lolli \alpha$ could be instantiated to
-$\alpha0 \lolli \alpha0$. We add a rule for this:
+$\forall \overline{\alpha}.\ \tau$ where $\overline{\alpha}$ is a set of bound
+variables that quantify universally the type variables in $\tau$, which is also
+called a \emph{scheme}.  Synthesis of a scheme comprises of turning it into a
+non-quantified type, and then treating its type variables agnostically.  First,
+\textbf{type variables are considered atomic types}, then, instantiate the bound
+variables of the scheme as described by the Hindley-Milner inference
+method's~\cite{HM-infer} instantiation rule (put simply, generate fresh names
+for each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha \lolli
+\alpha$ could be instantiated to $\alpha0 \lolli \alpha0$. We add a rule for
+this:
 \begin{mathpar}
     \infer*[right=($\forall R$)]
     { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \tau' \Uparrow \and \forall
@@ -697,9 +690,9 @@ synthesis of a program where some expressions are treated agnostically --
 nothing constrains their type -- meaning the program is polymorphic. The
 simplest example is the polymorphic function \emph{id} of type $\forall \alpha
 .\ \alpha \lolli \alpha$. The
-program synthed from that specification is $\lambda x \rightarrow x$, a lambda
-abstraction that doesn't constrain its parameter $x$ in any way. \todo{R :
-rewrite this? não estranho?}
+program synthetised from that specification is $\lambda x . x$, a lambda
+abstraction that doesn't constrain its parameter $x$ in any way.
+% TODO: \todo{R : rewrite this? não estranho?}
 
 The interesting challenge of polymorphism in synthesis is the usage of
 schemes from the unrestricted context.  To begin with, $\Gamma$ now
@@ -715,7 +708,7 @@ the decision of what type it should be to be used in the proof), and
 collect them in a new constraints context $\Theta$ that is propagated
 across derivation branches the same way the linear context is (by
 havin an input and output context ($\Theta/\Theta'$)).  In contrast to
-HM, everytime a constraint is added it is solved against all other
+Hindley-Milner's inference, everytime a constraint is added it is solved against all other
 constraints -- a branch of the proof search is desired to fail as soon
 as possible; and more, two different existential vars do not unify
 against one another ($?\alpha \mapsto ?\beta$ fails) \todo{O que
@@ -724,7 +717,7 @@ against one another ($?\alpha \mapsto ?\beta$ fails) \todo{O que
 instance the scheme with \emph{existential} type variables ($\alpha$)
 rather than just type variables since the latter represent universal
 types in the synth, and the first represent an existential instance of
-a scheme, that might inclusively constraint normal type
+a scheme, that might inclusively constrain normal type
 variables. Additionally, it's required that all existential type
 variables were assigned a type, and provided they were, we can forget
 the constraints generated from the usage of the scheme. These concepts
@@ -741,13 +734,13 @@ are formalized with the rules:
     {\Theta/\Theta; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
     \and
     \infer*[right=($?L$)]
-    {\textsc{solve}(?\alpha
+    {\textsc{unify}(?\alpha
     \mapsto C, \Theta)}
     {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
     x{:}?\alpha \Downarrow\ \vdash x : C}
     \and
     \infer*[right=($\Downarrow L?$)]
-    {\textsc{solve}(?\alpha
+    {\textsc{unify}(?\alpha
     \mapsto A, \Theta)}
     {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
     x{:}A \Downarrow\ \vdash x : ?\alpha}
@@ -763,13 +756,13 @@ where
     ?\alpha \mapsto \tau_x\ \textrm{is a mapping from \emph{existential} type}\ ?\alpha\
     \textrm{to type}\ \tau_x
     \\
-    \textsc{solve}(c, \Theta)\ \textrm{indicates wether constraint}\ c\
-    \textrm{can be solved with those in}\ \Theta
+    \textsc{unify}(c, \Theta)\ \textrm{indicates wether constraint}\ c\
+    \textrm{can be unified with those in}\ \Theta
 \end{mathpar}
 
 
 
-\mypara{Polymorfic ADTs}
+\mypara{Polymorphic ADTs}
 
 \mypara{Refinement Types}
 
@@ -790,9 +783,11 @@ the language's syntax to a list of abstract syntax trees (ASTs) understood by th
 pipeline.
 
 The desugaring module converts the frontend AST to a core AST without syntatic
-sugar and using the locally-nameless~\cite{locally nameless} representation for
-all bound variables. \todo{Explica o que e isto} This way inference can be done without worrying about name
-conflicts.
+sugar and using the locally-nameless representation~\cite{locally nameless}, in
+which all bound variables have no name, and instead are addressed using the
+number of binders traversed since the binding.
+% TODO: não ficou muito mais claro :\todo{Explica o que e isto}
+This way inference can be done without worrying about name conflicts.
 
 The inference module will traverse the list of ASTs in order (top-down), and
 infer the type of all functions defined by the user, checking the inferred
@@ -812,40 +807,40 @@ replacing the mark in the frontend AST with the synthed program.
 pipeline was done in Haskell...
 
 \mypara{Backtracking} Even though the synthetiser formal system helps, there's
-still non-determinism in the synth process. At diverse times in the proof
+still non-determinism in the synthesis process. At diverse times in the proof
 construction we must choose one of multiple rules to apply, and in the event of
 not being able to construct the proof following that choice, we want to
 backtrack to the decision point and attempt to create a proof taking a different
 route. To this effect, our prototype synthetiser depends on \emph{logict}, "a backtracking logic-programming
 monad"~\cite{logict}.
 
-\mypara{SMT Solving} To typecheck and synth refinement types and dependent
+\mypara{SMT Solving} To typecheck and synthetise refinement types and dependent
 functions, we need to contact an SMT solver to check satisfiability. For this,
 we use the library \emph{sbv}~\cite{sbv}. Unfortunately, this library does not
 support the usage of the SMT solvers to satisfy and output more complicated
-first-order logic uninterpreted functions -- since this is needed to synth refinement types
+first-order logic uninterpreted functions -- since this is needed to synthetise refinement types
 when right focused, we instead use unsafe library primitives to communicate with
 the solver directly, constructing the logical formulas ourselves. For 
 satisfying formulas, for instance, when typechecking, or left focused on a
 refinement type, we use the library api successfully to get a veridct on
 satisfiability.
 
-\mypara{Memoization} Some proofs attempt to synth the same sub-goal with the
-same premises more than once. Since these proof attempts might be expensive
+\mypara{Memoization} Some proofs attempt to synthetise the same sub-goal with
+the same premises more than once. Since these proof attempts might be expensive
 performance-wise, and we can rely on the program's determinism (equal calls to
-synth result in equal outcomes), we add to our synth memoization, an
+synthetise result in equal outcomes), we add to our synthetiser memoization, an
 optimization technique that stores function calls and returns cached values for
-equal inputs. For our synth, two calls are equivalent when contexts $\Theta,
-\Rho, \Gamma, \Delta$, $\Omega$, (or alternatively the left focus), and the
-goal, are equivalent. Because comparing all of these is slow, our implementation
-hashes the relevant values and uses the result as the key. A
-branch we want to memoize might fail, not providing any result -- we also want
-to record synthesis failure, as it happens more often than successful results. We capture failure
-of a logict computation using the $ifte$ function and represent failure or
-success information with the Maybe type. We ran benchmarks to measure the impact
-of memoization on the performance. It's especially noticeable in synthesis with
-multiple functions in the unrestricted context, or more complex
-specifications:
+equal inputs. For our synthetiser, two calls are equivalent when contexts
+$\Theta, \Rho, \Gamma, \Delta$, $\Omega$, (or alternatively the left focus), and
+the goal, are equivalent. Because comparing all of these is slow, our
+implementation hashes the relevant values and uses the result as the key.
+Furthermore, a branch we want to memoize might fail, not providing any result --
+we also want to record synthesis failure, as it happens more often than
+successful results. We capture failure of a logict computation using the $ifte$
+function and represent failure or success information with the Maybe type. We
+ran benchmarks to measure the impact of memoization on the performance. It's
+especially noticeable in synthesis with multiple functions in the unrestricted
+context, or more complex specifications:
 %
 \begin{center}
     \begin{tabular}{ |c|c|c|c|c| }
@@ -856,6 +851,8 @@ specifications:
         \hline
     \end{tabular}
 \end{center}
+%
+The details of the memoization are very subject to change
 
 
 
