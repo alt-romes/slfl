@@ -208,13 +208,13 @@ recursion), and implicit rules come only as a byproduct. \todo{ Nao
   tecnicas de sintese para estes casos, que correspondem as regras que
   vais apresentar. E tao explicito ou implicito como o que esta na literatura.}
 
-With this section we aim to formalize the implicit \todo{mais uma vez\dots} rules that guide
-the synthesis of more \todo{nao se faz sintese de specs, mas sim a
-  partir de specs} expressive specifications, alongside the already
-explicit rules that model the core of the synth \todo{synthesis} process, resulting in
+With this section we aim to formalize the rules that guide
+synthesis from more expressive specifications, alongside the already
+well defined rules that model the core of the synthesis process, resulting in
 a \emph{sound} set of rules that hopes to serve as a source of ideas
 \todo{ nao me parece\dots As regras caracterizam o que esta
-  implementado, e esse o objectivo, nao e ser uma fonte de ideias\dots }
+  implementado, e esse o objectivo, nao e ser uma fonte de ideias\dots}
+  \todo{R: não parece ser sound ?}
 on taming synthesis of recursive functions with richer types in a
 linear context, as well as describe the system in enough detail for
 the synthetiser to be reproducible by a theory-driven implementation.
@@ -248,7 +248,7 @@ invert, moving them to the linear context ($\Delta$) when we fail to.
   faz ideia do que estas a dizer.}
 
 Putting together linear logic, the Curry-Howard correspondence, resource
-management, and focusing, we get the following formal system (heavily inspired
+management, and focusing, we get the following core formal system (heavily inspired
 by Frank Pfenning's notes on focusing for linear logic~\cite{FPnotes...}) -- in which the
 first rule is read: to synth a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
@@ -400,12 +400,13 @@ The decision rules are followed by either left or right focus rules:
     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C}
     {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{snd}\ x)/y\} : C}
 \end{mathpar}
-Eventually, the focus proposition will no longer be synchronous, i.e. it's atomic or
-asynchronous. If we're left focused on an atomic proposition we either
-instance \todo{instantiate}
-the goal or fail. Otherwise the left focus is asynchronous and we can start
-inverting it. If we're right focused on a proposition that isn't right
+%
+Eventually, the focus proposition will no longer be synchronous, i.e. it's
+atomic or asynchronous. If we're left focused on an atomic proposition we either
+instantiate the goal or fail. Otherwise the left focus is asynchronous and we
+can start inverting it. If we're right focused on a proposition that isn't right
 synchronous, we switch to inversion as well. Three rules model these conditions:
+%
 \begin{mathpar}
     \infer*[right=(init)]
     {  }
@@ -450,7 +451,7 @@ constructor:
 \begin{mathpar}
     \infer*[right=(adtR)]
     {\Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow}
-    {\Gamma; \Delta/\Delta' \vdash\ \textrm{Bar}_n \ M : \te{Foo} \Downarrow}
+    {\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
 \and
     \mprset{flushleft}
     \infer*[right=(adtL)]
@@ -471,26 +472,28 @@ constructor:
         \\
         \Delta'_1 = \Delta'_2 = \dots = \Delta'_n
     }
-    {\Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}\te{Foo} \Uparrow\
-    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ \textrm{Bar}_n\ y_n
+    {\Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
+    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ C_n\ y_n
     \rightarrow M_n : C}
 \end{mathpar}
 
 
-where the ADT \emph{Foo} and its constructors stand for any ADT with form
+where the ADT $T$ and its constructors stand for any ADT with form
 \[
-    \textrm{data Foo} = \textrm{Bar}_1\ X_1\ \vert\ \textrm{Bar}_2\ X_2\ \vert\
-\dots\ \vert\ \textrm{Bar}_n\ X_n
+    \textrm{data}\ T = C_1\ X_1\ \vert\ C_2\ X_2\ \vert\
+\dots\ \vert\ C_n\ X_n
 \]
+
+% repetition does not legitimize :p
 
 A more general (and interesting) formulation of ADTs says an ADT can be
 recursive (or "indutively defined"), meaning the type a constructor needs might
-be the type the constructor constructs \todo{ Na escrita, repetition
-  does not legitimize. Constructors can take as arguments values of
-  the type they are defining, ou algo assim}. Seemingly small, this change has a big
-impact in the synthesis process. Take, for instance, the ADT defined as
-$\textrm{data Foo} = \textrm{Bar Foo}$, the synth goal $\te{Foo}
-\lolli C$, and its derivation:
+be the type the constructor constructs \todo{ Na escrita, repetition does not
+legitimize. Constructors can take as arguments values of the type they are
+defining, ou algo assim}. Seemingly small, this change has a big impact in the
+synthesis process. Take, for instance, the ADT defined as $\textrm{data}\ T =
+C_1\ T$, the synth goal $T \lolli C$, and its derivation:
+%
 \begin{mathpar}
     \infer*[right=($\lolli R$)]
     {
@@ -502,24 +505,26 @@ $\textrm{data Foo} = \textrm{Bar Foo}$, the synth goal $\te{Foo}
                 {
                     \infer*[right=(adtL)]
                     {\dots}
-                    {\Gamma; \Delta/\Delta'; \Omega, z{:}\te{Foo} \Uparrow\ \vdash \textrm{case}\ z\ 
-                    \textrm{of Bar}\ k \rightarrow \dots : C}
+                    {\Gamma; \Delta/\Delta'; \Omega, z{:}T \Uparrow\ \vdash \textrm{case}\ z\ 
+                    \textrm{of}\ C_1\ k \rightarrow \dots : C}
                 }
-                {\Gamma; \Delta/\Delta'; \Omega, y{:}\te{Foo} \Uparrow\ \vdash \textrm{case}\ y\ 
-                \textrm{of Bar}\ z \rightarrow \dots : C}
+                {\Gamma; \Delta/\Delta'; \Omega, y{:}T \Uparrow\ \vdash \textrm{case}\ y\ 
+                \textrm{of}\ C_1\ z \rightarrow \dots : C}
             }
-            {\Gamma; \Delta/\Delta'; \Omega, x{:}\te{Foo} \Uparrow\ \vdash \textrm{case}\ x\ 
-            \textrm{of Bar}\ y \rightarrow \dots : C}
+            {\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash \textrm{case}\ x\ 
+            \textrm{of}\ C_1\ y \rightarrow \dots : C}
         }
-        {\Gamma; \Delta/\Delta'; \Omega, x{:}\te{Foo} \vdash \dots : C
+        {\Gamma; \Delta/\Delta'; \Omega, x{:}T \vdash \dots : C
         \Uparrow}
     }
     {\Gamma; \Delta/\Delta'; \Omega \vdash \lambda x \rightarrow \dots :
-    \te{Foo} \lolli C \Uparrow}
+    T \lolli C \Uparrow}
 \end{mathpar}
+%
 Using our current system, we are to apply an infinite number of times the left
 ADT rule, never reaching a final state for the proof. Symmetrically, the
-derivation for the synth goal $\te{Foo}$ is also infinite.
+derivation for the synth goal $T$ is also infinite.
+%
 \begin{mathpar}
     \infer*[left=(adtR)]
     {
@@ -529,36 +534,37 @@ derivation for the synth goal $\te{Foo}$ is also infinite.
             {
                 \infer*[left=(adtR)]
                 {\dots}
-                {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo} \Downarrow}
+                {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
             }
-            {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo} \Downarrow}
+            {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
         }
-        {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo} \Downarrow}
+        {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
     }
-    {\Gamma; \Delta/\Delta'; \Omega \vdash \textrm{Bar}\ \dots : \te{Foo}
-    \Downarrow}
+    {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
 \end{mathpar}
+%
 To account for this situation, we impede the decomposition of an ADT in subsequent
-proofs of its branches, and to impede the construction of an ADT in a subsequent
-proof of a type to construct it. \todo{Não se percebe muito bem a
-  segunda parte da frase, rephrase!}
+proofs of its branches, and, simetrically, don't allow construction of an
+ADT when trying to synth an argument for its constructor. \todo{R: A segunda parte confusa era da frase de
+  cima?, está melhor?}
 %
 %
 For this, we need two more contexts, $\Rho_C$
-for restrictions \todo{constraints} on construction and $\Rho_D$ for restrictions on
+for constraints on construction and $\Rho_D$ for constraints on
 deconstruction. For convenience, they are represented by a single $\Rho$ if
 unused. All rules must trivially propagate these. The ADT rules are explicitly
 modified to take this into consideration:
+%
 \begin{mathpar}
     \infer*[right=(adtR)]
     {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
-    \te{Foo} \notin \Rho_C}
-    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ \textrm{Bar}_n \ M : \te{Foo} \Downarrow}
+    T \notin \Rho_C}
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
 \and
     \mprset{flushleft}
     \infer*[right=(adtL)]
     {
-        \te{Foo} \notin \Rho_D
+        T \notin \Rho_D
         \and
         \Delta'_1 = \dots = \Delta'_n 
         \\
@@ -572,25 +578,24 @@ modified to take this into consideration:
         \and
         y_n \notin \Delta'_n
     }
-    {(\Rho_C; \Rho_D); \Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}\te{Foo} \Uparrow\
-    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ \textrm{Bar}_n\ y_n
+    {(\Rho_C; \Rho_D); \Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
+    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ C_n\ y_n
     \rightarrow M_n : C}
 \end{mathpar}
 where
 \begin{mathpar}
-    \Rho'_C = \textrm{\textbf{if}}\ \te{Foo}\ \textrm{is recursive \textbf{then}}\ \Rho_C,
-    \te{Foo}\ \textrm{\textbf{else}}\ \Rho_C
+    \Rho'_C = \textrm{\textbf{if}}\ T\ \textrm{is recursive \textbf{then}}\ \Rho_C,
+    T\ \textrm{\textbf{else}}\ \Rho_C
 
     \Rho'_D = \textrm{likewise}
 \end{mathpar}
-These modifications prevent the derivation from not ending
-\todo{infinite derivations} for the scenarios described above,
-however, they also greatly limit the space of derivable programs,
-leaving the synthetiser effectively unable to synth specifications
-with recursive types\todo{refrasear tendo em conta que se sintetiza a
-  partir de specs e nao specs}, which is so undesirable that we add three rules
-to complement the restrictions on construction and destruction of
-recursive types.
+%
+These modifications prevent the infinite derivations in the scenarios described
+above, however, they also greatly limit the space of derivable programs, leaving
+the synthetiser effectively unable to synth from specifications with recursive
+types\todo{refrasear tendo em conta que se sintetiza a partir de specs e nao
+specs R: refrasear mas só com "from" não fica bem?}, which is so undesirable that we add three rules to complement the
+restrictions on construction and destruction of recursive types.
 
 First, after decomposing a recursive ADT, we must consume all constructor
 parameters, and since we can't decompose the self type any further because of a
@@ -606,20 +611,20 @@ following rules ensure this:
 \begin{mathpar}
     \infer*[right=(adt$\Uparrow$L)]
     {
-        (\Rho_C; \Rho_D);\Gamma; \Delta, x{:}\te{Foo}/\Delta'; \Omega \Uparrow\ \vdash M : C
+        (\Rho_C; \Rho_D);\Gamma; \Delta, x{:}T/\Delta'; \Omega \Uparrow\ \vdash M : C
         \and
-        \te{Foo} \in \Rho_D
+        T \in \Rho_D
     }
-    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}\te{Foo} \Uparrow\ \vdash M : C}
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}
     \and
     \infer*[right=(adt-init)]
     {  }
-    {\Rho; \Gamma; \Delta/\Delta'; x{:}\te{Foo} \Downarrow\ \vdash x : \te{Foo}}
+    {\Rho; \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash x : T}
     \and
     \infer*[right=(adt$\Downarrow$L)]
-    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}\te{Foo} \Uparrow\ \vdash M :
-    \te{Foo} \and \te{Foo} \notin \Rho_D}
-    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}\te{Foo} \Downarrow\ \vdash M : \te{Foo}}
+    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Uparrow\ \vdash M :
+    T \and T \notin \Rho_D}
+    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash M : T}
 \end{mathpar}
 % TODO: Adicionar regra que diz que se for ADT Rec -o A então a construção de
 % ADT Rec é logo restrita?? parece que acelera minimamente mas não arranjo um
@@ -627,55 +632,48 @@ following rules ensure this:
 % uma coisa antiga que ficou resolvida mais tarde com outra modificação e então
 % é agora inutil. Talvez seja demais adicionar à regra
 
-\todo[inline]{esta frase nao me parece muito necessaria}
-The ADT rules draw closer to a final form, but will still need a revision
-after the introduction of polymorfism and polymorfic parametrization on ADTs.
-
 \mypara{Recursion} The main idea behind synthesis of recursive programs is the
 labeling of the main goal and the addition of its type, under that name, to the
 unrestricted context. That is, to synth a function of type $A \lolli B$ named
-\emph{foo}, the initial judgment can be written as
+\emph{f}, the initial judgment can be written as
 \begin{mathpar}
     \infer
     {\dots}
-    {\Gamma, \textrm{\emph{foo}}{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M :
+    {\Gamma, f{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M :
     A \lolli B \Uparrow}
 \end{mathpar}
 and, by definition, all subsequent inference rules will have
-($\textrm{\emph{foo}}{:}A \lolli B$) in the $\Gamma$ context too.
+($f{:}A \lolli B$) in the $\Gamma$ context too.
 We can also force the usage of the recursive call by adding it not only to the
 unrestricted context, but to the linear one as well.
 
 Having said that, we won't allow the use of the recursive call in $\Gamma$ right
 away. If we did, every synth goal would have a trivial proof (a non-terminating
 function that just calls itself) that could even shadow other valid, relevant,
-solutions.  Instead, our framework only allows the use of recursion after having
+solutions.  Instead, our framework allows the use of recursion only after having
 deconstructed a recursive ADT. To avoid complicating the rules, we'll add the
 invariant: the recursive hypothesis can only be \textbf{used in recursive branches of
 ADT deconstruction}, i.e. the recursive call should only take "smaller", recursive,
 hypothesis as arguments. To illustrate, having $\textrm{data List} =
 \textrm{Nil}\ \vert\ \textrm{Cons}\ (A * \textrm{List})$, recursion is only
 "available" when deconstructing ($\textrm {List} \vdash C$), and only in
-the \emph{Cons} branch. % (TODO: rewrite)
+the \emph{Cons} branch. % (TODO: rewrite? O bold é meio estranho não?)
 
 
-% TODO: E como evitamos coisas trivialmente estúpidas?
+\todo[inline]{Polymorphic R: ??}
 
-
-\todo[inline]{Polymorphic}
-
-\mypara{Polymorphic Types} A polymorphic specification is a type $X$ \todo{T} and a set of
-bound variables that quantify universally the type variables in $X$, called a
-\emph{scheme} ($\forall \overline{\alpha}.\ \tau$).
-\todo[inline]{Não é um tipo e um conjunto de variáveis bound. É um
-  tipo da forma $\forall \overline{\alpha}.\ T$ em que $\dots$ }
-Synthesis of a scheme is straightforward. \todo{Diria que nao e
-  especialmente straightforward.}
+\mypara{Polymorphic Types} A polymorphic specification is a type of form
+$\forall \overline{\alpha}.\ \tau$ where $\overline{\alpha}$ is a set of
+bound variables that quantify universally the type variables in $\tau$, which is
+also called a \emph{scheme}.
+Synthesis of a scheme comprises of turning it into a non-quantified type, and
+then treating its type variables agnostically. \todo{R: Melhor que
+straightforward?}
 First, \textbf{type variables are considered atomic types}, then, instantiate
-the bound vars\todo{variables} of the scheme as described by the Hindley-Milner inference
+the bound variables of the scheme as described by the Hindley-Milner inference
 method's~\cite{HM-infer} instantiation rule (put simply, generate fresh names for
 each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha
-\lolli \alpha$ could be instanced \todo{instantiated} to
+\lolli \alpha$ could be instantiated to
 $\alpha0 \lolli \alpha0$. We add a rule for this:
 \begin{mathpar}
     \infer*[right=($\forall R$)]
@@ -691,11 +689,17 @@ where
     \tau'\ \textrm{is an \emph{instantiation} of type scheme}\ \forall
     \overline{\alpha}.\ \tau
 \]
-As such, the construction of a derivation in which, to some types, no specific rules can be applied (except for the \textsc{init} rule,
-a type variable can instance a goal that's a type variable of the same name),
-corresponds to the synthesis of a program where some expressions are treated
-agnostically -- nothing constrains their type, meaning the program is
-polymorphic * TODO: rewrite this?.\todo[inline]{Use an example.}
+%
+As such, the construction of a derivation in which, to some types, no specific
+rules can be applied (except for the \textsc{init} rule, a type variable can
+instance a goal that's a type variable of the same name), corresponds to the
+synthesis of a program where some expressions are treated agnostically --
+nothing constrains their type -- meaning the program is polymorphic. The
+simplest example is the polymorphic function \emph{id} of type $\forall \alpha
+.\ \alpha \lolli \alpha$. The
+program synthed from that specification is $\lambda x \rightarrow x$, a lambda
+abstraction that doesn't constrain its parameter $x$ in any way. \todo{R :
+rewrite this? não estranho?}
 
 The interesting challenge of polymorphism in synthesis is the usage of
 schemes from the unrestricted context.  To begin with, $\Gamma$ now
@@ -834,12 +838,12 @@ optimization technique that stores function calls and returns cached values for
 equal inputs. For our synth, two calls are equivalent when contexts $\Theta,
 \Rho, \Gamma, \Delta$, $\Omega$, (or alternatively the left focus), and the
 goal, are equivalent. Because comparing all of these is slow, our implementation
-hashes the relevant values and uses the result as the key. Using LogicT, a
-branch we want to memoize might fail -- it's desireable to also record that a
-synthesis fails, as it happens more than successful results. We capture failure
+hashes the relevant values and uses the result as the key. A
+branch we want to memoize might fail, not providing any result -- we also want
+to record synthesis failure, as it happens more often than successful results. We capture failure
 of a logict computation using the $ifte$ function and represent failure or
 success information with the Maybe type. We ran benchmarks to measure the impact
-of memoization on the performance. It's more noticeable in synthesis with
+of memoization on the performance. It's especially noticeable in synthesis with
 multiple functions in the unrestricted context, or more complex
 specifications:
 %
@@ -848,7 +852,8 @@ specifications:
         \hline
         Goal & Time + $\sigma$ & TimeM + $\sigma$ \\
         \hline
-        insertWithKey & 13.31 s ± 593.4 ms & 2.667 s ± 284.3 ms
+        insertWithKey & 13.31 s $\pm$ 593.4 ms & 2.667 s $\pm$ 284.3 ms \\
+        \hline
     \end{tabular}
 \end{center}
 
@@ -860,7 +865,7 @@ retrospective, however, when faced with a program that doesn't terminate, what
 went wrong is not so clear. While we were able to figure out a solution for the
 first couple of "infinite examples", the following problems were much harder,
 taking sometimes full days to solve (and as of now, some still remain unsolved,
-e.g. List (List a) -o List a). To make the debugging experience better, we
+e.g. List (List a) $\lolli$ List a). To make the debugging experience better, we
 developed a tracing system that prints information whenever a rule is applied,
 alongside the stack of rules applied up until that one. This improved our
 debugging speed considerably, especially when put together with a correct
