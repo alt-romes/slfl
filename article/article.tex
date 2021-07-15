@@ -43,16 +43,17 @@
 % General motivation?
 Program synthesis is an automated or semi-automated process of deriving a
 program, i.e.~generating code, from a high-level specification. Synthesis can be
-seen as a means to improve a programmer's productivity and program correctness
+seen as a means to improve programmer productivity and program correctness
 (e.g. through suggestion and autocompletion).
 %
-Specifications can take many forms: natural language~\cite{chen2021evaluating},
-examples~\cite{DBLP:conf/popl/FrankleOWZ16}, polymorphic refinement
-types~\cite{DBLP:conf/pldi/PolikarpovaKS16}, graded linear
-types~\cite{DBLP:conf/lopstr/HughesO20}, \emph{etc.}, but, regardless the kind of
-specification, program synthetisers have to deal with two main inherent sources
-of complexity -- searching over a vast space of (potentially) valid programs,
-and interpreting user intent.
+Specifications can take many forms such as natural
+language~\cite{chen2021evaluating},
+examples~\cite{DBLP:conf/popl/FrankleOWZ16} or rich types such as
+polymorphic refinement types~\cite{DBLP:conf/pldi/PolikarpovaKS16} or
+graded types~\cite{DBLP:conf/lopstr/HughesO20}. Regardless of the kind
+of specification, program synthesizers have to deal with two main
+inherent sources of complexity -- searching over a vast space of
+(potentially) valid programs, and interpreting user intent.
 
 Synthesis is said to be \emph{type-driven} when it uses types as a form of program
 specification and produces an expression whose type matches the specification.
