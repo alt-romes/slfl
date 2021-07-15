@@ -24,9 +24,10 @@
 \def\Rho{P}
 \newcommand{\te}[1]{\textrm{\emph{#1}}}
 
-% \usemintedstyle{lovelace}
-\usemintedstyle{murphy}
+\usemintedstyle{manni}
 
+% TODO: Temos de ter o título assim? ficava mais fixe sem o número e sem o
+% supervisor :P
 \title{Synthesis of Linear Functional Programs}
 \author{Rodrigo Mesquita - Nº 55902 \\
     Supervisor: Bernardo Toninho}
@@ -41,64 +42,102 @@
 
 % General motivation?
 Program synthesis is an automated or semi-automated process of deriving a
-program (i.e.~generating code) from a high-level specification.
+program, i.e.~generating code, from a high-level specification. Synthesis can be
+seen as a means to improve a programmer's productivity and program correctness
+(e.g. through suggestion and autocompletion).
 %
-Synthesis can be seen as a means to improve a programmer's productivity and/or
-program correctness (e.g. through suggestion and/or autocompletion), or as a
-tool to automate certain parts of the programming process, to name a few
-examples.
-% TODO: Escrever um início melhor
+Specifications can take many forms: natural language~\cite{chen2021evaluating},
+examples~\cite{DBLP:conf/popl/FrankleOWZ16}, polymorphic refinement
+types~\cite{DBLP:conf/pldi/PolikarpovaKS16}, graded linear
+types~\cite{DBLP:conf/lopstr/HughesO20}, \emph{etc.}, but, regardless the kind of
+specification, program synthetisers have to deal with two main inherent sources
+of complexity -- searching over a vast space of (potentially) valid programs,
+and interpreting user intent.
 
-
-Specifications can take many forms (e.g.  polymorphic refinement
-types~\cite{DBLP:conf/pldi/PolikarpovaKS16},
-examples~\cite{DBLP:conf/popl/FrankleOWZ16}, graded linear
-types~\cite{DBLP:conf/lopstr/HughesO20}).  Regardless of the kind of
-specification, program synthesizers have to deal with two main inherent sources
-of complexity: searching over a vast space of (potentially) valid programs, and
-interpreting user intent.
+Synthesis is said to be \emph{type-driven} when it uses types as a form of program
+specification and produces an expression whose type matches the specification.
+Type-driven synthesis frameworks usually leverage rich types as a way to make
+specifications more expressive and prune the valid programs search space, while
+maintaining a ``familiar'' specification interface (types) for the user.
 %
-In this work we'll explore type-based synthesis where specifications take the
-form of linear types, which limit resource usage in programs, in combination
-with polymorphism and refinements.  Concretely, we will explore the proof-theoretic foundations
-of linear types via the Curry-Howard correspondence with linear logic, viewing
-program synthesis under the lens of (linear logic) bottom-up proof search.
-
+Richer type systems allow for more precise types, which can statically eliminate
+various kinds of logical errors by making certain invalid program states
+ill-typed (e.g.,~a ``null aware'' type system will ensure at compile-time that
+you cannot dereference a null-pointer).
 %
-
-\mypara{Type-Based Synthesis}
-% Type based synthesis
-Type-based synthesis uses types as a form of program specification,
-automatically or semi-automatically producing a program expression
-with the given type and so matching the specification.
+% However, they can also be a burden -- the whole point of these type systems is
+% to ensure that \emph{fewer} programs are deemed well-typed, which can pose
+% additional challenges to the development process.
 %
-In order to make type-based specifications more expressive, type-based
-synthesis frameworks use rich type systems such as refinement
-types~\cite{DBLP:conf/pldi/PolikarpovaKS16} and polymorphic types~\cite{DBLP:conf/pldi/PolikarpovaKS16}.
+For instance, the type $\mathsf{Int} \rightarrow \mathsf{Int} \rightarrow
+\mathsf{Int}$ specifies a (curried) function that takes two integers and
+produces an integer. Viewed as a specification, it is extremely imprecise (there
+are an infinite number of functions that satisfy this specification).  However,
+the richer type $(x{:}\mathsf{Int}) \rightarrow (y{:}\mathsf{Int}) \rightarrow
+\{z{:}\mathsf{Int} \mid z = x+y\}$ very precisely specifies a function that
+takes integer arguments $x$ and $y$ and returns an integer $z$ that is the sum
+of $x$ and $y$. 
 
-Richer type systems allow for more precise types, which can
-statically eliminate various kinds of logical errors by making certain
-invalid program states ill-typed (e.g.,~a ``null aware'' type system,
-will ensure at compile-time that you cannot dereference a
-null-pointer). However, they can also be a burden -- the whole point
-of these type systems is to ensure that \emph{fewer} programs are
-deemed well-typed, which can pose additional challenges to the
-development process. Type-based synthesis leverages rich types as a
-way of pruning the search space, and by using types the user 
-is given a more ``familiar'' specification interface. For instance, the type
-$\mathsf{Int} \rightarrow \mathsf{Int} \rightarrow \mathsf{Int}$
-specifies a (curried) function that takes two integers and produces an
-integer. Viewed as a specification, it is extremely imprecise (there
-are an infinite number of functions that satisfy this specification).
-However, the richer type $(x{:}\mathsf{Int}) \rightarrow
-(y{:}\mathsf{Int}) \rightarrow \{z{:}\mathsf{Int} \mid z = x+y\}$
-very precisely specifies a function that takes integer arguments $x$
-and $y$ and returns an integer $z$ that is the sum of $x$ and $y$. 
-
+The focus of our work is on type-driven synthesis where specifications take the
+form of linear types.
 %
-This work explores the synthesis of linear functional
-programs from types based on linear logic propositions (i.e.~linear
-types) by leveraging the Curry-Howard correspondence. 
+% TODO: Deixar isto para mais à frente?  More concretely, we will explore the
+% proof-theoretic foundations of linear types via the Curry-Howard
+% correspondence with linear logic propositions, viewing program synthesis as
+% proof search in linear logic.  (Said correspondence maps \emph{types} to
+% \emph{propositions in a logic}, and \emph{programs} to \emph{proofs}).
+%
+Linear types differ from more traditional types in that they constrain resource
+usage in programs by \emph{statically} limiting the number of times certain
+resources can be used during their lifetime (linear resources must be used
+\emph{exactly once}).
+%
+They can be applied to resource-aware programming such as concurrent programming
+(e.g. session types for message passing
+concurrency~\cite{DBLP:journals/mscs/CairesPT16}), memory-management
+(e.g.~Rust's ownership types), safely updating-in-place mutable
+structures~\cite{Bernardy_2018}, enforcing protocols for external \textsc{api}s~\cite{Bernardy_2018}, to name a few.
+% TODO: Repensar esta parte dos exemplos de aplicação e de como podemos
+% relacionar o nosso trabalho com futuras aplicações nestes campos
+
+Despite their long-known potential (\emph{linear types can change the
+world!}\cite{Wadler90lineartypes}, \cite{DBLP:journals/mscs/CairesPT16,Bernardy_2018}) and,
+primarily, strong proof-theoretic
+foundations \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00}, synthesis of linear functional programs
+from linear types hasn't been previously explored in an extended context (e.g.
+with recursion, polymorphism, ...).
+%TODO: Sinto que faltam algumas palavras aqui..
+
+In this paper we present a framework for synthesis of linear types extended with
+recursive algebraic data types, parametric polymorphism and refinements.
+% TODO: extensible? proving feasability of... ? showing potential for ... ?
+
+First, we discuss the use of linear types as specifications, the outline of the
+synthesis process, and what that entails for the synthetiser -- ilustrated with
+concrete results (Section~\ref{sec:overview}). Then, we present the
+algorithm and formal system driving the synthesis
+(Section~\ref{sec:formal_system}). Aftwerwards, we describe the architecture 
+of our synthetiser named \synname, and examine technical details and challenges of the
+implementation (Section~\ref{sec:architecture}). Finally, we evaluate our work
+through expressiveness benchmarks (i.e.~can we synth $X$?) and time benchmarks
+(i.e.~how fast can we synth a term of type $T$?) (Section~\ref{sec:evaluation}).
+
+
+% TODO: Why linear types?
+
+
+%%
+
+
+%%
+%This work explores the synthesis of linear functional
+%programs from types based on linear logic propositions (i.e.~linear
+%types) by leveraging the Curry-Howard correspondence. 
+
+
+
+
+
 
 % It
 % states that propositions in a logic have a direct
@@ -110,13 +149,6 @@ types) by leveraging the Curry-Howard correspondence.
 % allows us to inform our work with approaches from the relevant 
 % literature.
 
-Linear types differ from more traditional types in
-that they constrain resource usage in programs by \emph{statically}
-limiting the number of times certain resources can be used during
-their lifetime.  They can be applied to resource-aware programming
-such as concurrent programming (e.g. session types for message passing
-concurrency~\cite{DBLP:journals/mscs/CairesPT16}), and to memory-management (e.g.~Rust's ownership
-types).
 
 %\mypara{Goals}
 % % Goals
@@ -135,25 +167,47 @@ types).
 
 
 
-\section{Overview}
+\section{Overview}\label{sec:overview}
 
-Escrever introdução melhor que tenha isto como seguimento...e que siga duma
-introdução extendida
+The \synname\ synthetiser combines the features of linear types, recursion,
+parametric polymorphism, recursive polymorphic? algebraic data types, and
+refinement types.
+
+The \synname\ language is an extension of the linear $\lambda$-calculus.
+
+... in proof search, our programs are correct by construction -- if
+we were able to synth it, then it typechecks.
+
+Linear types provide a more certain specification, when compared to simple
+traditional types. By requiring some types to be used linearly (consumed) we can
+assure, for example, the deconstruction of an ADT. Given the goal $\bang(a \lolli b)
+\lolli List\ a \lolli List\ b$, the program $\lambda x. \lambda y. Nil$ wouldn't
+be valid. To synthetise a valid program, $List\ a$
+would have to be deconstructed, and its constructor arguments used, resulting
+in the map function without relying on any additional information:
+
+\begin{minted}{haskell}
+map c d = let !e = c in
+    case d of
+          Nil  -> Nil
+        | Cons f ->
+            let g*h = f in Cons (e g, map (!e) h);
+\end{minted}
+
 
 At the core of the synthesis process, and of the developed synthetiser \synname,
 is a \emph{sound} and \emph{complete?} system of focusing for linear logic with
-resource management. It connects the concepts seen in
-background~\ref{sec:background} -- a type system
-consisting of inference rules in sequent calculus for linear logic connectives;
-with resource management, and focusing, as formalized techniques to,
-respectively, solve resource related non-determinism, and to eliminate from the
-proof search don't-care non-determinism.  Guided solely by this system's formal
+resource management -- a type system consisting of inference rules in sequent
+calculus for linear logic connectives; with resource management, and focusing,
+as formalized techniques to, respectively, solve resource related
+non-determinism, and to eliminate from the proof search don't-care
+non-determinism.  Guided solely by this system's formal
 representation\ref{sec:formal_system}, we can (and did) create a very robust
 synthetiser for a select part of the linear types that's able to synthetise
-programs successfully from e.g. the major linear logic equivalences. For example,
-given the specification $(A \lolli (B \lolli C)) \lolli (A \tensor B) \lolli C$,
-the program $\lambda a .\ \lambda b .$ let $c \tensor d$ =
-$b$ in $a$ $c$ $d$ (commonly known as \emph{uncurry}) is synthetised.
+programs successfully from e.g. the major linear logic equivalences. For
+example, given the specification $(A \lolli (B \lolli C)) \lolli (A \tensor B)
+\lolli C$, the program $\lambda a .\ \lambda b .$ let $c \tensor d$ = $b$ in $a$
+$c$ $d$ (commonly known as \emph{uncurry}) is synthetised.
 
 The \synname\ programming language is naturally born alongside the synthetiser
 to create an environment for it. Synth goals are inserted in the program by use
@@ -651,8 +705,8 @@ solutions.  Instead, our framework allows the use of recursion only after having
 deconstructed a recursive ADT. To avoid complicating the rules, we'll add the
 invariant: the recursive hypothesis can only be \textbf{used in recursive branches of
 ADT deconstruction}, i.e. the recursive call should only take "smaller", recursive,
-hypothesis as arguments. To illustrate, having $\textrm{data List} =
-\textrm{Nil}\ \vert\ \textrm{Cons}\ (A * \textrm{List})$, recursion is only
+hypothesis as arguments. To illustrate, having \mintinline{haskell}{data List =
+Nil | Cons (A * List)}, recursion is only
 "available" when deconstructing ($\textrm {List} \vdash C$), and only in
 the \emph{Cons} branch. % (TODO: rewrite? O bold é meio estranho não?)
 
@@ -768,7 +822,7 @@ where
 
 
 
-\section{Architecture}
+\section{Architecture}\label{sec:architecture}
 
 The \synname\ synthetiser operates as part of the pipeline that processes a
 full program in the \synname\ language, and is called to generate parts marked
@@ -852,7 +906,9 @@ context, or more complex specifications:
     \end{tabular}
 \end{center}
 %
-The details of the memoization are very subject to change
+The implementation could be improved by better combining the
+memoization with the LogicT monad transformer (remembering decisions across
+backtracking branches) and by finetuning key-equality for polymorphic types.
 
 
 
@@ -1061,18 +1117,18 @@ types).
 %usability, expand the language domain, and add features such as those
 %mentioned above.
 
-\mypara{Evaluation} Validation and evaluation of our work is fairly
-easy. Simple questions such as \emph{does it typecheck}? \emph{can
-  we synthesize}? \emph{how fast}?  are the core of our evaluation. In
-more concrete terms, we can compare our times to state of the art
-synthetizers, present a list of working examples of programs synthesized
-by our framework, and corresponding benchmarks.
+% \mypara{Evaluation} Validation and evaluation of our work is fairly
+% easy. Simple questions such as \emph{does it typecheck}? \emph{can
+%   we synthesize}? \emph{how fast}?  are the core of our evaluation. In
+% more concrete terms, we can compare our times to state of the art
+% synthetizers, present a list of working examples of programs synthesized
+% by our framework, and corresponding benchmarks.
 
-On the eventual addition of recursive functions, refinement types, and
-interactive synthesis, we'll consider, respectively, other examples to
-showcase recursive functions synthesis, updated times for benchmarks
-with refinement types, and a display of the possible user interaction
-in the user process, and the resulting function following it.
+% On the eventual addition of recursive functions, refinement types, and
+% interactive synthesis, we'll consider, respectively, other examples to
+% showcase recursive functions synthesis, updated times for benchmarks
+% with refinement types, and a display of the possible user interaction
+% in the user process, and the resulting function following it.
 
 
 % Expand on earlier points. Start from a functional language with linear types
@@ -1089,7 +1145,7 @@ in the user process, and the resulting function following it.
 % can you synth? how fast?
 
 
-\section{Evaluation}
+\section{Evaluation}\label{sec:evaluation}
 
 The benchmarks are separated into groups: theorems of linear logic, recursive
 ADTs, refinements. For each goal we analyze if the synthesis process terminated
@@ -1140,6 +1196,9 @@ resulting program fullfills its intended purpose
         \hline
     \end{tabular}
 \end{center}
+
+
+Synthesis of 
 
 
 \section{Background}\label{sec:background}
