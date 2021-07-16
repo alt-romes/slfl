@@ -143,8 +143,8 @@ addbinaryrestriction tag ty ty' = local (\ (rs, adtds, d, t, e) -> ((tag, Left (
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    -- trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-    local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
+    trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+        local (\(a,b,c,d,e) -> (a,b,c+1,t:d,e)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
@@ -164,14 +164,14 @@ checkrestrictions tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construc
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
     subs <- getsubs
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
-    let b = ty `notElem` reslist && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
+    let b = ty `notElem` reslist && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
     -- trace ("Is " ++ show ty ++ " (" ++ show (apply subs ty) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
     return b
 
 checkrestrictions' :: Restrictions -> RestrictTag -> Type -> Synth Bool
 checkrestrictions' rs tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construction and Destruction
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
-    return $ ty `notElem` reslist && not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist)
+    return $ ty `notElem` reslist && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
 
 
 getres :: Synth Restrictions
@@ -183,7 +183,7 @@ checkbinaryrestrictions tag typair = do
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
     subs <- getsubs
     let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs
-    let b = typair `notElem` reslist && all ((not . isExistentialType) . snd) reslist
+    let b = typair `notElem` reslist && (not (isExistentialType $ snd typair) || all ((not . isExistentialType) . snd) reslist)
     -- trace ("Is " ++ show typair  ++ " (" ++ show (apply subs typair) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
     return b
 
@@ -625,8 +625,8 @@ focus c goal =
                  _ -> False
               then do
                   let (ADT tyn' tps') = goal
-                  zipWithM_ unifyadtparams tps tps'
-                  return (Var n, d)
+                  trace ("Unifying " ++ show (ADT tyn tps) ++ " with " ++ show (ADT tyn' tps')) $ zipWithM_ unifyadtparams tps tps'
+                  trace "Successful unification!" $ return (Var n, d)
               else do
                   adtcns <- getadtcons (ADT tyn tps) 
                   guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop

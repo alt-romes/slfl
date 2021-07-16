@@ -172,7 +172,7 @@ unifyExistential (ADT x ts) (ADT y ts') =
        else Nothing
 unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
-unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Nothing
+unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
 unifyExistential (ExistentialTypeVar x) y =
     if (-x) `notElem` ftv y then Just $ Map.singleton (-x) y else Nothing
 unifyExistential x (ExistentialTypeVar y) =

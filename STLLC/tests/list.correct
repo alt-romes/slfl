@@ -48,7 +48,7 @@ foldr c d e = let !f = c in
 insert :: forall a . (a -o (List a -o List a));
 insert b c = case c of 
       Nil  -> Cons (b, Nil)
-    | Cons m -> 
-        let n*o = m in Cons (n, insert b o);
+    | Cons s -> 
+        let t*u = s in Cons (t, insert b u);
 
 
