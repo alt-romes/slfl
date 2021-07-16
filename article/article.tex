@@ -121,21 +121,11 @@ of our synthetiser named \synname, and examine technical details and challenges 
 implementation (Section~\ref{sec:architecture}). Finally, we evaluate our work
 through expressiveness benchmarks (i.e.~can we synth $X$?) and time benchmarks
 (i.e.~how fast can we synth a term of type $T$?) (Section~\ref{sec:evaluation}).
+%TODO: And appendice with...
 
-
-% TODO: Why linear types?
-
-
-%%
-
-
-%%
 %This work explores the synthesis of linear functional
 %programs from types based on linear logic propositions (i.e.~linear
 %types) by leveraging the Curry-Howard correspondence. 
-
-
-
 
 % It
 % states that propositions in a logic have a direct
@@ -146,7 +136,6 @@ through expressiveness benchmarks (i.e.~can we synth $X$?) and time benchmarks
 % type. Formulating synthesis as proof search in linear logic
 % allows us to inform our work with approaches from the relevant 
 % literature.
-
 
 %\mypara{Goals}
 % % Goals
@@ -163,24 +152,60 @@ through expressiveness benchmarks (i.e.~can we synth $X$?) and time benchmarks
 %expressiveness benchmarks (i.e. can we synthesize a term of type $T$?) and time
 %measurements (i.e. how fast can we synthesize a term of type $T$?').
 
-
-
 \section{Overview}\label{sec:overview}
 
-The \synname\ synthetiser combines the features of linear types, recursion,
+% TODO: Why linear types?
+The \synname\ synthetiser combines the features of linear types with recursion,
 parametric polymorphism, recursive polymorphic? algebraic data types, and
-refinement types.
+refinement types. The synthetiser is built on top of a system of proof-search in
+linear logic. Proof-search relates to program synthesis through the Curry-Howard
+correspondence~\cite{}, which states that \emph{propositions in a logic} map
+directly to \emph{types}, and \emph{proofs} of those propositions to well-typed
+\emph{programs} -- finding a proof of a proposition is finding a program with
+that type.
 
-The \synname\ language is an extension of the linear $\lambda$-calculus.
+The core of the synthesis is a \emph{sound} and \emph{complete} system
+consisting of \emph{bottom-up} proof search in linear logic augmented with
+resource management~\cite{} and focusing~\cite{} as techniques to, respectively,
+solve resource related non-determinism, and eliminate from the proof-search
+don't-care non-determinism. A more in depth explanation is in
+section~\ref{sec:formal_system}.
 
-... in proof search, our programs are correct by construction -- if
-we were able to synth it, then it typechecks.
+With the core in place, we can synthetise programs from specifications that use
+canonical linear types ($\lolli, \with, \tensor, 1, \oplus, \bang$), such as
+fundamental linear logic equivalences. For example, given the specification $(A
+\lolli (B \lolli C)) \lolli (A \tensor B) \lolli C$, the program
+\mintinline{haskell}{\a -> \b -> let c*d = b in a c d}
+% $\lambda a .\ \lambda b .$ let $c \tensor d$ = $b$ in $a$ $c$ $d$
+(commonly known as \emph{uncurry}) is synthetised.
+
+However, a programming language only with the canonical linear types lacks
+expressiveness. To enhance \synname\ and its language, synthetise more
+interesting programs -- and thus empirically prove the feasability of more
+relevant synthesis in a linear context, we extend the syntax and type system
+with recursiveness and richer types: -- polimorfic, refinements, adts
+parametrizáveis...  todo
+
+The \synname\ programming language is naturally born alongside the synthetiser
+to create an environment for it. Synth goals are inserted in the program by use
+of a \emph{synth} keyword or syntatic \emph{mark}, indicating a program should
+be generated for a given type. Additionally, it opens the possibility of synthesis with
+context, that is, with knowledge of other functions and structures defined in
+the same program.
+
+All additions to the synthesis are extensions of the proof-search in linear
+logic system -- in the end, the process still consists of constructing a proof.
+Because we can only construct valid proofs (a wrong proof isn't a proof), we
+know that all produced synthesis results are correct: \textbf{all programs are
+correct by construction}, i.e. if we're able to synthetise it, then it typechecks,
+and therefore fullfills the specification.
 
 Linear types provide a more certain specification, when compared to simple
 traditional types. By requiring some types to be used linearly (consumed) we can
 assure, for example, the deconstruction of an ADT. Given the goal $\bang(a \lolli b)
-\lolli List\ a \lolli List\ b$, the program $\lambda x. \lambda y. Nil$ wouldn't
-be valid. To synthetise a valid program, $List\ a$
+\lolli List\ a \lolli List\ b$, the program \mintinline{haskell}{\x -> \y ->
+Nil} wouldn't be valid. To synthetise a valid program,
+\mintinline{haskell}{List a}
 would have to be deconstructed, and its constructor arguments used, resulting
 in the map function without relying on any additional information:
 
@@ -191,36 +216,6 @@ map c d = let !e = c in
         | Cons f ->
             let g*h = f in Cons (e g, map (!e) h);
 \end{minted}
-
-
-At the core of the synthesis process, and of the developed synthetiser \synname,
-is a \emph{sound} and \emph{complete?} system of focusing for linear logic with
-resource management -- a type system consisting of inference rules in sequent
-calculus for linear logic connectives; with resource management, and focusing,
-as formalized techniques to, respectively, solve resource related
-non-determinism, and to eliminate from the proof search don't-care
-non-determinism.  Guided solely by this system's formal
-representation\ref{sec:formal_system}, we can (and did) create a very robust
-synthetiser for a select part of the linear types that's able to synthetise
-programs successfully from e.g. the major linear logic equivalences. For
-example, given the specification $(A \lolli (B \lolli C)) \lolli (A \tensor B)
-\lolli C$, the program $\lambda a .\ \lambda b .$ let $c \tensor d$ = $b$ in $a$
-$c$ $d$ (commonly known as \emph{uncurry}) is synthetised.
-
-The \synname\ programming language is naturally born alongside the synthetiser
-to create an environment for it. Synth goals are inserted in the program by use
-of a \emph{synth} keyword or syntatic \emph{mark}, indicating a program should
-be generated for a given, or inferred, type. Synth results are functions in this
-language's syntax. Additionally, it opens the possibility of synthetisis with
-context, that is, with knowledge of other functions and eventual structures
-defined in the same program.
-
-However, a programming language only with the canonical linear types lacks
-expressiveness. To enhance \synname\ and its language, synthetise more interesting
-programs -- and thus empirically prove the feasability of more relevant
-synthesis in a linear context, we extend the syntax and type system with
-recursiveness and richer
-types: -- polimorfic, refinements, adts parametrizáveis...  todo
 
 
 \section{Synthesis Framework}\label{sec:formal_system}
@@ -680,6 +675,12 @@ following rules ensure this:
 % exemplo em que seja crucial. pode ser uma coisa que tenha ficado para resolver
 % uma coisa antiga que ficou resolvida mais tarde com outra modificação e então
 % é agora inutil. Talvez seja demais adicionar à regra
+%
+Finally, these rules end up ensuring that a recursive ADT will deconstruct
+itself once, and move the recursive argument from its constructor to the linear
+context -- essentially forcing it to be used as a function argument, and most
+usually that function will be the synthesis recursive call.
+
 
 \mypara{Recursion} The main idea behind synthesis of recursive programs is the
 labeling of the main goal and the addition of its type, under that name, to the

@@ -115,9 +115,9 @@ instance (Show Expr) where
             showexpr' d (Fst e) = "(fst " ++ showexpr' d e ++ ")"
             showexpr' d (Snd e) = "(snd " ++ showexpr' d e ++ ")"
             -- showexpr' d (InjL (Just t) e) = "inl " ++ showexpr' d e ++ " : " ++ show t
-            showexpr' d (InjL _ e) = "inl " ++ showexpr' d e 
+            showexpr' d (InjL _ e) = "inl (" ++ showexpr' d e ++ ")"
             -- showexpr' d (InjR (Just t) e) = "inr " ++ show t ++ " : " ++ showexpr' d e
-            showexpr' d (InjR _ e) = "inr " ++ showexpr' d e
+            showexpr' d (InjR _ e) = "inr (" ++ showexpr' d e ++ ")"
             showexpr' d (CaseOfPlus e1 x e2 y e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
                                                         indent (d+1) ++ "  inl " ++ x ++ " -> " ++ showexpr' (d+2) e2 ++
                                                         indent (d+1) ++ "| inr " ++ y ++ " -> " ++ showexpr' (d+2) e3
