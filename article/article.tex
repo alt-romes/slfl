@@ -109,10 +109,13 @@ from linear types hasn't been previously explored in an ``advanced'' context (e.
 with recursion, polymorphism, ...).
 %TODO: Sinto que faltam algumas palavras aqui..
 
+\paragraph{Contributions}
 In this paper we present a framework for synthesis of linear types extended with
 recursive algebraic data types, parametric polymorphism and refinements.
 % TODO: extensible? proving feasability of... ? showing potential for ... ?
 
+
+\paragraph{Outline}
 First, we discuss the use of linear types as specifications, the outline of the
 synthesis process, and what that entails for the synthetiser -- ilustrated with
 concrete results (Section~\ref{sec:overview}). Then, we present the
@@ -157,7 +160,7 @@ through expressiveness benchmarks (i.e.~can we synth $X$?) and time benchmarks
 
 % TODO: Why linear types?
 The \synname\ synthetiser combines the features of linear types with recursion,
-parametric polymorphism, recursive polymorphic? algebraic data types, and
+parametric polymorphism, recursive algebraic data types, and
 refinement types. The synthetiser is built on top of a system of proof-search in
 linear logic. Proof-search relates to program synthesis through the Curry-Howard
 correspondence~\cite{}, which states that \emph{propositions in a logic} map
@@ -166,13 +169,22 @@ directly to \emph{types}, and \emph{proofs} of those propositions to well-typed
 that type.
 
 The core of the synthesis is a \emph{sound} and \emph{complete} system
-consisting of \emph{bottom-up} proof search in linear logic augmented with
-resource management~\cite{} and focusing~\cite{} as techniques to, respectively,
-solve resource related non-determinism, and eliminate from the proof-search
-don't-care non-determinism. A more in depth explanation is in
-section~\ref{sec:formal_system}.
+consisting of \emph{bottom-up} proof search in propositional linear
+logic based on \emph{focusing}~\cite{}. Our approach, being grounded
+by propositions-as-types, ensures that all synthesized programs
+(i.e.~proofs) are well-typed \emph{by construction} (i.e.~if the
+synthesis procedure terminates, then the program satisfies its
+specification). Moreover, we can leverage the modularity of the
+proof-search based approach in two key axes: first, since proof search
+need not construct only closed proofs, we can effectively synthesize
+program sub-expressions (i.e.~synthesis based on typed holes);
+secondly, the framework is amenable to extension beyond the core
+propositional language, employing a richer type structure that
+includes polymorphism, algebraic data types and type refinements.
 
-With the core in place, we can synthetise programs from specifications that use
+
+\paragraph{A core linear calculus.}
+we can synthetise programs from specifications that use
 canonical linear types ($\lolli, \with, \tensor, 1, \oplus, \bang$), such as
 fundamental linear logic equivalences. For example, given the specification $(A
 \lolli (B \lolli C)) \lolli (A \tensor B) \lolli C$, the program
@@ -180,6 +192,8 @@ fundamental linear logic equivalences. For example, given the specification $(A
 % $\lambda a .\ \lambda b .$ let $c \tensor d$ = $b$ in $a$ $c$ $d$
 (commonly known as \emph{uncurry}) is synthetised.
 
+
+\paragraph{Beyond propositional logic.}
 However, a programming language only with the canonical linear types lacks
 expressiveness. To enhance \synname\ and its language, synthetise more
 interesting programs -- and thus empirically prove the feasability of more
@@ -194,12 +208,6 @@ be generated for a given type. Additionally, it opens the possibility of synthes
 context, that is, with knowledge of other functions and structures defined in
 the same program.
 
-All additions to the synthesis are extensions of the proof-search in linear
-logic system -- in the end, the process still consists of constructing a proof.
-Because we can only construct valid proofs (a wrong proof isn't a proof), we
-know that all produced synthesis results are correct: \textbf{all programs are
-correct by construction}, i.e. if we're able to synthetise it, then it typechecks,
-and therefore fullfills the specification.
 
 Linear types provide a more certain specification, when compared to simple
 traditional types. By requiring some types to be used linearly (consumed) we can
@@ -1201,6 +1209,15 @@ resulting program fullfills its intended purpose
 Synthesis of 
 
 
+
+
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+
+\appendix
+
 \section{Background}\label{sec:background}
 
 \mypara{Type Systems} A type system can be formally described through
@@ -1457,7 +1474,4 @@ non-determinism that pertains to unknowns (or ``don't know''
 non-determinism), identifying precisely the points at which
 backtracking is necessary.
 
-
-\bibliographystyle{splncs04}
-\bibliography{references}
 \end{document}
