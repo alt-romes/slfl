@@ -30,8 +30,8 @@ import Typechecker (instantiateFrom)
 type Gamma = [(Name, Either Scheme Type)] -- Unrestricted hypothesis              (Γ)
 type Delta = [(Name, Type)]       -- Linear hypothesis (not left asynchronous)    (Δ)
 type Omega = [(Name, Type)]       -- Ordered (linear?) hypothesis                 (Ω)
-type Ctxt = (Gamma, Delta, Omega)   -- Delta out is a return value
-type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
+type Ctxt = (Subst, Gamma, Delta, Omega)   -- Delta out is a return value
+type FocusCtxt = (Subst, Gamma, Delta)     -- Gamma, DeltaIn
 
 -------------------------------------------------------------------------------
 -- Synth "Monad"
@@ -40,7 +40,7 @@ type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 type Synth a = LogicT (StateT SynthState (ReaderT SynthReaderState IO)) a 
 
 
-type SynthState = (MemoTable, Subst, Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
+type SynthState = (MemoTable, Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)
 type MemoTable = Map.Map Int (Maybe (Expr, Delta, Subst, Int))
 
 
@@ -58,12 +58,12 @@ data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type 
 
 runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> IO ([Expr], MemoTable)
 runSynth n (g, d) t st adtds = do
-    (exps_deltas, (memot, _, _)) <- runReaderT (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds
+    (exps_deltas, (memot, _)) <- runReaderT (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds
     return (map fst exps_deltas, memot)
 
     where
         synthComplete (g, d, o) t = do
-            (e, d') <- memoizesynth synth (recf, d, o) t <|> memoizesynth synth (g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
+            (e, d', _) <- memoizesynth synth (Map.empty, recf, d, o) t <|> memoizesynth synth (Map.empty, g, d, o) t -- first try synth only with the recursive function in the gamma context instead of the whole program
             guard $ null d'
             return (e, d')
 
@@ -73,7 +73,7 @@ runSynth n (g, d) t st adtds = do
 
 
 initSynthState :: MemoTable -> Int -> SynthState
-initSynthState mt i = (mt, Map.empty, i)
+initSynthState mt i = (mt, i)
 
 
 initSynthReaderState :: Name -> [ADTD] -> SynthReaderState
@@ -87,49 +87,48 @@ initSynthReaderState n a = ([], a, 0, [], (n, False))
 -- Functions
 -------------------------------------------------------------------------------
 
-memoize :: Maybe (Maybe (Either (String, Scheme) (String, Type))) -> Ctxt -> Type -> Synth (Expr, Delta) -> Synth (Expr, Delta)
+memoize :: Maybe (Maybe (Either (String, Scheme) (String, Type))) -> Ctxt -> Type -> Synth (Expr, Delta, Subst) -> Synth (Expr, Delta, Subst)
 memoize maybefocus c t syn = do -- TODO: Can possibly be improved/optimized if we look at the existential type vars and restrictions... perhaps the hash function can play a role in it...
-    (memot, cs, i) <- lift get
+    (memot, i) <- lift get
     res <- getres
-    let key = hash c + hash (Map.toList cs) + hash res + hash t + hash maybefocus
+    let key = hash ((\(cs,g,d,o) -> (Map.toList cs, g, d, o)) c) + hash res + hash t + hash maybefocus
     case Map.lookup key memot of
        Nothing -> do        -- If this synth hasn't been previously done -- run it and save the resulting values and state
            ifte syn
-             (\(e, d') -> do
-                 lift $ modify $ \(memot', cs', i') -> (Map.insert key (Just (e, d', cs', i'-i)) memot', cs', i')
-                 return (e, d'))
-             (do lift $ put (Map.insert key Nothing memot, cs, i)
+             (\(e, d', cs') -> do
+                 lift $ modify $ \(memot', i') -> (Map.insert key (Just (e, d', cs', i'-i)) memot', i')
+                 return (e, d', cs'))
+             (do lift $ put (Map.insert key Nothing memot, i)
                  empty)
        Just Nothing -> -- trace ("Speed up by skipping synth of " ++ show t)
            empty
        Just (Just (e, d', cs', deltai)) -> do 
            -- trace ("Speed up by skipping synth of " ++ show t ++ " and returning " ++ show e) $
-           lift $ put (memot, cs', i + deltai)
-           return (e, d') -- TODO: I think this has some issues with variable names that might collide
+           lift $ put (memot, i + deltai)
+           return (e, d', cs') -- TODO: I think this has some issues with variable names that might collide
 
-memoizesynth :: (Ctxt -> Type -> Synth (Expr, Delta)) -> Ctxt -> Type -> Synth (Expr, Delta)
+memoizesynth :: (Ctxt -> Type -> Synth (Expr, Delta, Subst)) -> Ctxt -> Type -> Synth (Expr, Delta, Subst)
 memoizesynth syn c ty = memoize Nothing c ty (syn c ty)
 
-memoizefocus :: (FocusCtxt -> Type -> Synth (Expr, Delta)) -> FocusCtxt -> Type -> Synth (Expr, Delta)
-memoizefocus synf c@(g, d) ty = memoize Nothing (g, d, []) ty (synf c ty)
+memoizefocus :: (FocusCtxt -> Type -> Synth (Expr, Delta, Subst)) -> FocusCtxt -> Type -> Synth (Expr, Delta, Subst)
+memoizefocus synf c@(cs, g, d) ty = memoize Nothing (cs, g, d, []) ty (synf c ty)
 
-memoizefocus' :: (Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)) -> Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)
-memoizefocus' syn fty c@(g, d) ty = memoize (Just (Right <$> fty)) (g, d, []) ty (syn fty c ty)
+memoizefocus' :: (Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta, Subst)) -> Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta, Subst)
+memoizefocus' syn fty c@(cs, g, d) ty = memoize (Just (Right <$> fty)) (cs, g, d, []) ty (syn fty c ty)
 
-memoizefocusSch :: ((String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta)) -> (String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta)
-memoizefocusSch syn fty c@(g, d) ty = memoize (Just (Just (Left fty))) (g, d, []) ty (syn fty c ty)
+memoizefocusSch :: ((String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta, Subst)) -> (String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta, Subst)
+memoizefocusSch syn fty c@(cs, g, d) ty = memoize (Just (Just (Left fty))) (cs, g, d, []) ty (syn fty c ty)
 
 
 allowrecursion :: Synth a -> Synth a
 allowrecursion = local (\(a,b,c,d,(fn, _)) -> (a,b,c,d,(fn, True)))
 
 
-addconstraint :: Constraint -> Synth ()
-addconstraint c = do
-    (m, subs, i) <- lift get
+addconstraint :: Subst -> Constraint -> Synth Subst
+addconstraint subs c = do
     let maybesubs = solveconstraintsExistential subs c
     guard $ isJust maybesubs
-    lift $ put (m, fromJust maybesubs, i)
+    return $ fromJust maybesubs
 
 
 addrestriction :: RestrictTag -> Type -> Synth a -> Synth a
@@ -162,7 +161,6 @@ getRecInfo = lift (lift ask) >>= \(a,b,c,d,ra) -> return ra
 checkrestrictions :: RestrictTag -> Type -> Synth Bool
 checkrestrictions tag ty@(ADT tyn tpl) = do -- Restrictions only on ADT Construction and Destruction
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
-    subs <- getsubs
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs
     let b = ty `notElem` reslist && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
     -- trace ("Is " ++ show ty ++ " (" ++ show (apply subs ty) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
@@ -181,7 +179,6 @@ getres = lift (lift ask) >>= \(a,b,c,d,e) -> return a
 checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Synth Bool
 checkbinaryrestrictions tag typair = do
     rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
-    subs <- getsubs
     let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs
     let b = typair `notElem` reslist && (not (isExistentialType $ snd typair) || all ((not . isExistentialType) . snd) reslist)
     -- trace ("Is " ++ show typair  ++ " (" ++ show (apply subs typair) ++ ") restricted by any of " ++ show reslist ++ " ? -> " ++ show (not b)) $
@@ -198,25 +195,17 @@ getadtcons (ADT tyn tps) = do
       Nothing -> return []
 
 
-getsubs :: Synth Subst
-getsubs = (\(a,b,c) -> b) <$> lift get
-
-
-clearsubs :: Subst -> Synth ()
-clearsubs previousSubst = modify (\(m, s, i) -> (m, previousSubst, i))
-
-
 fresh :: Synth String
 fresh = do 
-    (m, cs, n) <- lift get
-    lift $ put (m, cs, n+1)
+    (m, n) <- lift get
+    lift $ put (m, n+1)
     return $ getName n
 
 
 freshIndex :: Synth Int
 freshIndex = do 
-    (m, cs, n) <- lift get
-    lift $ put (m, cs, n+1)
+    (m, n) <- lift get
+    lift $ put (m, n+1)
     return n
 
 
@@ -254,7 +243,7 @@ ftvctx :: FocusCtxt -> Set.Set Int
 ftvctx = ftvctx' Set.empty
     where
         ftvctx' :: Set.Set Int -> FocusCtxt -> Set.Set Int
-        ftvctx' acc (gc, dc) = Set.unions (map (ftvctx'' . snd) gc) `Set.union` Set.unions (map (ftv . snd) dc)
+        ftvctx' acc (_, gc, dc) = Set.unions (map (ftvctx'' . snd) gc) `Set.union` Set.unions (map (ftv . snd) dc)
         ftvctx'' = \case {Right t -> ftv t; Left sch -> ftvsch sch}
         ftvsch (Forall ns t) = Set.difference (Set.fromList ns) $ ftv t
 
@@ -277,26 +266,26 @@ isRecursiveType (ADT tyn tps) = do
 -- Main Logic
 -------------------------------------------------------------------------------
 
-synth :: Ctxt -> Type -> Synth (Expr, Delta)
+synth :: Ctxt -> Type -> Synth (Expr, Delta, Subst)
 
 ---- * Right asynchronous rules * -----------------
 
 ---- -oR
-synth c@(г, d, o) (Fun a b) = addtrace (RightFun c (Fun a b)) $ do
+synth c@(cs, г, d, o) (Fun a b) = addtrace (RightFun c (Fun a b)) $ do
     name <- fresh
     let b' = if isRefType a
                 then addRefinementToCtxs a b    -- Everytime we decompose a dependent function, we must add it to the rest's refinement context... we need to change the core rules for this...
                 else b
-    (exp, d') <- memoizesynth synth (г, d, o ++ [(name, a)]) b' -- TODO:! Não usar append ?
+    (exp, d', cs') <- memoizesynth synth (cs, г, d, o ++ [(name, a)]) b' -- TODO:! Não usar append ?
     guard (name `notElem` map fst d')
-    return (Abs name (Just a) exp, d')
+    return (Abs name (Just a) exp, d', cs')
 
 ---- &R
-synth c (With a b) = addtrace (RightWith c (With a b)) $ do
-    (expa, d') <- memoizesynth synth c a
-    (expb, d'') <- memoizesynth synth c b
+synth c@(cs, g, d, o) (With a b) = addtrace (RightWith c (With a b)) $ do
+    (expa, d', cs') <- memoizesynth synth c a
+    (expb, d'', cs'') <- memoizesynth synth (cs', g, d, o) b
     guard (d' == d'')
-    return (WithValue expa expb, d')
+    return (WithValue expa expb, d', cs'')
 
 -- no more synchronous right propositions, start inverting the ordered context (Ω)
 
@@ -305,79 +294,85 @@ synth c (With a b) = addtrace (RightWith c (With a b)) $ do
 ---- * Left asynchronous rules * ------------------
 
 ---- *L
-synth c@(g, d, (n, Tensor a b):o) t = addtrace (LeftTensor c (Tensor a b) t) $ do
+synth c@(cs, g, d, (n, Tensor a b):o) t = addtrace (LeftTensor c (Tensor a b) t) $ do
     n1 <- fresh
     n2 <- fresh
-    (expt, d') <- memoizesynth synth (g, d, (n2, b):(n1, a):o) t
+    (expt, d', cs') <- memoizesynth synth (cs, g, d, (n2, b):(n1, a):o) t
     guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d'))
-    return (LetTensor n1 n2 (Var n) expt, d')
+    return (LetTensor n1 n2 (Var n) expt, d', cs')
 
 ---- 1L
-synth c@(g, d, (n, Unit):o) t = addtrace (LeftUnit c t) $ do
-    (expt, d') <- memoizesynth synth (g, d, o) t
-    return (LetUnit (Var n) expt, d')
+synth c@(cs, g, d, (n, Unit):o) t = addtrace (LeftUnit c t) $ do
+    (expt, d', cs') <- memoizesynth synth (cs, g, d, o) t
+    return (LetUnit (Var n) expt, d', cs')
 
 ---- +L
-synth c@(g, d, (n, Plus a b):o) t = addtrace (LeftPlus c (Plus a b) t) $ do
+synth c@(cs, g, d, (n, Plus a b):o) t = addtrace (LeftPlus c (Plus a b) t) $ do
     n1 <- fresh
     n2 <- fresh
-    (expa, d') <- memoizesynth synth (g, d, (n1, a):o) t
-    (expb, d'')  <- memoizesynth synth (g, d, (n2, b):o) t
+    (expa, d', cs') <- memoizesynth synth (cs, g, d, (n1, a):o) t
+    (expb, d'', cs'')  <- memoizesynth synth (cs', g, d, (n2, b):o) t
     guard (d' == d'')
     guard ((n1 `notElem` map fst d') && (n2 `notElem` map fst d''))
-    return (CaseOfPlus (Var n) n1 expa n2 expb, d')
+    return (CaseOfPlus (Var n) n1 expa n2 expb, d', cs'')
 
 ---- sumL
-synth (g, d, (n, Sum tys):o) t = addtrace (LeftSum (Sum tys) t) $ do
-    ls <- mapM (\(name, ct) -> do
-        varid <- fresh
-        (exp, d') <- memoizesynth synth (g, d, (varid, ct):o) t
+synth (cs, g, d, (n, Sum tys):o) t = addtrace (LeftSum (Sum tys) t) $ do
+    (ls, cs'') <- runStateT (mapM (\(name, ct) -> do
+        varid <- lift fresh
+        cs' <- get
+        (exp, d', cs'') <- lift $ memoizesynth synth (cs', g, d, (varid, ct):o) t
         guard $ varid `notElem` map fst d'
+        put cs''
         return (name, varid, exp, d')
-        ) tys
+        ) tys) cs
     let (n1, varid1, e1, d1') = head ls
     guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls)
-    return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1')
+    return (CaseOfSum (Var n) (map (\(n,i,e,_) -> (n,i,e)) ls), d1', cs'')
 
 ---- adtL
-synth c@(g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (LeftADT res c (ADT tyn tps) t) $ do
+synth c@(cs, g, d, p@(n, ADT tyn tps):o) t = (lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (LeftADT res c (ADT tyn tps) t) $ do
     checkrestrictions DeconstructADT (ADT tyn tps) >>= guard
     adtds <- getadtcons (ADT tyn tps)
     if null adtds
-       then addrestriction DeconstructADT (ADT tyn tps) $ memoizesynth synth (g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
+       then addrestriction DeconstructADT (ADT tyn tps) $ memoizesynth synth (cs, g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
        else do
             isrectype <- isRecursiveType (ADT tyn tps)
-            ls <- mapM (\(name, vtype) ->
-                (if isrectype
-                   then addrestriction DeconstructADT (ADT tyn tps)           -- For recursive types, restrict deconstruction of this type in further computations
-                   else id) $
+            (ls, cs'') <- runStateT (mapM (\(name, vtype) ->
                    -- (if t /= ADT tyn tps -- TODO!!! para que exemplos preciso disto?? talvez já não seja preciso com as modificações que fiz entretanto
                    --     then addrestriction ConstructADT (ADT tyn tps)         -- If the goal is anything but the recursive type, restrict construction of type to avoid "stupid functions"
                    --     else id) $
                         case vtype of
                           Unit -> do
-                            (exp, d') <- memoizesynth synth (g, d, o) t
+                            cs' <- get
+                            (exp, d', cs'') <- lift $ (if isrectype then addrestriction DeconstructADT (ADT tyn tps) else id)   -- For recursive types, restrict deconstruction of this type in further computations
+                                                    $ memoizesynth synth (cs', g, d, o) t
+                            put cs''
                             return (name, "", exp, d')
-                          argty -> (if isrectype then allowrecursion else id) $ do -- only allow recursion after having deconstructed a recursive ADT
-                            varid <- fresh
-                            (exp, d') <- memoizesynth synth (g, d, (varid, argty):o) t
+                          argty ->do -- only allow recursion after having deconstructed a recursive ADT
+                            varid <- lift fresh
+                            cs' <- get
+                            (exp, d', cs'') <- lift $ (if isrectype then allowrecursion else id)
+                                                    $ (if isrectype then addrestriction DeconstructADT (ADT tyn tps) else id)   -- For recursive types, restrict deconstruction of this type in further computations
+                                                    $ memoizesynth synth (cs', g, d, (varid, argty):o) t
+                            put cs''
                             guard $ varid `notElem` map fst d'
                             return (name, varid, exp, d')
-                ) adtds
+                ) adtds) cs
             let (n1, varid1, e1, d1') = head ls
             guard $ all ((== d1') . (\(_,_,_,c) -> c)) (tail ls) -- all resulting contexts are the same
-            return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1')
+            return (CaseOf (Var n) (map (\(n, vari, exp, _) -> (n, vari, exp)) ls), d1', cs'')
     ) <|> (
     lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (MoveLeftADT res c (ADT tyn tps) t) $ do
     checkrestrictions DeconstructADT (ADT tyn tps) >>= guard . not          -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)
-    memoizesynth synth (g, p:d, o) t)                                       -- So if we failed above because a restriction didn't allow us to invert this ADT, try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
+    memoizesynth synth (cs, g, p:d, o) t)                                       -- So if we failed above because a restriction didn't allow us to invert this ADT, try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
 
 ---- !L
-synth c@(g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do
+synth c@(cs, g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do
     nname <- fresh
-    (exp, d') <- memoizesynth synth ((nname, Right a):g, d, o) t
+    (exp, d', cs') <- memoizesynth synth (cs, (nname, Right a):g, d, o) t
     guard (nname `notElem` map fst d') -- Useless?
-    return (LetBang nname (Var n) exp, d')
+    return (LetBang nname (Var n) exp, d', cs')
 
 ---- refinementL
 -- not used because we add the refinements to the context in the RightFunction rule
@@ -389,8 +384,8 @@ synth c@(g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do
 
 ---- * Synchronous left propositions to Δ * -------
 
-synth (g, d, p:o) t =
-    addtrace (MoveToDelta p t) $ memoizesynth synth (g, p:d, o) t
+synth (cs, g, d, p:o) t =
+    addtrace (MoveToDelta p t) $ memoizesynth synth (cs, g, p:d, o) t
 
 
 
@@ -398,16 +393,16 @@ synth (g, d, p:o) t =
 
 -- no more asynchronous propositions, focus
 
-synth c@(g, d, []) t = lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (Focus res c t) $
-    memoizefocus focus (g, d) t
+synth c@(cs, g, d, []) t = lift (lift ask) >>= \(res,_,_,_,_) -> addtrace (Focus res c t) $
+    memoizefocus focus (cs, g, d) t
 
 
-focus :: FocusCtxt -> Type -> Synth (Expr, Delta)
+focus :: FocusCtxt -> Type -> Synth (Expr, Delta, Subst)
 focus c goal =
     decideLeft c goal <|> decideRight c goal <|> decideLeftBang c goal -- deciding left before right will be correct more often than not (at least based on recent attempts...) -- !TODO: Deciding Right before Left can lead to infinite loops!! (Ex: Expr = Var Nat | Lam Expr)
 
     where
-        decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta)
+        decideRight, decideLeft, decideLeftBang :: FocusCtxt -> Type -> Synth (Expr, Delta, Subst)
 
         decideRight c goal = addtrace (DecideRight goal) $
             if isAtomic goal                            -- to decide right, goal cannot be atomic
@@ -417,13 +412,13 @@ focus c goal =
                     memoizefocus' focus' Nothing c goal
 
 
-        decideLeft (g, din) goal =
+        decideLeft (cs, g, din) goal =
             case din of
               []     -> empty
-              _ -> foldr ((<|>) . (\nx@(n,x) -> addtrace (DecideLeft x goal) $ memoizefocus' focus' (Just nx) (g, delete nx din) goal)) empty din
+              _ -> foldr ((<|>) . (\nx@(n,x) -> addtrace (DecideLeft x goal) $ memoizefocus' focus' (Just nx) (cs, g, delete nx din) goal)) empty din
 
 
-        decideLeftBang (g, din) goal =
+        decideLeftBang c@(cs, g, din) goal =
             case g of
               []   -> empty
               _ -> do
@@ -431,10 +426,10 @@ focus c goal =
                   foldr ((<|>) . (\case
                                     (n, Right x) -> addtrace (DecideLeftBang res x goal) $
                                         managerestrictions n x $
-                                            memoizefocus' focus' (Just (n, x)) (g, din) goal;
+                                            memoizefocus' focus' (Just (n, x)) c goal;
                                     (n, Left sch) -> addtrace (DecideLeftBangSch res sch goal) $
                                         managerestrictions n (instantiateFrom 0 sch) $
-                                            memoizefocusSch focusSch (n, sch) (g, din) goal)) empty g
+                                            memoizefocusSch focusSch (n, sch) c goal)) empty g
                                  where
                                      managerestrictions :: Name -> Type -> Synth a -> Synth a
                                      managerestrictions n x s = do    
@@ -446,24 +441,22 @@ focus c goal =
         
             
         ---- Eliminating Schemes
-        focusSch :: (String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta)
+        focusSch :: (String, Scheme) -> FocusCtxt -> Type -> Synth (Expr, Delta, Subst)
 
         ---- VL
-        focusSch (n, sch@(Forall ns t)) ctxt goal = do
+        focusSch (n, sch@(Forall ns t)) ctxt@(cs, g, din) goal = do
             (et, etvars) <- existencialInstantiate sch                                              -- tipo com existenciais
             addtrace (FocusLeftScheme (n, et) ctxt goal) $ do
                 -- can only try scheme if current constraints are still safe
                 -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
                 -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
                 -- (et, etvars) <- existencialInstantiate sch                                       -- tipo com existenciais
-                previousSubst <- getsubs
-                (se, d') <- memoizefocus' focus' (Just (n, et)) ctxt goal                           -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
-                unifysubs <- getsubs
+                (se, d', cs') <- memoizefocus' focus' (Just (n, et)) ctxt goal                      -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
                                                                                                     -- resolve ou falha -- por conflito ou falta informação
                                                                                                     -- por conflicto durante o processo
-                guard (Set.disjoint (Set.fromList etvars) (ftv $ apply unifysubs et))               -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
-                clearsubs previousSubst                                                             -- after making sure no instantiated variables escaped, clear the constraints added to the substitution so that it doesn't complicate further scheme computations
-                return (se, d')                                                                     -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
+                guard (Set.disjoint (Set.fromList etvars) (ftv $ apply cs' et))                     -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
+                                                                                                    -- after making sure no instantiated variables escaped, the constraints added to the substitution can be forgotten so that it doesn't complicate further scheme computations
+                return (se, d', cs)                                                                 -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
                     where
                         existencialInstantiate (Forall ns t) = do
                             netvs <- mapM (const $ do {i <- freshIndex; return (ExistentialTypeVar i, -i)}) ns
@@ -471,44 +464,44 @@ focus c goal =
 
 
 
-        focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta)
+        focus' :: Maybe (String, Type) -> FocusCtxt -> Type -> Synth (Expr, Delta, Subst)
 
         ---- * Right synchronous rules * ------------------
 
         ---- *R
-        focus' Nothing c@(g, d) (Tensor a b) = addtrace (RightTensor c (Tensor a b)) $ do
-            (expa, d') <- case a of { ADT _ _ -> memoizefocus focus c a; _ -> memoizefocus' focus' Nothing c a }
-            (expb, d'') <- case b of { ADT _ _ -> memoizefocus focus (g, d') b; _ -> memoizefocus' focus' Nothing (g, d') b }
-            return (TensorValue expa expb, d'')
+        focus' Nothing c@(cs, g, d) (Tensor a b) = addtrace (RightTensor c (Tensor a b)) $ do
+            (expa, d', cs') <- case a of { ADT _ _ -> memoizefocus focus c a; _ -> memoizefocus' focus' Nothing c a }
+            (expb, d'', cs'') <- case b of { ADT _ _ -> memoizefocus focus (cs', g, d') b; _ -> memoizefocus' focus' Nothing (cs', g, d') b }
+            return (TensorValue expa expb, d'', cs'')
 
         ---- 1R
-        focus' Nothing c@(g, d) Unit = addtrace (RightUnit c) $
-            return (UnitValue, d)
+        focus' Nothing c@(cs, _, d) Unit = addtrace (RightUnit c) $
+            return (UnitValue, d, cs)
             
         ---- +R
         focus' Nothing c (Plus a b) = addtrace (RightPlus c (Plus a b)) $ do
-            (il, d') <- case a of { ADT _ _ -> memoizefocus focus c a; _ -> memoizefocus' focus' Nothing c a }
-            return (InjL (Just b) il, d')
+            (il, d', cs') <- case a of { ADT _ _ -> memoizefocus focus c a; _ -> memoizefocus' focus' Nothing c a }
+            return (InjL (Just b) il, d', cs')
             `interleave` do
-            (ir, d') <- case b of { ADT _ _ -> memoizefocus focus c b; _ -> memoizefocus' focus' Nothing c b }
-            return (InjR (Just a) ir, d')
+            (ir, d', cs') <- case b of { ADT _ _ -> memoizefocus focus c b; _ -> memoizefocus' focus' Nothing c b }
+            return (InjR (Just a) ir, d', cs')
 
         ---- sumR
         focus' Nothing c (Sum sts) = addtrace (RightSum (Sum sts)) $
             foldr (interleave . (\(tag, goalt) ->
                 do
-                   (e, d') <- case goalt of { ADT _ _ -> memoizefocus focus c goalt; _ -> memoizefocus' focus' Nothing c goalt }
+                   (e, d', cs') <- case goalt of { ADT _ _ -> memoizefocus focus c goalt; _ -> memoizefocus' focus' Nothing c goalt }
                    let smts = map (second Just) $ delete (tag, goalt) sts
-                   return (SumValue smts (tag, e), d')
+                   return (SumValue smts (tag, e), d', cs')
                 )) empty sts
 
         ---- adtR
-        focus' Nothing c@(g, d) (ADT tyn pts) = lift (lift ask) >>= \(res,_,_,_,_) -> do
+        focus' Nothing c@(cs, g, d) (ADT tyn pts) = lift (lift ask) >>= \(res,_,_,_,_) -> do
             cons <- getadtcons (ADT tyn pts)
             foldr (interleave . (\(tag, argty) ->
                 addtrace (RightADT tag res c (ADT tyn pts)) $
                    case argty of
-                     Unit -> return (Var tag, d)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
+                     Unit -> return (Var tag, d, cs)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
                      argtype -> do
                          -- rs <- lift (lift ask) >>= \(a,b,c,d,e) -> return a
                          -- let reslist = rights $ map snd $ filter (\(n,x) -> n == ConstructADT) rs
@@ -519,8 +512,8 @@ focus c goal =
                                 _ -> False
                             then empty
                             else addrestriction ConstructADT (ADT tyn pts) $ do     -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
-                                (arge, d') <- case argtype of { ADT _ _ -> memoizefocus focus c argtype; _ -> memoizefocus' focus' Nothing c argtype }
-                                return (App (Var tag) arge, d')
+                                (arge, d', cs') <- case argtype of { ADT _ _ -> memoizefocus focus c argtype; _ -> memoizefocus' focus' Nothing c argtype }
+                                return (App (Var tag) arge, d', cs')
                 )) empty cons
             -- When we're right focused, we might continue right focused as we construct the proof (e.g. RightTensor),
             -- However, where other propositions would loop back to asynch mode, and back again to the decision point,
@@ -530,14 +523,14 @@ focus c goal =
            
 
         ---- !R
-        focus' Nothing c@(g, d) (Bang a) = addtrace (RightBang c (Bang a)) $ do
-            (expa, d') <- memoizesynth synth (g, d, []) a
+        focus' Nothing c@(cs, g, d) (Bang a) = addtrace (RightBang c (Bang a)) $ do
+            (expa, d', cs') <- memoizesynth synth (cs, g, d, []) a
             guard (d == d')
-            return (BangValue expa, d')
+            return (BangValue expa, d', cs')
 
 
         ---- refinementR
-        focus' Nothing c@(g, d) r@(RefinementType rname ty rctx mpred) = addtrace (RightRefinement c r) $
+        focus' Nothing c@(cs, g, d) r@(RefinementType rname ty rctx mpred) = addtrace (RightRefinement c r) $
             case mpred of
               Nothing -> focus' Nothing c ty    -- If there's no predicate try instancing the type
               Just pred -> do
@@ -546,7 +539,7 @@ focus c goal =
                     Nothing -> empty   -- the SMT solver couldn't generate a model for this predicate
                     Just expr -> do -- error ("Got model " ++ show expr ++ " and " ++ show rctx ++ " and now utilizing variables to instance it")
                         (expr', d') <- ifte (replaceRefVariables expr) return (trace ("Failed to instance expression from the SMT Solver: " ++ show expr) empty)
-                        return (expr', d')
+                        return (expr', d', cs)
 
             where
                 replaceRefVariables :: Expr -> Synth (Expr, Delta)
@@ -582,36 +575,36 @@ focus c goal =
         ---- * Left synchronous rules * -------------------
 
         ---- -oL
-        focus' (Just (n, Fun a b)) c@(g, d) goal = addtrace (LeftFun c (Fun a b) goal) $ do
+        focus' (Just (n, Fun a b)) c@(cs, g, d) goal = addtrace (LeftFun c (Fun a b) goal) $ do
             nname <- fresh
             let b' = if isRefType a
                         then addRefinementToCtxs a b    -- Everytime we decompose a dependent function, we must add it to the rest's refinement context... we need to change the core rules for this...
                         else b
-            (expb, d') <- memoizefocus' focus' (Just (nname, b')) c goal
-            (expa, d'') <- memoizesynth synth (g, d', []) a
-            return (substitute nname (App (Var n) expa) expb, d'')
+            (expb, d', cs') <- memoizefocus' focus' (Just (nname, b')) c goal
+            (expa, d'', cs'') <- memoizesynth synth (cs', g, d', []) a
+            return (substitute nname (App (Var n) expa) expb, d'', cs'')
             
         ---- &L
         focus' (Just (n, With a b)) c goal = addtrace (LeftWith c (With a b) goal) $
             do
                 nname <- fresh
-                (lf, d') <- memoizefocus' focus' (Just (nname, a)) c goal
-                return (substitute nname (Fst (Var n)) lf, d')
+                (lf, d', cs') <- memoizefocus' focus' (Just (nname, a)) c goal
+                return (substitute nname (Fst (Var n)) lf, d', cs')
             <|>
             do
                 nname <- fresh
-                (rt, d') <- memoizefocus' focus' (Just (nname, b)) c goal
-                return (substitute nname (Snd (Var n)) rt, d')
+                (rt, d', cs') <- memoizefocus' focus' (Just (nname, b)) c goal
+                return (substitute nname (Snd (Var n)) rt, d', cs')
 
         ---- ∃L (?)
-        focus' (Just (n, ExistentialTypeVar x)) (g, d) goal = addtrace LeftExistentialTV $
+        focus' (Just (n, ExistentialTypeVar x)) (cs, g, d) goal = addtrace LeftExistentialTV $
             case goal of
               (ExistentialTypeVar y) ->
-                  if x == y then return (Var n, d)          -- ?a |- ?a succeeds
+                  if x == y then return (Var n, d, cs)          -- ?a |- ?a succeeds
                             else empty                      -- ?a |- ?b fails
               _ -> do                                       -- ?a |- t  succeeds with constraint
-                  addconstraint $ Constraint (ExistentialTypeVar x) goal
-                  return (Var n, d)
+                  cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) goal
+                  return (Var n, d, cs')
 
 
 
@@ -619,31 +612,23 @@ focus c goal =
 
         ---- adtLFocus
         ---- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
-        focus' (Just nh@(n, ADT tyn tps)) c@(g, d) goal = addtrace (FocusLeftADT c (ADT tyn tps) goal) $
+        focus' (Just nh@(n, ADT tyn tps)) c@(cs, g, d) goal = addtrace (FocusLeftADT c (ADT tyn tps) goal) $
             if case goal of
                  ADT tyn' tps' -> tyn' == tyn
                  _ -> False
               then do
                   let (ADT tyn' tps') = goal
-                  trace ("Unifying " ++ show (ADT tyn tps) ++ " with " ++ show (ADT tyn' tps')) $ zipWithM_ unifyadtparams tps tps'
-                  trace "Successful unification!" $ return (Var n, d)
+                  cs' <- addconstraint cs $ Constraint (ADT tyn tps) (ADT tyn' tps')
+                  return (Var n, d, cs')
               else do
                   adtcns <- getadtcons (ADT tyn tps) 
                   guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
                   checkrestrictions DeconstructADT (ADT tyn tps) >>= guard  -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
-                  memoizesynth synth (g, d, [nh]) goal
-                      where
-                          unifyadtparams :: Type -> Type -> Synth ()
-                          unifyadtparams (ADT tyn'' tps'') (ADT tyn''' tps''') = do
-                              guard $ tyn'' == tyn'''
-                              zipWithM_ unifyadtparams tps'' tps'''
-                          unifyadtparams (ExistentialTypeVar x) y = addconstraint $ Constraint (ExistentialTypeVar x) y
-                          unifyadtparams x (ExistentialTypeVar y) = unifyadtparams (ExistentialTypeVar y) x
-                          unifyadtparams x y = guard (x == y)
+                  memoizesynth synth (cs, g, d, [nh]) goal
 
 
         ---- refinementLFocus
-        focus' (Just nh@(n, r@(RefinementType rname ty rctx mpred))) c@(g, d) goal = addtrace (FocusLeftRefinement c nh goal) $
+        focus' (Just nh@(n, r@(RefinementType rname ty rctx mpred))) c@(cs, g, d) goal = addtrace (FocusLeftRefinement c nh goal) $
             case goal of
               RefinementType _ _ ls goalpred ->
                   case goalpred of
@@ -653,7 +638,7 @@ focus c goal =
                         guard $ length ls == length rctx               -- no way to instanciating refinements that have different number of variables : TODO OK?
                         satunify <- liftIO $ satunifyrefinements r goal     -- we need to make sure it satisfy all constraints
                         guard satunify
-                        return (Var n, d)
+                        return (Var n, d, cs)
               _ -> focus' (Just (n, ty)) c goal -- using the focus proposition to instance any other type is the same as using the type without the refinements
 
 
@@ -661,19 +646,19 @@ focus c goal =
         ---- if it is atomic, it'll either be the goal and instanciate it, or fail
         ---- if it's not atomic, and it's not left synchronous, unfocus
 
-        focus' (Just nh@(n, h)) c@(g, d) goal
+        focus' (Just nh@(n, h)) c@(cs, g, d) goal
           | isAtomic h                      -- left focus is atomic
           = addtrace (DefaultFocusLeft c nh goal) $
           do case goal of
                  (ExistentialTypeVar x)     -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
                    -> do
-                        addconstraint $ Constraint (ExistentialTypeVar x) h
-                        return (Var n, d)
+                        cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) h
+                        return (Var n, d, cs')
                  _ -> do
                         guard (h == goal)  -- if is atomic and not the goal, fail
-                        return (Var n, d)  -- else, instantiate it
+                        return (Var n, d, cs)  -- else, instantiate it
           | otherwise
-          = addtrace (DefaultFocusLeft c nh goal) $ memoizesynth synth (g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
+          = addtrace (DefaultFocusLeft c nh goal) $ memoizesynth synth (cs, g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
 
 
 
@@ -681,8 +666,8 @@ focus c goal =
 
         ---- right focus is not synchronous, unfocus.
 
-        focus' Nothing c@(g, d) goal = addtrace (DefaultFocusRight c goal) $
-            memoizesynth synth (g, d, []) goal -- <|> if t refined then smt solve t with join context refined with && else empty
+        focus' Nothing c@(cs, g, d) goal = addtrace (DefaultFocusRight c goal) $
+            memoizesynth synth (cs, g, d, []) goal -- <|> if t refined then smt solve t with join context refined with && else empty
 
 
 
@@ -724,7 +709,7 @@ synthAllType t = fst <$> synthCtxAllType 5 Map.empty ([], []) 0 [] t -- Not real
 
 
 synthType :: Type -> IO Expr
-synthType t = head <$> synthAllType (instantiateFrom 0 $ generalize ([], []) t)
+synthType t = head <$> synthAllType (instantiateFrom 0 $ generalize (Map.empty, [], []) t)
 
 
 synthMarks :: Expr -> [ADTD] -> (StateT MemoTable IO) Expr -- replace all placeholders in an expression with a synthetized expr

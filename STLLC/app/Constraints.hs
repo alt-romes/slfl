@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Constraints (Constraint(..), Subst(..), Substitutable(..), ftv, solveconstraints, solveconstraintsExistential) where
+module Constraints (Constraint(..), Subst(..), Substitutable(..), ftv, solveconstraints, solveconstraintsExistential, compose, unifyExistential) where
 
 import Data.List (sortBy)
 import Data.Bifunctor (second)
@@ -163,6 +163,8 @@ unify _ _ = Nothing
 
 
 unifyExistential :: Type -> Type -> Maybe Subst 
+unifyExistential Unit Unit = Just Map.empty
+unifyExistential (TyLit x) (TyLit y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ADT x ts) (ADT y ts') =
     if x == y
        then do
@@ -170,7 +172,6 @@ unifyExistential (ADT x ts) (ADT y ts') =
            let maybesubs = zipWith unifyExistential ts ts'
            foldM (\p n -> compose p <$> n) Map.empty maybesubs
        else Nothing
-unifyExistential Unit Unit = Just Map.empty
 unifyExistential (TypeVar x) (TypeVar y) = if x == y then Just Map.empty else Nothing
 unifyExistential (ExistentialTypeVar x) (ExistentialTypeVar y) = if x == y then Just Map.empty else Just $ Map.singleton x (ExistentialTypeVar y)
 unifyExistential (ExistentialTypeVar x) y =
