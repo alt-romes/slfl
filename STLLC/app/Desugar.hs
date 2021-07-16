@@ -158,7 +158,7 @@ builtinfs :: [TypeBinding]
 builtinfs = [psum, psub, pmult]
 
 addPrelude :: [TypeBinding] -> [TypeBinding]
-addPrelude ts = ts ++ [psum, psub, pmult]
+addPrelude ts = ts -- ++ builtinfs
 
 
 
