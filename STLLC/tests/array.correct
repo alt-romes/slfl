@@ -1,0 +1,13 @@
+newMArray :: forall a b . (!Int -o ((MArray a -o !b) -o b));
+
+write :: forall a . (MArray a -o (!(Int * a) -o MArray a));
+
+freeze :: forall a . (MArray a -o !Array a);
+
+foldl :: forall a b . (!(a -o (b -o a)) -o (a -o (List b -o a)));
+
+array :: forall a . (!Int -o (!List !(Int * a) -o Array a));
+array b c = let !d = b in 
+    let !e = c in newMArray (!d) (λj -> freeze (foldl (!write) j e));
+
+

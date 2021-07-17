@@ -17,7 +17,7 @@ import Debug.Trace
 import Refinements
 
 
-import CoreSyntax (Name, Type(..), Scheme(..), isInType, isExistentialType)
+import CoreSyntax (Name, Type(..), Scheme(..), isInType, isExistentialType, isFunction)
 import Syntax
 import Program
 import Util
@@ -44,7 +44,7 @@ type SynthState = (MemoTable, Int)  -- (list of constraints added by the process
 type MemoTable = Map.Map Int (Maybe (Expr, Delta, Subst, Int))
 
 
-type SynthReaderState = ([ADTD], Int, [TraceTag], (Name, Bool)) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
+type SynthReaderState = ([ADTD], Int, [TraceTag], (Name, Bool), Int) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
 type Restriction = Either (Type, Type) Type
 type Restrictions = [(RestrictTag, Restriction)]
 
@@ -56,47 +56,34 @@ instance Hashable RestrictTag where
 data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | MoveLeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Name Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type | LeftRefinement Ctxt (Name, Type) Type | FocusLeftRefinement FocusCtxt (Name, Type) Type | RightRefinement FocusCtxt Type | FocusLeftBang FocusCtxt (Name, Type) Type | RightExistentialTV FocusCtxt (Name, Type) Type deriving (Show)
 
 
-runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> IO ([Expr], MemoTable)
-runSynth n (g, d) t st adtds = do
-    (exps_deltas, (memot, _)) <- runReaderT (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds
+runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> Int -> [Name] -> IO ([Expr], MemoTable)
+runSynth n (g, d) t st adtds ed touse = do
+    (exps_deltas, (memot, _)) <- runReaderT (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds ed
     return (map fst exps_deltas, memot)
 
     where
         synthComplete (g, d, o) t = do
             (e, d', _) <-  memoizesynth synth (Map.empty, [], recf, d, o) t -- synth only with the recursive function
                        <|> memoizesynth synth (Map.empty, [], g, d, o) t    -- synth with the whole context
-                       -- <|> let (params, goal) = separateParams t in do  -- synth with the whole context but all function parameters are in delta
-                       --          let (unrs, lins) = partitionEithers params
-                       --          let rs' = concatMap (\case (_, a@ADT {}) -> [(ConstructADT, Right a), (DeconstructADT, Right a)]; _ -> []) (unrs ++ lins)
-                       --          memoizesynth synth (Map.empty, rs', map (second Right) unrs ++ g, lins ++ d, o) goal
             guard $ null d'
+            guard $ synthResultUses touse e
             return (e, d')
+
+        synthResultUses :: [Name] -> Expr -> Bool
+        synthResultUses [] _ = True
+        synthResultUses (x:xs) e = (Var x `isInExpr` e) && synthResultUses xs e
 
         recf = case g of
                  [] -> []
                  x:xs -> [x] -- head of Gamma is the recursive name since the recursive signature is the last added to the gamma context
-
-        separateParams :: Type -> ([Either (Name, Type) (Name, Type)], Type)
-        separateParams t = evalState (separateParams' t) 0 
-
-        separateParams' :: Type -> State Int ([Either (Name, Type) (Name, Type)], Type)
-        separateParams' t = 
-            case t of
-                Fun a b -> do
-                    i <- get
-                    put $ i + 1
-                    case a of
-                      Bang bt -> first (Left ("arg_" ++ getName i, bt):) <$> separateParams' b
-                      _ -> first (Right ("arg_" ++ getName i, a):) <$> separateParams' b
-                fin -> return ([], fin)
 
 
 initSynthState :: MemoTable -> Int -> SynthState
 initSynthState mt i = (mt, i)
 
 
-initSynthReaderState :: Name -> [ADTD] -> SynthReaderState
-initSynthReaderState n a = (a, 0, [], (n, False))
+initSynthReaderState :: Name -> [ADTD] -> Int -> SynthReaderState
+initSynthReaderState n a ed = (a, 0, [], (n, False), ed)
 
 
 
@@ -141,7 +128,7 @@ memoizefocusSch syn fty c@(cs, r, g, d) ty = memoize (Just (Just (Left fty))) (c
 
 
 allowrecursion :: Synth a -> Synth a
-allowrecursion = local (\(b,c,d,(fn, _)) -> (b,c,d,(fn, True)))
+allowrecursion = local (\(b,c,d,(fn, _),ed) -> (b,c,d,(fn, True),ed))
 
 
 addconstraint :: Subst -> Constraint -> Synth Subst
@@ -162,20 +149,24 @@ addbinaryrestriction tag ty ty' rs = (tag, Left (ty, ty')):rs
 addtrace :: TraceTag -> Synth a -> Synth a
 addtrace t s = do
     (tstck, depth) <- gettracestack
-    trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
-        local (\(b,c,d,e) -> (b,c+1,t:d,e)) s
+    -- trace ("D" ++ show depth ++ ": " ++ show t) $ -- ++ "\n-- stack --\n" ++ unlines (map show tstck) ++ "\n") $
+    local (\(b,c,d,e,f) -> (b,c+1,t:d,e,f)) s
 
 
 gettracestack :: Synth ([TraceTag], Int)
-gettracestack = lift (lift ask) >>= \(b,c,d,e) -> return (d,c)
+gettracestack = lift (lift ask) >>= \(b,c,d,e,f) -> return (d,c)
 
 
 getdepth :: Synth Int
-getdepth = lift (lift ask) >>= \(b,c,d,e) -> return c
+getdepth = lift (lift ask) >>= \(b,c,d,e,f) -> return c
 
 
 getRecInfo :: Synth (Name, Bool)
-getRecInfo = lift (lift ask) >>= \(b,c,d,ra) -> return ra
+getRecInfo = lift (lift ask) >>= \(b,c,d,ra,f) -> return ra
+
+
+getExistentialDepth :: Synth Int
+getExistentialDepth = lift (lift ask) >>= \(b,c,d,ra,ed) -> return ed
 
 
 checkrestrictions :: RestrictTag -> Type -> Restrictions -> Bool
@@ -183,18 +174,18 @@ checkrestrictions tag ty@(ADT tyn tpl) rs = -- Restrictions only on ADT Construc
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs in
     ty `notElem` reslist && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
 
-checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Restrictions -> Bool
-checkbinaryrestrictions tag typair rs =
-    let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs in
-    typair `notElem` reslist &&
+checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Restrictions -> Synth Bool
+checkbinaryrestrictions tag typair rs = do
+    existentialdepth <- getExistentialDepth
+    let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs
+    return $ typair `notElem` reslist &&
         -- isExistential => NoExistentialIsBangRestricted
-        let existentialdepth = 1 in
         (not (isExistentialType $ snd typair) || existentialdepth > count True (map (isExistentialType . snd) reslist)) -- no repeated use of unr functions or use of unr func when one was used focused on an existential
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
 getadtcons (ADT tyn tps) = do
-    adtds <- lift (lift ask) >>= \(b,c,d,e) -> return b
+    adtds <- lift (lift ask) >>= \(b,c,d,e,f) -> return b
     case find (\(ADTD name ps _) -> tyn == name && length tps == length ps) adtds of
       Just (ADTD _ paramvars cons) ->
           let subst = Map.fromList $ zip paramvars tps in
@@ -437,7 +428,7 @@ focus c goal =
                                      managerestrictions n x = do    
                                          (recname, recallowed) <- getRecInfo  -- Restrict usage of recursive function if it isn't allowed
                                          guard $ recname /= n || recallowed
-                                         guard $ checkbinaryrestrictions DecideLeftBangR (x, goal) rs -- Restrict re-usage of decide left bang to synth the same goal a second time
+                                         when (isFunction x) $ checkbinaryrestrictions DecideLeftBangR (x, goal) rs >>= guard -- Restrict re-usage of decide left bang to synth the same goal a second time, if using a function
                                          return $ addbinaryrestriction DecideLeftBangR x goal rs
 
         
@@ -635,15 +626,10 @@ focus c goal =
                   cs' <- addconstraint cs $ Constraint (ADT tyn tps) (ADT tyn' tps')
                   return (Var n, d, cs')
               else do
-                  -- case goal of
-                  --   (ExistentialTypeVar x) -> do
-                  --       cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) (ADT tyn tps)
-                  --       return (Var n, d, cs')
-                  --   _ -> do
-                      adtcns <- getadtcons (ADT tyn tps) 
-                      guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
-                      guard $ checkrestrictions DeconstructADT (ADT tyn tps) rs -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
-                      memoizesynth synth (cs, rs, g, d, [nh]) goal
+                  adtcns <- getadtcons (ADT tyn tps) 
+                  guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
+                  guard $ checkrestrictions DeconstructADT (ADT tyn tps) rs -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
+                  memoizesynth synth (cs, rs, g, d, [nh]) goal
 
 
         ---- refinementLFocus
@@ -669,7 +655,7 @@ focus c goal =
           | isAtomic h                      -- left focus is atomic
           = addtrace (DefaultFocusLeft c nh goal) $ do
                 guard (h == goal)      -- if is atomic and not the goal, fail
-                trace ("Returning instance " ++ show nh ++ " -> " ++ show goal ) $ return (Var n, d, cs)  -- else, instantiate it
+                return (Var n, d, cs)  -- else, instantiate it
           | otherwise
           = addtrace (DefaultFocusLeft c nh goal) $ memoizesynth synth (cs, rs, g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
 
@@ -696,18 +682,18 @@ removeadtcons adts (fc, bc) = case adts of -- During the synth process, construc
     (ADTD _ _ cons):xs -> removeadtcons xs (filter (\(n, _) -> isNothing $ lookup n cons) fc, bc)
 
 
-synthCtxAllType :: Int -> MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> IO ([Expr], MemoTable)
-synthCtxAllType n mt c i adts t = do
+synthCtxAllType :: Int -> MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> IO ([Expr], MemoTable)
+synthCtxAllType n mt c i adts t ed touse = do
     let c' = removeadtcons adts c
-    (exps, memot) <- runSynth n c' t (initSynthState mt i) adts
+    (exps, memot) <- runSynth n c' t (initSynthState mt i) adts ed touse
     if null exps
         then error $ "[Synth] Failed synthesis of: " ++ show t
         else return (exps, memot)
 
 
-synthCtxType :: MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> IO (Expr, MemoTable)
-synthCtxType mt c i adts t = do
-    (exps, memot) <- synthCtxAllType 1 mt c i adts t
+synthCtxType :: MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> IO (Expr, MemoTable)
+synthCtxType mt c i adts t ed touse = do
+    (exps, memot) <- synthCtxAllType 1 mt c i adts t ed touse
     return (head exps, memot)
 
 
@@ -718,7 +704,7 @@ synthCtxType mt c i adts t = do
 -------------------------------------------------------------------------------
 
 synthAllType :: Type -> IO [Expr]
-synthAllType t = fst <$> synthCtxAllType 5 Map.empty ([], []) 0 [] t -- Not really *all* bc runSynth might loop forever?
+synthAllType t = fst <$> synthCtxAllType 5 Map.empty ([], []) 0 [] t 0 [] -- Not really *all* bc runSynth might loop forever?
 
 
 synthType :: Type -> IO Expr
@@ -731,12 +717,12 @@ synthMarks ex adts = transformM transformfunc ex
         transformfunc :: Expr -> (StateT MemoTable IO) Expr
         transformfunc =
             \case
-                (Mark _ name c@(fc, bc) t) -> do
+                (Mark _ name c@(fc, bc) t (ed, touse)) -> do
                     mt <- get
                     let sch@(Forall tvs t') = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t
                     case name of
                       Nothing    -> do -- Non-recursive Mark
-                        (exp, memot') <- liftIO $ synthCtxType mt c (length tvs) adts $ instantiateFrom 0 sch
+                        (exp, memot') <- liftIO $ synthCtxType mt c (length tvs) adts (instantiateFrom 0 sch) ed touse
                         modify (`Map.union` memot')
                         return exp
                       Just name' -> -- Recursive Mark
@@ -751,11 +737,11 @@ synthMarks ex adts = transformM transformfunc ex
                                   synthBranches adtcons i = mapM (\(name, vtype) ->
                                         case vtype of
                                           Unit -> do
-                                              (exp, memot') <- liftIO $ synthCtxType mt c i adts t2
+                                              (exp, memot') <- liftIO $ synthCtxType mt c i adts t2 0 []
                                               modify (`Map.union` memot')
                                               return (name, "", exp)
                                           argty -> do
-                                              (exp, memot') <- liftIO $ synthCtxType mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2
+                                              (exp, memot') <- liftIO $ synthCtxType mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2 ed touse
                                               modify (`Map.union` memot')
                                               return (name, getName i, exp) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
                                       ) adtcons

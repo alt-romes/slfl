@@ -151,7 +151,7 @@ eval ctxt@(bctxt, fctxt) (LetIn e1 e2) =
 
 --- Mark for synthesis ---
 
-eval _ (Mark _ _ _ t) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
+eval _ (Mark _ _ _ t _) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis marker:\n    " ++ show t
 
 --- Sum Type ---------------
 

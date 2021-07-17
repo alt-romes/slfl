@@ -295,7 +295,7 @@ typeconstraint (LetIn e1 e2) = do
 
 --- Synth marker -----------
 
-typeconstraint (Mark i n _ t) = do
+typeconstraint (Mark i n _ t ed) = do
     tv <- fresh
     c@(bc, fc) <- get
     let t' = fromMaybe (trivialScheme tv) t
@@ -303,7 +303,7 @@ typeconstraint (Mark i n _ t) = do
       Forall [] t'' -> do
         vari <- lift $ lift get
         lift $ lift $ put (vari + length (ftv t''))
-        return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t''))
+        return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t'') ed)
       _ -> error "Type inference shouldn't have marks with bound polimorfic variables"
 
 --- Sum --------------------
@@ -521,9 +521,9 @@ typeinferModule (Program adts bs ts cbs) = do
         substSelfTypeMarks :: Name -> Scheme -> CoreExpr -> CoreExpr
         substSelfTypeMarks n btype bexpr' =
             transform (\case
-                (Mark i mn (bc, fc) t) ->
+                (Mark i mn (bc, fc) t ed) ->
                     let fc' = (n, btype):deleteBy (\ (s, _) (s', _) -> s == s') (n, undefined) fc in -- Remove possibly incorrect self type from mark context and re-add one correctly
-                        Mark i mn (bc, fc') t;
+                        Mark i mn (bc, fc') t ed;
                  x -> x) bexpr'
 
 

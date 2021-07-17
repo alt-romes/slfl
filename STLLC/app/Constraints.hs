@@ -76,7 +76,7 @@ instance Substitutable CoreExpr where
     apply s (InjL (Just t) e) = InjL (return $ apply s t) (apply s e)
     apply s (InjR (Just t) e) = InjR (return $ apply s t) (apply s e)
     apply s (CaseOfPlus e1 e2 e3) = CaseOfPlus (apply s e1) (apply s e2) (apply s e3)
-    apply s (Mark i n ctx (Just t)) = Mark i n (apply s ctx) (return $ apply s t)
+    apply s (Mark i n ctx (Just t) ed) = Mark i n (apply s ctx) (return $ apply s t) ed
     apply s (SumValue tl (i, e)) = SumValue (map (second $ apply s) tl) (i, apply s e)
     apply s (CaseOfSum e el) = CaseOfSum (apply s e) (map (second $ apply s) el)
     apply s (CaseOf e el) = CaseOf (apply s e) (map (second $ apply s) el)

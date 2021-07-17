@@ -249,14 +249,14 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme plhty)
+            return $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme plhty) (0, [])
 
         emptymark = do
             reservedOp "..."
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i Nothing ([], []) Nothing
+            return $ Syntax.Mark i Nothing ([], []) Nothing (0, [])
 
 
 
@@ -409,9 +409,19 @@ letsynth :: Parser (Either TypeBinding Binding)
 letsynth = do
     reserved "synth"
     (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
+    usenames <- option [] (do
+        reservedOp "|"
+        reserved "using"
+        parens $ many1 identifier
+        )
+    depth <- option 1 (do
+        reservedOp "|"
+        reserved "depth"
+        natural
+        )
     i <- getState
     putState $ i+1
-    return $ Right $ Binding name $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme t)
+    return $ Right $ Binding name $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme t) (fromIntegral depth, usenames)
 
 
 synthrec :: Parser (Either TypeBinding Binding)
@@ -419,9 +429,19 @@ synthrec = do
     reserved "synth"
     reserved "rec"
     (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
+    usenames <- option [] (do
+        reservedOp "|"
+        reserved "using"
+        parens $ many1 identifier
+        )
+    depth <- option 1 (do
+        reservedOp "|"
+        reserved "depth"
+        natural
+        )
     i <- getState
     putState $ i+1
-    return $ Right $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just $ trivialScheme t)
+    return $ Right $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just $ trivialScheme t) (fromIntegral depth, usenames)
 
 
 datacon :: Parser (Name, Type)

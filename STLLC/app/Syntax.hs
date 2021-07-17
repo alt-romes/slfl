@@ -1,8 +1,8 @@
 {-# LANGUAGE LambdaCase, DeriveGeneric, DeriveAnyClass #-}
-module Syntax (Binding(..), Expr(..), Pattern(..), transformM, transform) where 
+module Syntax (Binding(..), Expr(..), Pattern(..), transformM, transform, isInExpr) where 
 
 import Data.Maybe
-import Prelude hiding (Bool)
+import Control.Monad.State
 import GHC.Generics (Generic)
 import Control.DeepSeq
 import Data.Functor.Identity
@@ -55,7 +55,7 @@ data Expr
 
     | LetIn Name Expr Expr
 
-    | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme)
+    | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme) (Int, [Name])
 
     -- Sum types
     | SumValue [(Name, Maybe Type)] (Name, Expr)
@@ -66,7 +66,7 @@ data Expr
     -- Added sugar :)
 
     | UnrestrictedAbs Name (Maybe Type) Expr
-    deriving (Generic, NFData)
+    deriving (Generic, NFData, Eq)
 
 
 data Pattern
@@ -126,7 +126,7 @@ instance (Show Expr) where
             showexpr' d (BangValue e) = "(!" ++ showexpr' d e ++ ")"
             showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
             showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-            showexpr' d (Mark _ _ _ (Just t)) = "{{ " ++ show t ++ " }}"
+            showexpr' d (Mark _ _ _ (Just t) _) = "{{ " ++ show t ++ " }}"
             showexpr' d Mark {} = "{{ ... }}"
             showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
                 foldl (\p (s, mt) -> p ++ indent (d+2) ++ s ++ maybe "" (\t -> " : " ++ show t) mt ++ ";") "" mts
@@ -175,7 +175,7 @@ transformM f (CaseOfPlus e1 x e2 y e3) = f =<< (CaseOfPlus <$> transformM f e1 <
 transformM f (BangValue e) = f . BangValue =<< transformM f e
 transformM f (LetBang x e1 e2) = f =<< (LetBang x <$> transformM f e1 <*> transformM f e2)
 transformM f (LetIn x e1 e2) = f =<< (LetIn x <$> transformM f e1 <*> transformM f e2)
-transformM f (Mark a b c t) = f $ Mark a b c t
+transformM f (Mark a b c t ed) = f $ Mark a b c t ed
 transformM f (SumValue mts (s, e)) = f . SumValue mts . (,) s =<< transformM f e
 transformM f (CaseOfSum e ls) = f =<< (CaseOfSum <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
 transformM f (CaseOf e ls) = f =<< (CaseOf <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
@@ -186,3 +186,8 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 transform f e = runIdentity (transformM (return . f) e)
 
 
+isInExpr :: Expr -> Expr -> Bool
+isInExpr e1 e2 = execState (transformM (\e' -> do
+                    when (e1 == e') (put True)
+                    return e'
+               ) e2) False

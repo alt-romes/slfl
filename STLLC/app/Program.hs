@@ -73,7 +73,7 @@ completeFrontendMarksCtx (Program as bs ts cs) =                    -- !TODO: É
                 copyMarksTypes (Binding n e) (CoreBinding _ ce) = Binding n $ copyMarksTypes' (getMarksTypes Map.empty ce) e
                     where
                         getMarksTypes :: MarksTypes -> CoreExpr -> MarksTypes
-                        getMarksTypes m (CoreSyntax.Mark i _ c t) = --Map.insert i (c,t) m
+                        getMarksTypes m (CoreSyntax.Mark i _ c t _) = --Map.insert i (c,t) m
                             Map.insert i (adaptmc c, t) m
                                 where
                                     adaptmc (bc, fc) = (map (\(n,s) ->
@@ -105,7 +105,7 @@ completeFrontendMarksCtx (Program as bs ts cs) =                    -- !TODO: É
                         copyMarksTypes' :: MarksTypes -> Expr -> Expr
                         copyMarksTypes' m e =
                             Syntax.transform (\case
-                                (Syntax.Mark i name _ _) -> let (c, t') = Map.findWithDefault (error "[Copy Marks Types] Failed to find mark index in map") i m
-                                                        in Syntax.Mark i name c t';
+                                (Syntax.Mark i name _ _ ed) -> let (c, t') = Map.findWithDefault (error "[Copy Marks Types] Failed to find mark index in map") i m
+                                                        in Syntax.Mark i name c t' ed;
                                  x -> x) e
 
