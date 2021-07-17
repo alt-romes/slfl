@@ -32,3 +32,6 @@ getNumCode n = fromJust $ lookup n [("a", 0), ("b", 1), ("c", 2), ("d", 3), ("e"
 
 mparens :: String -> String
 mparens s = "(" ++ s ++ ")"
+
+count :: Eq a => a -> [a] -> Int
+count x = length . filter (== x)

@@ -101,21 +101,18 @@ structures~\cite{Bernardy_2018}, enforcing protocols for external \textsc{api}s~
 % TODO: Repensar esta parte dos exemplos de aplicação e de como podemos
 % relacionar o nosso trabalho com futuras aplicações nestes campos
 
+\paragraph{Contributions.}
 Despite their long-known potential (\emph{linear types can change the
 world!}\cite{Wadler90lineartypes}, \cite{DBLP:journals/mscs/CairesPT16,Bernardy_2018}) and,
 primarily, strong proof-theoretic
 foundations \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00}, synthesis of linear functional programs
-from linear types hasn't been previously explored in an ``advanced'' context (e.g.
-with recursion, polymorphism, ...).
-%TODO: Sinto que faltam algumas palavras aqui..
-
-\paragraph{Contributions}
+from linear types in an advanced context has been greatly overlooked.
 In this paper we present a framework for synthesis of linear types extended with
 recursive algebraic data types, parametric polymorphism and refinements.
 % TODO: extensible? proving feasability of... ? showing potential for ... ?
 
 
-\paragraph{Outline}
+\paragraph{Outline.}
 First, we discuss the use of linear types as specifications, the outline of the
 synthesis process, and what that entails for the synthetiser -- ilustrated with
 concrete results (Section~\ref{sec:overview}). Then, we present the
@@ -781,8 +778,7 @@ rather than just type variables since the latter represent universal
 types in the synth, and the first represent an existential instance of
 a scheme, that might inclusively constrain normal type
 variables. Additionally, it's required that all existential type
-variables were assigned a type, and provided they were, we can forget
-the constraints generated from the usage of the scheme. These concepts
+variables were assigned a type. These concepts
 are formalized with the rules:
 \begin{mathpar}
     \infer*[right=($\forall L$)]
@@ -793,7 +789,7 @@ are formalized with the rules:
         \\
         \textrm{ftv}_E(\tau') \cap \{ ?\alpha\ \vert\ (?\alpha \mapsto \tau_x) \in \Theta'\} = \emptyset
     }
-    {\Theta/\Theta; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
+    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
     \and
     \infer*[right=($?L$)]
     {\textsc{unify}(?\alpha

@@ -53,7 +53,7 @@ data RestrictTag = ConstructADT | DeconstructADT | DecideLeftBangR deriving (Sho
 instance Hashable RestrictTag where
     hashWithSalt a r = hashWithSalt a (show r)
 
-data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | MoveLeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Name Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type | LeftRefinement Ctxt (Name, Type) Type | FocusLeftRefinement FocusCtxt (Name, Type) Type | RightRefinement FocusCtxt Type deriving (Show)
+data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | MoveLeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Name Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type | LeftRefinement Ctxt (Name, Type) Type | FocusLeftRefinement FocusCtxt (Name, Type) Type | RightRefinement FocusCtxt Type | FocusLeftBang FocusCtxt (Name, Type) Type | RightExistentialTV FocusCtxt (Name, Type) Type deriving (Show)
 
 
 runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> IO ([Expr], MemoTable)
@@ -65,9 +65,10 @@ runSynth n (g, d) t st adtds = do
         synthComplete (g, d, o) t = do
             (e, d', _) <-  memoizesynth synth (Map.empty, [], recf, d, o) t -- synth only with the recursive function
                        <|> memoizesynth synth (Map.empty, [], g, d, o) t    -- synth with the whole context
-                       <|> let (params, goal) = separateParams t in do  -- synth with the whole context but all function parameters are in delta
-                                let rs' = concatMap (\case (_, a@ADT {}) -> [(ConstructADT, Right a), (DeconstructADT, Right a)]; _ -> []) params
-                                memoizesynth synth (Map.empty, rs', g, params ++ d, o) goal
+                       -- <|> let (params, goal) = separateParams t in do  -- synth with the whole context but all function parameters are in delta
+                       --          let (unrs, lins) = partitionEithers params
+                       --          let rs' = concatMap (\case (_, a@ADT {}) -> [(ConstructADT, Right a), (DeconstructADT, Right a)]; _ -> []) (unrs ++ lins)
+                       --          memoizesynth synth (Map.empty, rs', map (second Right) unrs ++ g, lins ++ d, o) goal
             guard $ null d'
             return (e, d')
 
@@ -75,16 +76,19 @@ runSynth n (g, d) t st adtds = do
                  [] -> []
                  x:xs -> [x] -- head of Gamma is the recursive name since the recursive signature is the last added to the gamma context
 
-        -- TODO: !s in gamma...
-        separateParams :: Type -> ([(Name, Type)], Type)
-        separateParams t = evalState (
+        separateParams :: Type -> ([Either (Name, Type) (Name, Type)], Type)
+        separateParams t = evalState (separateParams' t) 0 
+
+        separateParams' :: Type -> State Int ([Either (Name, Type) (Name, Type)], Type)
+        separateParams' t = 
             case t of
                 Fun a b -> do
                     i <- get
                     put $ i + 1
-                    return $ first (('_':show i, a):) $ separateParams b
+                    case a of
+                      Bang bt -> first (Left ("arg_" ++ getName i, bt):) <$> separateParams' b
+                      _ -> first (Right ("arg_" ++ getName i, a):) <$> separateParams' b
                 fin -> return ([], fin)
-             ) 42
 
 
 initSynthState :: MemoTable -> Int -> SynthState
@@ -182,7 +186,10 @@ checkrestrictions tag ty@(ADT tyn tpl) rs = -- Restrictions only on ADT Construc
 checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Restrictions -> Bool
 checkbinaryrestrictions tag typair rs =
     let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs in
-    typair `notElem` reslist && (not (isExistentialType $ snd typair) || all ((not . isExistentialType) . snd) reslist)
+    typair `notElem` reslist &&
+        -- isExistential => NoExistentialIsBangRestricted
+        let existentialdepth = 1 in
+        (not (isExistentialType $ snd typair) || existentialdepth > count True (map (isExistentialType . snd) reslist)) -- no repeated use of unr functions or use of unr func when one was used focused on an existential
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
@@ -448,10 +455,11 @@ focus c goal =
                 -- (et, etvars) <- existencialInstantiate sch                                       -- tipo com existenciais
                 (se, d', cs') <- memoizefocus' focus' (Just (n, et)) ctxt goal                      -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
                                                                                                     -- resolve ou falha -- por conflito ou falta informação
+                -- trace ("DID I INSTANCE ALL VARIABLES " ++ show (apply cs' et) ++ "\nftv:" ++ show (ftv $ apply cs' et) ++ "\nSet etvars:" ++ show (Set.fromList etvars) ++ "? " ++ show (Set.disjoint (Set.fromList etvars) (ftv $ apply cs' et))) $ do
                                                                                                     -- por conflicto durante o processo
                 guard (Set.disjoint (Set.fromList etvars) (ftv $ apply cs' et))                     -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
                                                                                                     -- after making sure no instantiated variables escaped, the constraints added to the substitution can be forgotten so that it doesn't complicate further scheme computations
-                return (se, d', cs)                                                                 -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
+                return (se, d', cs')                                                                -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
                     where
                         existencialInstantiate (Forall ns t) = do
                             netvs <- mapM (const $ do {i <- freshIndex; return (ExistentialTypeVar i, -i)}) ns
@@ -603,8 +611,18 @@ focus c goal =
                   return (Var n, d, cs')
 
 
-
         ---- * Proposition no longer synchronous * --------
+
+        
+        focus' (Just nh@(n, Bang t)) c (Bang goal) = addtrace (FocusLeftBang c nh (Bang goal)) $ -- If we have a bang focused on bang, don't loop through focus and left bang --> might fail synthesis because of restrictions and is unnecessary
+            focus' (Just (n, t)) c goal
+
+
+        -- preemptively instance existential tv goals
+        focus' (Just nh@(n, h)) c@(cs, rs, g, d) (ExistentialTypeVar x) = addtrace (RightExistentialTV c nh (ExistentialTypeVar x)) $ do
+            cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) h -- goal is an existential proposition generate a constraint and succeed
+            return (Var n, d, cs')
+
 
         ---- adtLFocus
         ---- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
@@ -617,10 +635,15 @@ focus c goal =
                   cs' <- addconstraint cs $ Constraint (ADT tyn tps) (ADT tyn' tps')
                   return (Var n, d, cs')
               else do
-                  adtcns <- getadtcons (ADT tyn tps) 
-                  guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
-                  guard $ checkrestrictions DeconstructADT (ADT tyn tps) rs -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
-                  memoizesynth synth (cs, rs, g, d, [nh]) goal
+                  -- case goal of
+                  --   (ExistentialTypeVar x) -> do
+                  --       cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) (ADT tyn tps)
+                  --       return (Var n, d, cs')
+                  --   _ -> do
+                      adtcns <- getadtcons (ADT tyn tps) 
+                      guard $ not $ null adtcns                                 -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
+                      guard $ checkrestrictions DeconstructADT (ADT tyn tps) rs -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
+                      memoizesynth synth (cs, rs, g, d, [nh]) goal
 
 
         ---- refinementLFocus
@@ -644,15 +667,9 @@ focus c goal =
 
         focus' (Just nh@(n, h)) c@(cs, rs, g, d) goal
           | isAtomic h                      -- left focus is atomic
-          = addtrace (DefaultFocusLeft c nh goal) $
-          do case goal of
-                 (ExistentialTypeVar x)     -- goal is an existential proposition generate a constraint and succeed -- TODO: Fiz isto em vez de ter uma regra para left focus on TypeVar para Existencial porque parece-me que Bool |- ?a tmb deve gerar um constraint ?a => Bool, certo?
-                   -> do
-                        cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) h
-                        return (Var n, d, cs')
-                 _ -> do
-                        guard (h == goal)  -- if is atomic and not the goal, fail
-                        return (Var n, d, cs)  -- else, instantiate it
+          = addtrace (DefaultFocusLeft c nh goal) $ do
+                guard (h == goal)      -- if is atomic and not the goal, fail
+                trace ("Returning instance " ++ show nh ++ " -> " ++ show goal ) $ return (Var n, d, cs)  -- else, instantiate it
           | otherwise
           = addtrace (DefaultFocusLeft c nh goal) $ memoizesynth synth (cs, rs, g, d, [nh]) goal         -- left focus is not atomic and not left synchronous, unfocus
 

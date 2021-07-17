@@ -51,4 +51,14 @@ insert b c = case c of
     | Cons s -> 
         let t*u = s in Cons (t, insert b u);
 
+concat :: forall a . (List (List a) -o List a);
+concat b = case b of 
+      Nil  -> Nil
+    | Cons c -> 
+        let d*e = c in 
+            case d of 
+                  Nil  -> concat e
+                | Cons am -> 
+                    let an*ao = am in Cons (an, concat (Cons (ao, e)));
+
 

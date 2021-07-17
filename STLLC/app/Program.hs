@@ -35,12 +35,13 @@ data ADTD = ADTD Name [Int] [(Name, Type)]    -- Algebraic Data Type Definition
 -------------------------------------------------------------------------------
 
 instance Show Program where
-    show (Program adts bs ts cs) = unlines (map show adts) ++ (if not $ null adts then "\n" else "") ++ displayBindingsWithTypes bs ts -- unlines (map show bs) ++ unlines (map show ts)
+    show (Program adts bs ts cs) = unlines (map show adts) ++ (if not $ null adts then "\n" else "") ++ showSoloAnnotations ++ displayBindingsWithTypes bs ts -- unlines (map show bs) ++ unlines (map show ts)
         where
             displayBindingsWithTypes bs ts = unlines $ map (\b@(Binding n e) -> showbity n ts ++ show b) bs
             showbity n ts = case lookup n $ map (\(TypeBinding n t) -> (n, t)) ts of
                               Nothing -> ""
                               Just ty -> show (TypeBinding n ty)
+            showSoloAnnotations = unlines $ map show $ filter (\(TypeBinding n _) -> (n `notElem` map (\(Binding n' _) -> n') bs) && (n `notElem` concatMap (\(ADTD _ _ ns) -> map fst ns) adts)) ts
 
 
 instance Show ADTD where
