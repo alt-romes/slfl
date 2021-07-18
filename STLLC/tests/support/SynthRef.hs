@@ -18,6 +18,8 @@ synth number :: (x { Int | x > 345 && x != 346 });
 # correct me
 synth add3 :: (x {Int} -o y {Int} -o z {Int} -o k {Int | k == x + y + z});
 
+synth fn :: (x {Int} -o y {Int} -o z {Int} -o k {Int | x + k == y * z});
+
 # comment me
 #synth impossible :: (x {Int} -o y {Int} -o z {Int} -o k { Int | k == x * y + z });
 

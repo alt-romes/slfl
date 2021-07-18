@@ -409,7 +409,7 @@ letsynth :: Parser (Either TypeBinding Binding)
 letsynth = do
     reserved "synth"
     (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
-    usenames <- option [] (do
+    usenames <- option [] (try $ do
         reservedOp "|"
         reserved "using"
         parens $ many1 identifier

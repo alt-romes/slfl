@@ -19,6 +19,9 @@ number = 347;
 add3 :: (x { Int } -o (y { Int } -o (z { Int } -o k { Int | (k == ((x + y) + z)) })));
 add3 a b c = add c (add b a);
 
+fn :: (x { Int } -o (y { Int } -o (z { Int } -o k { Int | ((x + k) == (y * z)) })));
+fn a b c = add (mult (sub 0 1) a) (mult c b);
+
 inc :: (x { Int } -o y { Int | (y == (x + 1)) });
 inc = add 1;
 

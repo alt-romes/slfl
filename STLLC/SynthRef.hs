@@ -13,6 +13,8 @@ synth mm :: (x {Int} -o y {Int} -o z {Int} -o k { Int | k == x - y + z });
 
 synth plus20 :: (x { Int | x > 0 } -o y { Int | y == x + 20 });
 
+synth fn :: (x {Int} -o y {Int} -o z {Int} -o k {Int | x + k == y * z});
+
 synth number :: (x { Int | x > 345 && x != 346 });
 
 # correct me

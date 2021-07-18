@@ -51,7 +51,7 @@ language~\cite{chen2021evaluating},
 examples~\cite{DBLP:conf/popl/FrankleOWZ16} or rich types such as
 polymorphic refinement types~\cite{DBLP:conf/pldi/PolikarpovaKS16} or
 graded types~\cite{DBLP:conf/lopstr/HughesO20}. Regardless of the kind
-of specification, program synthesizers have to deal with two main
+of specification, program synthesisers have to deal with two main
 inherent sources of complexity -- searching over a vast space of
 (potentially) valid programs, and interpreting user intent.
 
@@ -77,7 +77,7 @@ are an infinite number of functions that satisfy this specification).  However,
 the richer type $(x{:}\mathsf{Int}) \rightarrow (y{:}\mathsf{Int}) \rightarrow
 \{z{:}\mathsf{Int} \mid z = x+y\}$ very precisely specifies a function that
 takes integer arguments $x$ and $y$ and returns an integer $z$ that is the sum
-of $x$ and $y$. 
+of $x$ and $y$.
 
 The focus of our work is on type-driven synthesis where specifications take the
 form of linear types.
@@ -101,19 +101,20 @@ structures~\cite{Bernardy_2018}, enforcing protocols for external \textsc{api}s~
 % TODO: Repensar esta parte dos exemplos de aplicação e de como podemos
 % relacionar o nosso trabalho com futuras aplicações nestes campos
 
-\paragraph{Contributions.}
-Despite their long-known potential (\emph{linear types can change the
-world!}\cite{Wadler90lineartypes}, \cite{DBLP:journals/mscs/CairesPT16,Bernardy_2018}) and,
-primarily, strong proof-theoretic
-foundations \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00}, synthesis of linear functional programs
-from linear types in an advanced context has been greatly overlooked.
-In this paper we present a framework for synthesis of linear types extended with
-recursive algebraic data types, parametric polymorphism and refinements.
+\paragraph{Contributions.} Despite their long-known potential (\emph{linear
+types can change the world!}\cite{Wadler90lineartypes},
+\cite{DBLP:journals/mscs/CairesPT16,Bernardy_2018}) and strong proof-theoretic
+foundations
+\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00},
+synthesis with linear types in a more advanced context
+has generally been overlooked in the literature.  In this paper we present a framework for synthesis
+with linear types extended with recursive algebraic data types, parametric
+polymorphism and refinements.
 % TODO: extensible? proving feasability of... ? showing potential for ... ?
 
 
 \paragraph{Outline.}
-First, we discuss the use of linear types as specifications, the outline of the
+First, we discuss linear types as specifications, the outline of the
 synthesis process, and what that entails for the synthetiser -- ilustrated with
 concrete results (Section~\ref{sec:overview}). Then, we present the
 algorithm and formal system driving the synthesis
@@ -165,70 +166,113 @@ directly to \emph{types}, and \emph{proofs} of those propositions to well-typed
 \emph{programs} -- finding a proof of a proposition is finding a program with
 that type.
 
+Linear types make for more precise specifications than simple traditional types
+because information on which resources must necessarily be used is encoded in
+the type. Their preciseness also influences the search space: all programs where
+a linear resource is used non-linearly (i.e. not \emph{exactly once}) are
+ill-typed. With linearity built-in to the synthesis process, usage of a
+linear proposition more than once is not even considered, and unused ones are caught
+mid-process, making proof-search in linear logic potentially faster than
+in classical logic.  % TODO: Reword?
+
 The core of the synthesis is a \emph{sound} and \emph{complete} system
-consisting of \emph{bottom-up} proof search in propositional linear
-logic based on \emph{focusing}~\cite{}. Our approach, being grounded
-by propositions-as-types, ensures that all synthesized programs
-(i.e.~proofs) are well-typed \emph{by construction} (i.e.~if the
-synthesis procedure terminates, then the program satisfies its
-specification). Moreover, we can leverage the modularity of the
-proof-search based approach in two key axes: first, since proof search
-need not construct only closed proofs, we can effectively synthesize
-program sub-expressions (i.e.~synthesis based on typed holes);
-secondly, the framework is amenable to extension beyond the core
-propositional language, employing a richer type structure that
-includes polymorphism, algebraic data types and type refinements.
-
-
-\paragraph{A core linear calculus.}
-we can synthetise programs from specifications that use
-canonical linear types ($\lolli, \with, \tensor, 1, \oplus, \bang$), such as
-fundamental linear logic equivalences. For example, given the specification $(A
-\lolli (B \lolli C)) \lolli (A \tensor B) \lolli C$, the program
-\mintinline{haskell}{\a -> \b -> let c*d = b in a c d}
-% $\lambda a .\ \lambda b .$ let $c \tensor d$ = $b$ in $a$ $c$ $d$
-(commonly known as \emph{uncurry}) is synthetised.
-
-
-\paragraph{Beyond propositional logic.}
-However, a programming language only with the canonical linear types lacks
-expressiveness. To enhance \synname\ and its language, synthetise more
-interesting programs -- and thus empirically prove the feasability of more
-relevant synthesis in a linear context, we extend the syntax and type system
-with recursiveness and richer types: -- polimorfic, refinements, adts
-parametrizáveis...  todo
+consisting of \emph{bottom-up} proof-search in propositional linear logic based
+on \emph{focusing}~\cite{}. Our approach, being grounded by
+propositions-as-types, ensures that all synthetised programs (i.e.~proofs) are
+well-typed \emph{by construction} (i.e.~if the synthesis procedure terminates,
+then the program satisfies its specification). Moreover, we can leverage the
+modularity of the proof-search based approach in two key axes: first, since
+proof search need not construct only closed proofs, we can effectively
+synthetise program sub-expressions (i.e.~synthesis based on typed holes);
+secondly, the framework is amenable to extensions to the core propositional
+language, allowing for the introduction of a richer type structure while
+preserving the correctness of programs by construction.
 
 The \synname\ programming language is naturally born alongside the synthetiser
 to create an environment for it. Synth goals are inserted in the program by use
-of a \emph{synth} keyword or syntatic \emph{mark}, indicating a program should
-be generated for a given type. Additionally, it opens the possibility of synthesis with
-context, that is, with knowledge of other functions and structures defined in
-the same program.
+of a \emph{synth} keyword or mark, indicating a program should be generated for a given
+type. Additionally, it opens the possibility of synthesis with context, that is,
+with knowledge of other functions and structures defined in the same program.
 
 
-Linear types provide a more certain specification, when compared to simple
-traditional types. By requiring some types to be used linearly (consumed) we can
-assure, for example, the deconstruction of an ADT. Given the goal $\bang(a \lolli b)
-\lolli List\ a \lolli List\ b$, the program \mintinline{haskell}{\x -> \y ->
-Nil} wouldn't be valid. To synthetise a valid program,
-\mintinline{haskell}{List a}
-would have to be deconstructed, and its constructor arguments used, resulting
-in the map function without relying on any additional information:
+\paragraph{Core linear calculus.} Initially, we synthetise from
+specifications that only use literals and canonical linear types ($\lolli, \with, \tensor, 1,
+\oplus, \bang$), such as linear logic theorems. Namely,
+the specification $(A \lolli B \lolli C) \lolli (A \tensor B) \lolli C$ produces
+the program \mintinline{haskell}{(\a -> \b -> let c*d = b in a c d)}
+(known as \emph{uncurry}).
 
+
+\paragraph{Beyond propositional logic.} To enhance \synname\ and its language,
+counter the core's lack of expressiveness, synthetise more interesting programs
+-- and thus, empirically prove the feasability of more relevant synthesis in a
+linear context, we extend the syntax and type system with recursiveness,
+parametric polymorphism, algebraic data types (ADTs) and type refinements.
+
+%TODO: Polymorphism ? read todo below
+
+\paragraph{ADTs.} We reiterate the expressiveness of linear types: by requiring some types to be
+used linearly (consumed), we can assure, e.g., the deconstruction of an
+ADT. As such, the specification $\bang(a \lolli b) \lolli List\ a \lolli
+List\ b$ isn't satisfied by the program \mintinline{haskell}{(\x -> \y -> Nil)}.
+To synthetise a valid program from it, \mintinline{haskell}{(List a)} has to be
+deconstructed, and its constructor arguments used. \synname\ would output the following
+function (\emph{map}) without relying on any additional information:
+% TODO: Aqui não estou bem a falar de polymorphism mas parece estranho não por
+% visto que falo dos outros temas? se calhar faço um à parte?
+%
 \begin{minted}{haskell}
 map c d = let !e = c in
     case d of
           Nil  -> Nil
-        | Cons f ->
-            let g*h = f in Cons (e g, map (!e) h);
+        | Cons f -> let g*h = f in Cons (e g, map (!e) h);
 \end{minted}
 
+\paragraph{Refinements.} Refinements are predicates added to a type which must hold for any
+element that inhabits said type. The \synname\ language supports simple
+refinements on integers with arithmetic expressions in the predicates. They
+assert the robustness of our main framework, i.e., how it is amenable to
+significant additions without necessarily interfering with the algorithm.
+%
+As an example, from the specification $x \{Int\} \lolli y \{Int\} \lolli z
+\{Int\} \lolli k \{Int\ \vert\ x + k = y * z\}$, the
+program\ \mintinline{haskell}{(fn a b c = add (mult (sub 0 1) a) (mult c b))} is
+synthetised.
+
+\paragraph{Configuration.} Specifications can be additionally augmented with three keywords: ``using'', ``depth'' and
+``assert''. Through them, we can fine-tune the synthesis process and, respectively,
+force certain functions to be present in the synthesis outcome, allow a
+\emph{deeper} search in the valid programs space, and require given predicates
+to hold true in the program after the synthesis is complete.
+
+Taken directly from the Linear Haskell paper~\cite{Bernardy_2018}, we present a
+complex example of synthesis: given the linear type signatures for array
+primitives (\emph{newMArray} passes a new mutable array to a function that uses
+it linearly, \emph{write} takes a mutable array and writes a pair to it,
+\emph{freeze} consumes a mutable array and produces an imutable array,
+\emph{foldl} has the default definition) we try to synthetise a function
+``array'' that provides an immutable array given a list of pairs to write. The input program is formulated as
+follows:
+%
+\begin{minted}{haskell}
+foldl :: ((a -o b -o a) -> a -o (List b) -o a);
+newMArray :: (Int -> (MArray a -o !b) -o b);
+write :: (MArray a -o (Int * a) -> MArray a);
+freeze :: (MArray a -o !(Array a));
+synth array :: (Int -> List (!(Int * a)) -> Array a)
+    | using (foldl) | depth 3;
+\end{minted}
+%
+And, in a small fraction of a second, matching exactly the linear definition for
+\emph{array} as seen in Linear Haskell~\cite{Bernardy_2018}, \synname\ outputs:
+%
+\begin{minted}{haskell}
+array b c = let !d = b in let !e = c in
+    newMArray (!d) (\j -> freeze (foldl (!write) j e));
+\end{minted}
 
 \section{Synthesis Framework}\label{sec:formal_system}
 % with Linear Types, Polymorphism and Refinements
-
-% \todo[inline]{Encurtar titulo, mas algo nesta onda que descreve
-%   ``tudo''}
 
 \todo[inline]{Aqui parece-me que deves comecar por explicar o que vais
   fazer nesta seccao. Sinto falta da sintaxe da linguagem,
@@ -994,7 +1038,7 @@ between the language of specification and programs and making the
 approach amenable to compositional synthesis techniques.
 
 \mypara{Resourceful Program Synthesis from Graded Linear Types} The
-work~\cite{DBLP:conf/lopstr/HughesO20} synthesizes programs using an
+work~\cite{DBLP:conf/lopstr/HughesO20} synthetises programs using an
 approach very similar to our own.  The work employs so-called graded
 modal types, which is an refinement of pure linear types -- a more
 \emph{fine-grained} version, since it allows for quantitative
@@ -1417,7 +1461,7 @@ argument $N$ but potentially deep in the structure of $M$.
 
 We'll define our inference rules for synthesis under the sequent
 calculus system, for it simplifies the work to be done in the
-synthesizer.
+synthetiser.
 
 
 \mypara{Resource-Management}
