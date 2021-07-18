@@ -5,11 +5,8 @@
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{hyperref}
-
 \usepackage{minted}
-
 \usepackage{todonotes}
-
 \usepackage{multirow}
 
 \newcommand{\lolli}{\multimap}
@@ -18,7 +15,7 @@
 \newcommand{\bang}{{!}}
 \newcommand{\mypara}[1]{\paragraph{\textbf{#1}.}}
 
-\newcommand{\llet}[2]{\mathsf{let}\,#1\,\mathsf{in}\,#2}
+\newcommand{\llet}[2]{\mathsf{let}\ #1\ \mathsf{in}\ #2}
 
 \newcommand{\synname}{\emph{SILI}}
 \def\Rho{P}
@@ -113,16 +110,15 @@ polymorphism and refinements.
 % TODO: extensible? proving feasability of... ? showing potential for ... ?
 
 
-\paragraph{Outline.}
-First, we discuss linear types as specifications, the outline of the
-synthesis process, and what that entails for the synthetiser -- ilustrated with
-concrete results (Section~\ref{sec:overview}). Then, we present the
-algorithm and formal system driving the synthesis
-(Section~\ref{sec:formal_system}). Aftwerwards, we describe the architecture 
-of our synthetiser named \synname, and examine technical details and challenges of the
-implementation (Section~\ref{sec:architecture}). Finally, we evaluate our work
-through expressiveness benchmarks (i.e.~can we synth $X$?) and time benchmarks
-(i.e.~how fast can we synth a term of type $T$?) (Section~\ref{sec:evaluation}).
+\paragraph{Outline.} First, we discuss linear types as specifications, the
+outline of the synthesis process, and what that entails for the synthetiser --
+ilustrated with concrete results (Section~\ref{sec:overview}). Then, we present
+the formal system driving the synthesis (Section~\ref{sec:formal_system}).
+Aftwerwards, we describe the architecture of our synthetiser named \synname, and
+examine technical details and challenges of the implementation
+(Section~\ref{sec:architecture}). Finally, we evaluate our work through
+expressiveness benchmarks (i.e.~can we synth $X$?) and time benchmarks (i.e.~how
+fast can we synth a term of type $T$?) (Section~\ref{sec:evaluation}).
 %TODO: And appendice with...
 
 %This work explores the synthesis of linear functional
@@ -274,54 +270,66 @@ array b c = let !d = b in let !e = c in
 \section{Synthesis Framework}\label{sec:formal_system}
 % with Linear Types, Polymorphism and Refinements
 
-\todo[inline]{Aqui parece-me que deves comecar por explicar o que vais
-  fazer nesta seccao. Sinto falta da sintaxe da linguagem,
-  possivelmente incrementalmente. Comecava por listar os tipos/termos
-  do lambda linear ``simples'', depois em cada subseccao acrescentava
-  as construcoes novas e como a sintese funciona para esse
-  contexto. Enfatizar que a novelty é a combinacao destas features todas.}
+%\todo[inline]{Aqui parece-me que deves comecar por explicar o que vais fazer
+%nesta seccao. Sinto falta da sintaxe da linguagem, possivelmente
+%incrementalmente. Comecava por listar os tipos/termos do lambda linear
+%``simples'', depois em cada subseccao acrescentava as construcoes novas e como a
+%sintese funciona para esse contexto. Enfatizar que a novelty é a combinacao
+%destas features todas.}
 
-The development of \synname\ was based on an almost direct reading of
-concrete inference rules and theoretical principles (~\cite{frank
-  pfenning notes});
-\todo{aqui queres dizer que começaste por te basear
-  num sistema de focusing para a logica linear (era sequer linear a
-  formulacao que comecaste a seguir?) O que são theoretical
-  principles?}
-and work on its environment was also guided by formal
-systems and methods (e.g.~Hindley-Milner type
-inference~\cite{}).\todo{esta frase parece-me desnecessaria. O que
-  queres dizer neste paragrafo, parece-me, é que partes de um sistema
-  focused da literatura que depois vais extender, inspirando te em
-  tecnicas standard de proof search / inferencia.}
+%The development of \synname\ was based on an almost direct reading of concrete
+%inference rules and theoretical principles (~\cite{frank pfenning notes});
+%%
+%\todo{aqui queres dizer que começaste por te basear num sistema de focusing para
+%a logica linear (era sequer linear a formulacao que comecaste a seguir?) O que
+%são theoretical principles?}
+%%
+%and work on its environment was also guided by formal systems and methods
+%(e.g.~Hindley-Milner type inference~\cite{}).
+%%
+%\todo{esta frase parece-me desnecessaria. O que queres dizer neste paragrafo,
+%parece-me, é que partes de um sistema focused da literatura que depois vais
+%extender, inspirando te em tecnicas standard de proof search / inferencia.}
 
-However, with the addition of recursion and
-richer types to the synthesis and language, formal guidelines
-\todo{nao sao formal guidelines, nao existem trabalhos a combinar
-  estas features todas, essa parte é importante. Além de que 
-ao incluir estas coisas deixamos de estar completamente em proof
-search, pois muitas destas coisas (e.g. recursao) nao sao
-necessariamente sound logicamente.
-  Tenta usar termos 
-  especificos. Richer types? Richer como?} to support
-the implementation become scarcer, or more complex \todo{nao existem
-  ou sao complicados? ambos? citacao?}. Accordingly,
-rather than derived from explicit rules, solutions appear first to
-tame the extensions' inherent complex problems (such as infinite
-recursion), and implicit rules come only as a byproduct. \todo{ Nao
-  percebo o que queres dizer aqui. O que sao explicit rules e implicit
-  rules? Ou há regras ou nao há. O que estas a dizer é que inventaste
-  tecnicas de sintese para estes casos, que correspondem as regras que
-  vais apresentar. E tao explicito ou implicito como o que esta na literatura.}
+%However, with the addition of recursion and richer types to the synthesis and
+%language, formal guidelines
+%%
+%\todo{nao sao formal guidelines, nao existem trabalhos a combinar estas features
+%todas, essa parte é importante. Além de que ao incluir estas coisas deixamos de
+%estar completamente em proof search, pois muitas destas coisas (e.g. recursao)
+%nao sao necessariamente sound logicamente.  Tenta usar termos especificos.
+%Richer types? Richer como?}
+%%
+%to support the implementation become scarcer, or more complex.
+%%
+%\todo{nao existem ou sao complicados? ambos? citacao?}
+%%
+%Accordingly, rather than derived
+%from rules, solutions appeared first as techniques to tame the extensions'
+%inherent complex problems (such as infinite recursion), and we now present
+%those techniques as rules.
+%%
+% \todo{ Nao percebo o que queres dizer aqui. O que sao explicit rules e implicit rules?
+% Ou há regras ou nao há. O que estas a
+% dizer é que inventaste tecnicas de sintese para estes casos, que correspondem
+% as regras que vais apresentar. E tao explicito ou implicito como o que esta na
+% literatura.}
 
-With this section we aim to formalize the rules that guide
-the synthesis process for more expressive specifications, alongside the already
-well defined rules that model the core of the synthetiser, resulting in
-a \emph{sound} set of rules that characterizes our framework for synthesis of
-recursive functions from polymorphic and refinement types in a linear context
+Program synthesis from linear types in combination with polymorphism, recursive
+algebraic data types, and refinements, is new in the synthesis 
+literature. Despite the substantial amount of research on linear logic and
+proof-search upon which we found our core synthetiser, formal guidelines for the
+richer types and their inherent complex problems (such as infinite recursion)
+don't exist. % TODO: Developed an algorithm...?
+
+With this section we aim to formalize as rules the novel techniques that guide
+synthesis from our more expressive specifications, alongside the already well
+defined rules that model the core of the synthetiser, putting together a
+\emph{sound} set of inference rules that characterizes our framework for synthesis of
+recursive programs from specifications with the select richer types in a linear context,
 % TODO: Better?....
-, and describes the system in enough detail for
-the synthetiser to be reproducible by a theory-driven implementation.
+and describes the system in enough detail for the synthetiser to be reproducible
+by a theory-driven implementation.
 
 Even so, note that \emph{soundness} and \emph{completeness} have two very
 different meanings, and our \emph{sound} set of rules only guarantees we won't
@@ -331,26 +339,57 @@ subjective trade-offs we decided on. Different choices and approaches outside
 the core might lead to completely distinct synths and spaces of valid programs.
 
 
-\mypara{Core Rules} The core system comprises of the sequent calculus rules for
-linear logic connectives with resource-management and focusing.
-\todo{Introdução para focusing...}
-Focusing separates the proof search into two
-phases: inversion ($\Uparrow$) in which we apply invertible rules eagerly, and
-focusing ($\Downarrow$) in which we decide a proposition to focus on, and then
+\mypara{Core Rules} The core system comprises of proof-search in sequent
+calculus rules for linear logic with resource-management and focusing.
+%
+Andreoli's \emph{focusing} for linear logic~\cite{Andreolli
+focusing} is a technique to remove \emph{inessencial} non-determinism from
+proof-search by structuring the application of invertible and non-invertible
+inference rules. Rules are classified as \emph{left} or \emph{right},
+\emph{invertible} or \emph{non-invertible} as follows:...\todo{não estou a
+conseguir formular bem esta introdução}
+The proof search is separated into two phases:
+%
+inversion ($\Uparrow$), in which we apply all invertible rules eagerly, and
+focusing ($\Downarrow$), in which we decide a proposition to focus on, and then
 apply non-invertible rules, staying focused until either the focus is again an
 asynchronous, i.e. invertible, proposition, or the proof is complete.  For the
 invertible rules, a third, ordered, context ($\Omega$) is needed to hold
-propositions resulting from decomposing connectives; propositions we'll later try to
-invert, moving them to the linear context ($\Delta$) when we fail to.
+propositions resulting from decomposing connectives; propositions we'll later
+try to invert, moving them to the linear context ($\Delta$) when we fail to.
 
-\todo{Primeiro explica os varios judgments (as ``formas'' das
-  conclusoes das regras) e o que significam as varias componentes,
-  nomeadamente a parte da gestao de recursos.  Depois podes explicar
-  regras concretas como fazes a seguir. Tambem seria util dizer quais
-  os tipos que sao invertiveis a esquerda/direita, pois o leitor nao
-  faz ideia do que estas a dizer.}
+% TODO: Explicar vários judgments?
+% \todo{Primeiro explica os varios judgments (as ``formas'' das
+%   conclusoes das regras) e o que significam as varias componentes,
+%   nomeadamente a parte da gestao de recursos.  Depois podes explicar
+%   regras concretas como fazes a seguir. Tambem seria util dizer quais
+%   os tipos que sao invertiveis a esquerda/direita, pois o leitor nao
+%   faz ideia do que estas a dizer.}
+%
+% Esta parte em geral está a ficar pouco coerente, com a introdução do focusing,
+  % a suposta introdução dos judgments, e a introdução da gramática... deixa
 
-Putting together linear logic, the Curry-Howard correspondence, resource
+The core language is a simply typed linear lambda calculus for which the terms
+($M,N$)
+and types' ($\tau$) syntax is constructed with the following grammar:
+\[
+\begin{tabular}{lclc}
+$M,N$ & $\ ::=\ $ & $u, v$ & \emph{variables} \\
+    & & $\vert\ \lambda x. M\ \vert\ M\ N$ & $\lolli$ \\
+    & & $\vert\ M \with N\ \vert\ \mathsf{fst}\ M\ \vert\ \mathsf{snd}\ M$ & $\with$ \\
+    & & $\vert\ M \tensor N\ \vert\ \llet{u\tensor v = M}{N}$ & $\tensor$ \\
+    & & $\vert\ \star\ \vert\ \llet{\star = M}{N}$ & $\textbf{1}$ \\
+    & & $\vert\ \mathsf{inl}\ M\ \vert\ \mathsf{inr}\ M\ \vert\ (\mathsf{case}\
+    M\ \mathsf{of\ inl}\ u \Rightarrow N_1\ \vert\ \mathsf{inr}\ v \Rightarrow
+    N_2)$ & $\oplus$ \\
+    & & $\vert\ \bang M\ \vert\ \llet{\bang u = M}{N}$ & $\bang$ \\
+    \\
+$\tau$ & $\ ::=\ $ & $A, B, C\ \vert\ \tau \lolli \tau\ \vert\ \tau \with \tau\
+    \vert\ \tau \tensor \tau\ \vert\ \textbf{1}\ \vert\ \tau \oplus \tau\ \vert\ \bang \tau$
+\end{tabular}
+\]
+%
+Putting together linear logic and linear lambda calculus through the Curry-Howard correspondence, resource
 management, and focusing, we get the following core formal system (heavily inspired
 by Frank Pfenning's notes on focusing for linear logic~\cite{FPnotes...}) -- in which the
 first rule is read: to synthetise a program of type $A \lolli B$ while inverting
@@ -472,8 +511,8 @@ The decision rules are followed by either left or right focus rules:
     {\Gamma; \Delta/\Delta'' \vdash (M \tensor N) : A \tensor B \Downarrow}
 \and
     \infer*[right=($1 R$)]
-    {  }
-    {\Gamma; \Delta/\Delta \vdash \star : 1 \Downarrow}
+    { }
+    {\Gamma; \Delta/\Delta \vdash \star : \textbf{1} \Downarrow}
 \and
     \infer*[right=($\oplus R_1$)]
     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow}
@@ -532,7 +571,16 @@ for constructors with an arbitrary number of parameters. In the \synname\
 language, the programmer can define custom ADTs; as an example, we show the
 definition of an ADT which might be constructed with zero, one, or two
 propositions of type $A$, using its syntax: \mintinline{haskell}{data Container
-= None 1 | One A | Two (A * A)}
+= None 1 | One A | Two (A * A)}. The language grammar is extended as:
+\[
+\begin{tabular}{lclc}
+    $M,N$ & $\ ::=\ $ & $\dots\ \vert\ \emph{Cons}_n\ M\ \vert\ (\mathsf{case}\
+    M\ \mathsf{of}\ \dots\ \vert\ \emph{Cons}_n\ u \Rightarrow N)$ \\
+    $\tau$ & $\ ::=\ $ & $\dots\ \vert\ \langle\emph{name}\rangle$ \\
+    $ADT$ & $\ ::=\ $ & (\textsf{data} $\langle\emph{name}\rangle$\ $=$\ $\emph{Cons}_1\ \tau$\
+$\vert$\ $\dots$\ $\vert$\ $\emph{Cons}_n\ \tau$) \\ \end{tabular}
+\]
+%TODO: Como definir gramática dos ADTs?
 
 The semantics of the ADTs relate to those of the plus ($\oplus$) type --
 both are additive disjunctions.  A proof of an ADT requires only a proof of one
@@ -541,7 +589,7 @@ proof of either the left or right type it consists of. Analogously, a proof of
 $C$ by deconstructing an ADT stipulates that all types that can construct the
 ADT can prove $C$, akin to the left rule for the $\oplus$ connective. In effect,
 the inference rules for a simple ADT mimic the $\oplus$ rules, for an
-arbitrary ($> 1$) number of types, rather than exactly two. Therefore, there's one
+arbitrary ($>1$) number of types, rather than exactly two. Therefore, there's one
 left rule for ADTs, and an arbitrary number of right rules, one for each
 constructor:
 
@@ -597,12 +645,7 @@ derivation:
             \infer*[right=(adtL)]
             {
                 \infer*[right=(adtL)]
-                {
-                    \infer*[right=(adtL)]
-                    {\dots}
-                    {\Gamma; \Delta/\Delta'; \Omega, z{:}T \Uparrow\ \vdash \textrm{case}\ z\ 
-                    \textrm{of}\ C_1\ k \rightarrow \dots : C}
-                }
+                {\dots}
                 {\Gamma; \Delta/\Delta'; \Omega, y{:}T \Uparrow\ \vdash \textrm{case}\ y\ 
                 \textrm{of}\ C_1\ z \rightarrow \dots : C}
             }
@@ -626,11 +669,7 @@ derivation for the synth goal $T$ is also infinite.
         \infer*[left=(adtR)]
         {
             \infer*[left=(adtR)]
-            {
-                \infer*[left=(adtR)]
-                {\dots}
-                {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
-            }
+            {\dots}
             {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
         }
         {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
@@ -943,6 +982,7 @@ function and represent failure or success information with the Maybe type. We
 ran benchmarks to measure the impact of memoization on the performance. It's
 especially noticeable in synthesis with multiple functions in the unrestricted
 context, or more complex specifications:
+%TODO: ignore constraints if type isnnt existential
 %
 \begin{center}
     \begin{tabular}{ |c|c|c|c|c| }
@@ -1032,7 +1072,7 @@ refinement types (which correspond to a first-order logic through the
 Curry-Howard isomorphism) -- this is an interesting combination that offers
 ``expressive power and decidability, which enables automatic
 verification--and hence synthesis--of nontrivial programs''.  Their
-approach to refinement types consists a new algorithm that supports
+approach to refinement types consists of a new algorithm that supports
 decomposition of the refinement specification, allowing for separation
 between the language of specification and programs and making the
 approach amenable to compositional synthesis techniques.

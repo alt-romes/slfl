@@ -7,3 +7,5 @@ node_modules/
 *.out
 *.pdf
 _minted-article/
+llncs.cls
+splncs04.bst
