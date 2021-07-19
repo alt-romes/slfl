@@ -28,4 +28,4 @@ synth foldr :: (!(a -o b -o b) -o b -o List a -o b);
 
 synth insert :: (a -o List a -o List a)
 
-#synth concat :: (List (List a) -o List a);
+synth concat :: (List (List a) -o List a);

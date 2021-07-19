@@ -13,4 +13,4 @@ synth map :: ((a -o b) -> BST a -o BST b);
 synth uncons :: (BST a -o Maybe (a * (BST a) * (BST a)));
 
 # fails after a long time
-synth foldl :: ((b -o a -o b) -> b -o BST a -o b);
+#synth foldl :: ((b -o a -o b) -> b -o BST a -o b);

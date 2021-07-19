@@ -48,8 +48,8 @@ foldr c d e = let !f = c in
 insert :: forall a . (a -o (List a -o List a));
 insert b c = case c of 
       Nil  -> Cons (b, Nil)
-    | Cons s -> 
-        let t*u = s in Cons (t, insert b u);
+    | Cons g -> 
+        let h*i = g in Cons (h, insert b i);
 
 concat :: forall a . (List (List a) -o List a);
 concat b = case b of 
@@ -58,7 +58,7 @@ concat b = case b of
         let d*e = c in 
             case d of 
                   Nil  -> concat e
-                | Cons am -> 
-                    let an*ao = am in Cons (an, concat (Cons (ao, e)));
+                | Cons k -> 
+                    let l*m = k in Cons (l, concat (Cons (m, e)));
 
 

@@ -143,7 +143,7 @@ addrestriction tag ty rs = (tag, Right ty):rs
 
 
 addbinaryrestriction :: RestrictTag -> Type -> Type -> Restrictions -> Restrictions
-addbinaryrestriction tag ty ty' rs = (tag, Left (ty, ty')):rs
+addbinaryrestriction tag ty ty' rs = if isFunction ty then (tag, Left (ty, ty')):rs else rs
 
 
 addtrace :: TraceTag -> Synth a -> Synth a
@@ -172,7 +172,7 @@ getExistentialDepth = lift (lift ask) >>= \(b,c,d,ra,ed) -> return ed
 checkrestrictions :: RestrictTag -> Type -> Restrictions -> Bool
 checkrestrictions tag ty@(ADT tyn tpl) rs = -- Restrictions only on ADT Construction and Destruction
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs in
-    ty `notElem` reslist && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
+    ty `notElem` reslist -- && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
 
 checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Restrictions -> Synth Bool
 checkbinaryrestrictions tag typair rs = do
@@ -336,7 +336,7 @@ synth c@(cs, rs, g, d, p@(n, ADT tyn tps):o) t = addtrace (LeftADT rs c (ADT tyn
        then let rs' = addrestriction DeconstructADT (ADT tyn tps) rs in memoizesynth synth (cs, rs', g, p:d, o) t    -- An ADT that has no constructors might still be used to instantiate a proposition, but shouldn't leave synchronous mode (hence the restriction)
        else do
             isrectype <- isRecursiveType (ADT tyn tps)
-            (ls, cs'') <- runStateT (mapM (\(name, vtype) ->
+            (ls, cs'') <- runStateT (mapMFairConj (\(name, vtype) ->
                 let rs' = if isrectype then addrestriction DeconstructADT (ADT tyn tps) rs else rs in   -- For recursive types, restrict deconstruction of this type in further computations
                         case vtype of
                           Unit -> do
@@ -360,6 +360,12 @@ synth c@(cs, rs, g, d, p@(n, ADT tyn tps):o) t = addtrace (LeftADT rs c (ADT tyn
     addtrace (MoveLeftADT rs c (ADT tyn tps) t) (do
     guard $ not $ checkrestrictions DeconstructADT (ADT tyn tps) rs                 -- ADT with a restriction on deconstruction might still be useful by being instantiated while focused -- e.g. a Tensor was deconstructed asynchronously but the ADT has a deconstruct restriction -- it shouldn't fail, yet it shouldn't deconstruct either -- this option covers that case (Similar to "Move To Delta" but for ADTs that we cannot deconstruct any further)
     memoizesynth synth (cs, rs, g, p:d, o) t)                                       -- So if we failed above because a restriction didn't allow us to invert this ADT, try using the hypothesis in the linear context -- it won't loop back here because the DeconstructADT
+        where
+            mapMFairConj _ [] = return [] 
+            mapMFairConj f (x:xs) =
+                f x >>- \x' -> do
+                    xs' <- mapMFairConj f xs
+                    return $ x':xs'
 
 ---- !L
 synth c@(cs, rs, g, d, (n, Bang a):o) t = addtrace (LeftBang c (Bang a) t) $ do
@@ -428,7 +434,7 @@ focus c goal =
                                      managerestrictions n x = do    
                                          (recname, recallowed) <- getRecInfo  -- Restrict usage of recursive function if it isn't allowed
                                          guard $ recname /= n || recallowed
-                                         when (isFunction x) $ checkbinaryrestrictions DecideLeftBangR (x, goal) rs >>= guard -- Restrict re-usage of decide left bang to synth the same goal a second time, if using a function
+                                         checkbinaryrestrictions DecideLeftBangR (x, goal) rs >>= guard -- Restrict re-usage of decide left bang to synth the same goal a second time, if using a function
                                          return $ addbinaryrestriction DecideLeftBangR x goal rs
 
         

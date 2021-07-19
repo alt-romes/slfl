@@ -343,7 +343,7 @@ the core might lead to completely distinct synths and spaces of valid programs.
 calculus rules for linear logic with resource-management and focusing.
 %
 Andreoli's \emph{focusing} for linear logic~\cite{Andreolli
-focusing} is a technique to remove \emph{inessencial} non-determinism from
+focusing} is a technique to remove inessencial non-determinism from
 proof-search by structuring the application of invertible and non-invertible
 inference rules. Rules are classified as \emph{left} or \emph{right},
 \emph{invertible} or \emph{non-invertible} as follows:...\todo{não estou a
@@ -369,9 +369,14 @@ try to invert, moving them to the linear context ($\Delta$) when we fail to.
 % Esta parte em geral está a ficar pouco coerente, com a introdução do focusing,
   % a suposta introdução dos judgments, e a introdução da gramática... deixa
 
-The core language is a simply typed linear lambda calculus for which the terms
-($M,N$)
-and types' ($\tau$) syntax is constructed with the following grammar:
+The core language is a simply-typed linear lambda calculus with linear
+functions, additive and multiplicative pairs, multiplicative unit, additive sums
+and the exponential modality (to internalize unrestricted use of variables), for
+which the terms ($M,N$) and types' ($\tau$) syntax is constructed with the
+following grammar:
+%
+% TODO: Nao é um problema eu dizer que o A e B são átomos ali em cima e aqui
+% usá-los como tipos gerais?
 \[
 \begin{tabular}{lclc}
 $M,N$ & $\ ::=\ $ & $u, v$ & \emph{variables} \\
