@@ -45,7 +45,7 @@ type MemoTable = Map.Map Int (Maybe (Expr, Delta, Subst, Int))
 
 
 type SynthReaderState = ([ADTD], Int, [TraceTag], (Name, Bool), Int) -- (list of restrictions applied on types in specific places, list of ADTDs to be always present)
-type Restriction = Either (Type, Type) Type
+type Restriction = Either (Either Scheme Type, Type) Type
 type Restrictions = [(RestrictTag, Restriction)]
 
 
@@ -142,7 +142,7 @@ addrestriction :: RestrictTag -> Type -> Restrictions -> Restrictions
 addrestriction tag ty rs = (tag, Right ty):rs
 
 
-addbinaryrestriction :: RestrictTag -> Type -> Type -> Restrictions -> Restrictions
+addbinaryrestriction :: RestrictTag -> Either Scheme Type -> Type -> Restrictions -> Restrictions
 addbinaryrestriction tag ty ty' rs = if isFunction ty then (tag, Left (ty, ty')):rs else rs
 
 
@@ -174,13 +174,13 @@ checkrestrictions tag ty@(ADT tyn tpl) rs = -- Restrictions only on ADT Construc
     let reslist = rights $ map snd $ filter (\(n,x) -> n == tag) rs in
     ty `notElem` reslist -- && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
 
-checkbinaryrestrictions :: RestrictTag -> (Type, Type) -> Restrictions -> Synth Bool
+checkbinaryrestrictions :: RestrictTag -> (Either Scheme Type, Type) -> Restrictions -> Synth Bool
 checkbinaryrestrictions tag typair rs = do
     existentialdepth <- getExistentialDepth
     let reslist = lefts $ map snd $ filter (\(n,x) -> n == tag) rs
     return $ typair `notElem` reslist &&
-        -- isExistential => NoExistentialIsBangRestricted
-        (not (isExistentialType $ snd typair) || existentialdepth > count True (map (isExistentialType . snd) reslist)) -- no repeated use of unr functions or use of unr func when one was used focused on an existential
+        -- isExistential => Poly-Exist pairs are less than the existential depth
+        (not (isExistentialType $ snd typair) || existentialdepth > count True (map (\x -> isExistentialType (snd x) && isLeft (fst x)) reslist)) -- no repeated use of unr functions or use of unr func when one was used focused on an existential
 
 
 getadtcons :: Type -> Synth [(Name, Type)] -- Handles substitution of polimorfic types with actual type in constructors
@@ -424,13 +424,13 @@ focus c goal =
               _ -> do
                   foldr ((<|>) . (\case
                                     (n, Right x) -> addtrace (DecideLeftBang rs x goal) $ do
-                                        rs' <- managerestrictions n x
+                                        rs' <- managerestrictions n (Right x)
                                         memoizefocus' focus' (Just (n, x)) (cs, rs', g, din) goal;
                                     (n, Left sch) -> addtrace (DecideLeftBangSch rs sch goal) $ do
-                                        rs' <- managerestrictions n (instantiateFrom 0 sch)
+                                        rs' <- managerestrictions n (Left sch)
                                         memoizefocusSch focusSch (n, sch) (cs, rs', g, din) goal)) empty g
                                  where
-                                     managerestrictions :: Name -> Type -> Synth Restrictions
+                                     managerestrictions :: Name -> Either Scheme Type -> Synth Restrictions
                                      managerestrictions n x = do    
                                          (recname, recallowed) <- getRecInfo  -- Restrict usage of recursive function if it isn't allowed
                                          guard $ recname /= n || recallowed

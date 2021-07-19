@@ -318,12 +318,20 @@ isExistentialType (TypeVar x) = False
 isExistentialType (RefinementType _ t _ _) = isExistentialType t
 isExistentialType Unit = False
 
+class TypeProperties a where
+    isFunction :: a -> Bool
 
-isFunction :: Type -> Bool
-isFunction (Fun _ _) = True
-isFunction _ = False
+instance TypeProperties Type where
+    isFunction (Fun _ _) = True
+    isFunction _ = False
 
+instance TypeProperties Scheme where
+    isFunction (Forall _ (Fun _ _)) = True
+    isFunction _ = False
 
+instance (TypeProperties a, TypeProperties b) => TypeProperties (Either a b) where
+    isFunction (Left x) = isFunction x
+    isFunction (Right x) = isFunction x
 
 
 -------------------------------------------------------------------------------
