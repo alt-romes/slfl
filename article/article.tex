@@ -847,7 +847,7 @@ holds both types and schemes. Consequently, after the rule
 \textsc{decideLeft!} is applied, we become left focused on either a
 type or a scheme. Since left focus on a type is already well
 formulated, only rules for left focus on a scheme are needed. Our
-algorithm instances bound type vars of the focused scheme with
+algorithm instances bound type variables of the focused scheme with
 existential type variables, and the instanced type becomes the left
 focus. Inspired by the Hindley-Milner system, we also generate
 inference constraints on the existential type variables (postponing
@@ -857,16 +857,17 @@ across derivation branches the same way the linear context is (by
 havin an input and output context ($\Theta/\Theta'$)).  In contrast to
 Hindley-Milner's inference, everytime a constraint is added it is solved against all other
 constraints -- a branch of the proof search is desired to fail as soon
-as possible; and more, two different existential vars do not unify
-against one another ($?\alpha \mapsto ?\beta$ fails) \todo{O que
-  significa $?\alpha$ ? Não foi explicado -- no Hindley-Milner nao ha
-  propriamente o problema de misturar variaveis existenciais com universais}. Note that we
-instance the scheme with \emph{existential} type variables ($\alpha$)
-rather than just type variables since the latter represent universal
+as possible.
+%TODO: Como fazer? \todo{O que
+% significa $?\alpha$ ? Não foi explicado -- no Hindley-Milner nao ha
+% propriamente o problema de misturar variaveis existenciais com universais}
+Note that we
+instance the scheme with \emph{existential} type variables ($?\alpha$)
+rather than just type variables ($\alpha$) since the latter represent universal
 types in the synth, and the first represent an existential instance of
-a scheme, that might inclusively constrain normal type
+a scheme, that might inclusively constrain traditional type
 variables. Additionally, it's required that all existential type
-variables were assigned a type. These concepts
+variables are assigned a type. These concepts
 are formalized with the rules:
 \begin{mathpar}
     \infer*[right=($\forall L$)]
@@ -890,9 +891,7 @@ are formalized with the rules:
     \mapsto A, \Theta)}
     {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
     x{:}A \Downarrow\ \vdash x : ?\alpha}
-\end{mathpar}
-where
-\begin{mathpar}
+    \\
     \forall \overline{\alpha}.\ \tau \sqsubseteq_E \tau'\ \textrm{means type}\
     \tau'\ \textrm{is an \emph{existential instantiation} of scheme}\ \forall
     \overline{\alpha}.\ \tau
@@ -906,6 +905,62 @@ where
     \textrm{can be unified with those in}\ \Theta
 \end{mathpar}
 
+
+\mypara{More Restrictions} We can now look at two more sources of infinite
+recursion in the synthesis process. The first is the use of an unrestricted
+function to synthetise a term of type $\tau$ that in turn will require a term of
+the same type $\tau$. A good example is the sub-goal judgment $\Gamma,(a \lolli
+b \lolli b); (a \lolli b \lolli b) \Downarrow\ \vdash b$ that
+appears while synthetising \emph{foldr} -- we apply ($\lolli$L)
+until we can use \textsc{init} ($b \Downarrow\ \vdash b$), and then we must
+synthetise an argument of type $b$. Without any additional restrictions, we
+can end up left focused on $(a \lolli b \lolli b)$ again, and again require $b$,
+and on and on. The solution will be to disallow the usage of the same function
+to synthetise the same goal a second time further down in the derivation.
+
+% TODO TODO: Big rewrite
+The other situation occurs when using an unrestricted polymorphic function that
+requires synthesis of a term with an existential type when the goal is an
+existential type. In contrast to the previous problem, the type of the goal and
+of the argument that will cause the loop won't be the same, since instantiated
+bound variables are always fresh. For example, for $\Gamma,\forall \alpha,\beta
+.\ \alpha\lolli\beta\lolli\beta;?\alpha\lolli?\beta\lolli?\beta \Downarrow\
+\vdash\ ?\sigma$, we'll unify $?\beta$ with $?\sigma$, and then require a term
+of type $?\beta$ (not $?\sigma$). We want to forbid the usage of the \emph{same}
+function to attain \emph{any} existential goal, provided that function might
+create existential sub-goals (i.e. it's polymorphic). However, we noticed that,
+even though for most tried problems this ``same function'' approach worked,
+context-heavy problems such as \emph{array} (seen in Section~\ref{sec:overview})
+wouldn't terminate in a reasonable amount of time.  In fact, with $n$
+polymorphic functions in the unrestricted context, the complexity of searching for a
+program of any existential type $?\alpha$, while restricting solely the used
+function, is $O(n!)$~\ref{exemplo_apendice?}. As such, we'll instead forbid the
+usage of \emph{all} unrestricted polymorphic functions to synthetise any
+existential type if, altogether, we've already used $d_e$ times a polymorphic
+function for \emph{any} existential sub-goal, where $d_e$ is a \emph{constant
+existential depth} that controls the maximum depth of ``existential synthetis''.
+This approach reduces the complexity of our proof-search algorithm for
+existential types to $O(\tfrac{n!}{d_e!}) = O(n^{d_e})$.
+
+Extending the restrictions context ($\Rho$) with restrictions on using the
+unrestricted context ($\Rho_{L!}$), we modify \textsc{decideLeft!} to formalize
+the previous paragraph:
+\begin{mathpar}
+    \mprset{flushleft}
+    \infer*[right=(decideL!)]
+    {
+    (A, C) \notin \Rho_{L!}
+    \\
+    \textsc{isExist}(C) \Rightarrow |\{u\ |\
+    (f,u)\in\Rho_{L!},\textsc{isExist}(u),\textsc{isPoly}(f)\}| < d_e
+    \\
+    \Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!}');\Gamma, A; \Delta/\Delta' ; A
+    \Downarrow\ \vdash C
+    }
+    {\Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!});\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+    \\
+    \Rho_{L!}' =\ \textbf{if}\ \textsc{isFunction}(A)\ \textbf{then}\ \Rho_{L!},(A, C)\ \textbf{else}\ \Rho_{L!}
+\end{mathpar}
 
 
 \mypara{Polymorphic ADTs}
