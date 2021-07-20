@@ -382,8 +382,9 @@ phases: %
 the inversion phase ($\Uparrow$), in which we apply \emph{all} invertible rules
 eagerly, and the focusing phase  ($\Downarrow$), in which we decide a proposition
 to focus on, and then apply non-invertible rules, staying \emph{in focus}
-until we reach an asynchronous, i.e. invertible,
-proposition or the proof is complete.
+until we reach an asynchronous (i.e. invertible proposition), the
+proof is complete or no rules are applicable, in which the proof must
+\emph{backtrack} to the state at which the focusing phase began.
 
 \todo[inline]{Isto so faz sentido olhando para os judgments}
 For the invertible rules, a
@@ -1037,9 +1038,9 @@ type substitution needn't be explicit in the rule:
 \section{Architecture}\label{sec:architecture}
 
 The \synname\ synthetiser operates as part of the pipeline that processes a
-full program in the \synname\ language, and is called to generate parts marked
+full program in the \synname\ language, and is called to generate terms marked
 (by the syntax \emph{\{\{ ... \}\}}) for
-synthesis of said program. The main pipeline consists of:
+synthesis. The main pipeline consists of:
 \[
     \textrm{Parsing} \rightarrow \textrm{Desugaring} \rightarrow \textrm{Inference} \rightarrow \textrm{Synthesis}
 \]
@@ -1048,10 +1049,12 @@ The parsing module converts ADT declarations and top level functions written in
 the language's syntax to a list of abstract syntax trees (ASTs) understood by the rest of the
 pipeline.
 
-The desugaring module converts the frontend AST to a core AST without syntatic
-sugar and using the locally-nameless representation~\cite{locally nameless}, in
-which all bound variables have no name, and instead are addressed using the
-number of binders traversed since the binding.
+The desugaring module converts the frontend AST to a core AST without
+syntatic sugar and using the locally-nameless
+representation~\cite{locally nameless}, in which all bound variables
+are represented with Debruijn indices rather than names (i.e.~using
+the distance to the binding site in terms of the number of traversed
+binders),
 % TODO: não ficou muito mais claro :\todo{Explica o que e isto}
 This way inference can be done without worrying about name conflicts.
 
@@ -1062,60 +1065,71 @@ found in the AST, all the inferrence context up to that point is added to the
 mark, and if not explicit, its type is inferred, essentially defining the synth
 context and synth goal.
 
-The synthesis module iterates over the synth marks and runs the synthetiser with
-its context and goal for each, minimizing the resulting expression, and
-replacing the mark in the frontend AST with the synthed program.
+The synthesis module iterates over the synthesis marks and runs the
+synthetiser with its context and goal for each mark, minimizing the
+resulting expression (i.e.~$\eta$-reducing it), and replacing the mark
+in the frontend AST with the synthed program.
 
 
 \subsection{Implementation}
 
-\mypara{General} The complete implementation of the synthetiser and environment
-pipeline was done in Haskell...
+\mypara{General} The implementation was carried out in Haskell. We
+highlight some key points.
 
-\mypara{Backtracking} Even though the synthetiser formal system helps, there's
-still non-determinism in the synthesis process. At diverse times in the proof
-construction we must choose one of multiple rules to apply, and in the event of
-not being able to construct the proof following that choice, we want to
-backtrack to the decision point and attempt to create a proof taking a different
-route. To this effect, our prototype synthetiser depends on \emph{logict}, "a backtracking logic-programming
-monad"~\cite{logict}.
+\mypara{Backtracking} Even though focusing reduces non-determinism
+during proof search, it cannot fully eliminate it. At several points
+during proof construction we must choose one of multiple rules to
+apply, and in the event of not being able to construct the proof
+following that choice, we want to backtrack to the decision point and
+attempt to derive a proof taking a different route. To this effect,
+our prototype synthetiser depends on \emph{LogicT}, "a backtracking
+logic-programming monad"~\cite{logict}.
 
-\mypara{SMT Solving} To typecheck and synthetise refinement types and dependent
-functions, we need to contact an SMT solver to check satisfiability. For this,
-we use the library \emph{sbv}~\cite{sbv}. Unfortunately, this library does not
-support the usage of the SMT solvers to satisfy and output more complicated
-first-order logic uninterpreted functions -- since this is needed to synthetise refinement types
-when right focused, we instead use unsafe library primitives to communicate with
-the solver directly, constructing the logical formulas ourselves. For 
-satisfying formulas, for instance, when typechecking, or left focused on a
-refinement type, we use the library api successfully to get a veridct on
-satisfiability.
+\mypara{SMT Solving} To typecheck and synthesize refinement types and
+dependent functions, we interface with an SMT solver to check
+satisfiability. For this, we use the library
+\emph{SBV}~\cite{sbv}. Unfortunately, this library does not support
+the usage of SMT solvers to check first-order logic with uninterpreted
+functions. Since this is needed for synthesis with refinement types
+when right focused, we instead use unsafe library primitives to
+communicate with the solver directly, constructing the logical
+formulas directly. For satisfying formulas, for instance, when
+typechecking, or left focused on a refinement type, we use the library
+API as an oracle.
 
-\mypara{Memoization} Some proofs attempt to synthetise the same sub-goal with
-the same premises more than once. Since these proof attempts might be expensive
-performance-wise, and we can rely on the program's determinism (equal calls to
-synthetise result in equal outcomes), we add to our synthetiser memoization, an
-optimization technique that stores function calls and returns cached values for
-equal inputs. For our synthetiser, two calls are equivalent when contexts
-$\Theta, \Rho, \Gamma, \Delta$, $\Omega$, (or alternatively the left focus), and
-the goal, are equivalent. Because comparing all of these is slow, our
-implementation hashes the relevant values and uses the result as the key.
-Furthermore, a branch we want to memoize might fail, not providing any result --
-we also want to record synthesis failure, as it happens more often than
-successful results. We capture failure of a logict computation using the $ifte$
-function and represent failure or success information with the Maybe type. We
-ran benchmarks to measure the impact of memoization on the performance. It's
-quite noticeable in synthesis with multiple functions in the unrestricted
-context, or more complex specifications. For example, if we add a new function
-\emph{read} to the unrestricted context in the \emph{array} problem seen in
-Section~\ref{sec:overview}, synthesis with memoization will take around
-$5s$, while synthesis without memoization doesn't terminate even after
-$15m$ running.
+\mypara{Memoization} Some proofs attempt to synthetise the same
+sub-goal with the same premises more than once. Since these proof
+attempts might be expensive performance-wise, and we can rely on the
+program's determinism (equal calls to synthetise result in equal
+outcomes), we added memoization to our synthesizer -- an optimization
+technique that stores function calls and returns cached values for
+equal inputs.
+%
+For our synthesizer, two calls are equivalent when
+contexts $\Theta, \Rho, \Gamma, \Delta$, $\Omega$, (or alternatively
+the left focus), and the goal, are equivalent. Because comparing all
+of these is slow, our implementation hashes the relevant values and
+uses the result as the key\todo{via a hashconsing library?}.
+%
+Furthermore, a branch we want to memoize
+might fail, not providing any result -- we also want to record
+synthesis failure, as it happens more often than successful
+results. We capture failure of a LogicT computation using the $\mathit{ifte}$
+function and represent failure or success information with the \texttt{Maybe}
+type. We ran benchmarks to measure the impact of memoization on 
+performance. It's quite noticeable in synthesis with multiple
+functions in the unrestricted context, or more complex
+specifications. For example, if we add a new function \emph{read} to
+the unrestricted context in the \emph{array} problem seen in
+Section~\ref{sec:overview}, synthesis with memoization will take
+around $5s$, while synthesis without memoization doesn't terminate
+even after $15m$ running.
 %
 The implementation could be improved by better combining the
 memoization with the LogicT monad transformer (remembering decisions across
 backtracking branches) and by finetuning key-equality by ignoring context
-components that aren't relevant to the synthesis call, to name some examples.
+components that aren't relevant to the synthesis call, to name some
+examples. We leave such optimizations to future work.
 
 
 
