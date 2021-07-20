@@ -981,7 +981,13 @@ type substitution needn't be explicit in the rule:
     T_{\overline\beta}}
 \end{mathpar}
 
-\mypara{Refinement Types}
+\mypara{Refinement Types} Their syntax is... Their rules are...
+
+\begin{mathpar}
+    \infer*[right=(refR)]
+    {  }
+    {  }
+\end{mathpar}
 
 
 
@@ -1020,7 +1026,7 @@ replacing the mark in the frontend AST with the synthed program.
 
 \subsection{Implementation}
 
-\mypara{General} The complete implementation of the synthetiser and environment
+The complete implementation of the synthetiser and environment
 pipeline was done in Haskell...
 
 \mypara{Backtracking} Even though the synthetiser formal system helps, there's
@@ -1028,8 +1034,17 @@ still non-determinism in the synthesis process. At diverse times in the proof
 construction we must choose one of multiple rules to apply, and in the event of
 not being able to construct the proof following that choice, we want to
 backtrack to the decision point and attempt to create a proof taking a different
-route. To this effect, our prototype synthetiser depends on \emph{logict}, "a backtracking logic-programming
-monad"~\cite{logict}.
+route. To this effect, our prototype synthetiser depends on \emph{logict}, "a
+backtracking logic-programming monad"~\cite{logict}. Special attention is
+required for ADTs. When deconstructing an ADT, since all branches must be
+synthetisable and result in the same ouput linear context $\Delta'$, alternative
+constructor deconstructions should be considered fairly in conjunction, so the
+\textbf{fair conjunction} operator should be used. When constructing an ADT, the
+disjunctive choice of constructor should be fair, and so the \textbf{fair
+disjunction} operator used. Fairness at these two points usually increases
+the synthesis speed slightly, but can be a relevant factor in synthesis in which a
+combination of choices following the ADT deconstruction or construction can
+backtrack many times or even arbitrarily.
 
 \mypara{SMT Solving} To typecheck and synthetise refinement types and dependent
 functions, we need to contact an SMT solver to check satisfiability. For this,

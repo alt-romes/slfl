@@ -452,7 +452,6 @@ focus c goal =
                 -- (et, etvars) <- existencialInstantiate sch                                       -- tipo com existenciais
                 (se, d', cs') <- memoizefocus' focus' (Just (n, et)) ctxt goal                      -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
                                                                                                     -- resolve ou falha -- por conflito ou falta informação
-                -- trace ("DID I INSTANCE ALL VARIABLES " ++ show (apply cs' et) ++ "\nftv:" ++ show (ftv $ apply cs' et) ++ "\nSet etvars:" ++ show (Set.fromList etvars) ++ "? " ++ show (Set.disjoint (Set.fromList etvars) (ftv $ apply cs' et))) $ do
                                                                                                     -- por conflicto durante o processo
                 guard (Set.disjoint (Set.fromList etvars) (ftv $ apply cs' et))                     -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
                                                                                                     -- after making sure no instantiated variables escaped, the constraints added to the substitution can be forgotten so that it doesn't complicate further scheme computations
