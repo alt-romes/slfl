@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Program (Program(..), ADTD(..), trivialProgram, completeFrontendMarksCtx) where
+module Program (Program(..), ADTD(..), trivialProgram, completeFrontendMarksCtx, builtinfs) where
 
 import qualified Data.Map as Map
 import GHC.Generics (Generic)
@@ -41,7 +41,7 @@ instance Show Program where
             showbity n ts = case lookup n $ map (\(TypeBinding n t) -> (n, t)) ts of
                               Nothing -> ""
                               Just ty -> show (TypeBinding n ty)
-            showSoloAnnotations = unlines $ map show $ filter (\(TypeBinding n _) -> (n `notElem` map (\(Binding n' _) -> n') bs) && (n `notElem` concatMap (\(ADTD _ _ ns) -> map fst ns) adts)) ts
+            showSoloAnnotations = unlines $ map show $ filter (\(TypeBinding n _) -> (n `notElem` map (\(Binding n' _) -> n') bs) && (n `notElem` concatMap (\(ADTD _ _ ns) -> map fst ns) adts) && (n `notElem` map (\(TypeBinding n _) -> n) builtinfs)) ts
 
 
 instance Show ADTD where
@@ -108,4 +108,17 @@ completeFrontendMarksCtx (Program as bs ts cs) =                    -- !TODO: É
                                 (Syntax.Mark i name _ _ ed) -> let (c, t') = Map.findWithDefault (error "[Copy Marks Types] Failed to find mark index in map") i m
                                                         in Syntax.Mark i name c t' ed;
                                  x -> x) e
+
+
+pmult :: TypeBinding
+pmult = TypeBinding "mult" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "*" (PVar "x") (PVar "y"))))))
+
+psub :: TypeBinding
+psub = TypeBinding "sub" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "-" (PVar "x") (PVar "y"))))))
+
+psum :: TypeBinding
+psum = TypeBinding "add" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "+" (PVar "x") (PVar "y"))))))
+
+builtinfs :: [TypeBinding]
+builtinfs = [psum, psub, pmult]
 

@@ -1011,8 +1011,24 @@ the previous paragraph:
     \Rho_{L!}' =\ \textbf{if}\ \textsc{isFunction}(A)\ \textbf{then}\ \Rho_{L!},(A, C)\ \textbf{else}\ \Rho_{L!}
 \end{mathpar}
 
-
-\mypara{Polymorphic ADTs}
+\mypara{Polymorphic ADTs} To allow type parameters and the use of universally quantified type
+variables in ADT constructors, we must guarantee that the
+\textsc{adt-init} rule can unify the type parameters and that when constructing or
+destructing an ADT, type variables in constructor parameters are substituted by
+the actual type (i.e. to construct \mintinline{haskell}{List Int} with
+\mintinline{haskell}{data List a = Cons (a *
+List a)}, we wouldn't try to synthetise \mintinline{haskell}{(a * List a)},
+but rather \mintinline{haskell}{(Int * List Int)}). To unify $T_{\overline\alpha}$ with $T_{\overline\beta}$,
+the sets of type parameters $\overline\alpha$ and $\overline\beta$ must satisfy $|\overline\alpha| = |\overline\beta|$
+together with $\forall i\ 0 \leq i \land i < |\overline\alpha| \land
+\textsc{unify}(\overline\alpha_i \mapsto \overline\beta_i)$. The constructor
+type substitution needn't be explicit in the rule:
+\begin{mathpar}
+    \infer*[right=(adt-init)]
+    {\textsc{unify}(T_{\overline\alpha} \mapsto T_{\overline\beta}, \Theta)}
+    {\Theta/\Theta,T_{\overline\alpha} \mapsto T_{\overline\beta},\Rho; \Gamma; \Delta/\Delta'; x{:}T_{\overline\alpha} \Downarrow\ \vdash x :
+    T_{\overline\beta}}
+\end{mathpar}
 
 \mypara{Refinement Types}
 
@@ -1089,23 +1105,17 @@ we also want to record synthesis failure, as it happens more often than
 successful results. We capture failure of a logict computation using the $ifte$
 function and represent failure or success information with the Maybe type. We
 ran benchmarks to measure the impact of memoization on the performance. It's
-especially noticeable in synthesis with multiple functions in the unrestricted
-context, or more complex specifications:
-%TODO: ignore constraints if type isnnt existential
-%
-\begin{center}
-    \begin{tabular}{ |c|c|c|c|c| }
-        \hline
-        Goal & Time + $\sigma$ & TimeM + $\sigma$ \\
-        \hline
-        insertWithKey & 13.31 s $\pm$ 593.4 ms & 2.667 s $\pm$ 284.3 ms \\
-        \hline
-    \end{tabular}
-\end{center}
+quite noticeable in synthesis with multiple functions in the unrestricted
+context, or more complex specifications. For example, if we add a new function
+\emph{read} to the unrestricted context in the \emph{array} problem seen in
+Section~\ref{sec:overview}, synthesis with memoization will take around
+$5s$, while synthesis without memoization doesn't terminate even after
+$15m$ running.
 %
 The implementation could be improved by better combining the
 memoization with the LogicT monad transformer (remembering decisions across
-backtracking branches) and by finetuning key-equality for polymorphic types.
+backtracking branches) and by finetuning key-equality by ignoring context
+components that aren't relevant to the synthesis call, to name some examples.
 
 
 
@@ -1114,16 +1124,13 @@ system\ref{sec:formal_system} to handle infinite recursion might seem obvious in
 retrospective, however, when faced with a program that doesn't terminate, what
 went wrong is not so clear. While we were able to figure out a solution for the
 first couple of "infinite examples", the following problems were much harder,
-taking sometimes full days to solve (and as of now, some still remain unsolved,
-e.g. List (List a) $\lolli$ List a). To make the debugging experience better, we
+taking sometimes full days to solve. To make the debugging experience better, we
 developed a tracing system that prints information whenever a rule is applied,
 alongside the stack of rules applied up until that one. This improved our
 debugging speed considerably, especially when put together with a correct
 derivation done by hand, with which we could match what was happening against
 what was supposed to happen.
 
-Unfortunately, it seems that sometimes in the process of backtracking, stack
-information is "lost", and the trace logs lose useability.
 
 \mypara{Interface} A simple, syntax-highlighted, web interface was developed
 alongside a server to make possible experimenting with the \synname\ 

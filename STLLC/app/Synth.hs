@@ -49,7 +49,7 @@ type Restriction = Either (Either Scheme Type, Type) Type
 type Restrictions = [(RestrictTag, Restriction)]
 
 
-data RestrictTag = ConstructADT | DeconstructADT | DecideLeftBangR deriving (Show, Eq)
+data RestrictTag = ConstructADT | DeconstructADT | DecideLeftBangR deriving (Show, Eq, Ord)
 instance Hashable RestrictTag where
     hashWithSalt a r = hashWithSalt a (show r)
 
@@ -94,9 +94,9 @@ initSynthReaderState n a ed = (a, 0, [], (n, False), ed)
 -------------------------------------------------------------------------------
 
 memoize :: Maybe (Maybe (Either (String, Scheme) (String, Type))) -> Ctxt -> Type -> Synth (Expr, Delta, Subst) -> Synth (Expr, Delta, Subst)
-memoize maybefocus c t syn = do -- TODO: Can possibly be improved/optimized if we look at the existential type vars and restrictions... perhaps the hash function can play a role in it...
+memoize maybefocus c@(cs,r,g,d,o) t syn = do -- TODO: Can possibly be improved/optimized if we look at the existential type vars and restrictions... perhaps the hash function can play a role in it...
     (memot, i) <- lift get
-    let key = hash ((\(cs,r,g,d,o) -> (Map.toList cs, r, g, d, o)) c) + hash t + hash maybefocus
+    let key = hash (map (second $ apply cs) r, map (apply cs . snd) g, map (apply cs . snd) d, map (apply cs . snd) o) + hash (apply cs t) + hash (apply cs ((bimap snd snd <$>) <$> maybefocus))
     case Map.lookup key memot of
        Nothing -> do        -- If this synth hasn't been previously done -- run it and save the resulting values and state
            ifte syn

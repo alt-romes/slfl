@@ -145,18 +145,6 @@ desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Sy
 -- "Prelude"
 -------------------------------------------------------------------------------
 
-pmult :: TypeBinding
-pmult = TypeBinding "mult" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "*" (PVar "x") (PVar "y"))))))
-
-psub :: TypeBinding
-psub = TypeBinding "sub" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "-" (PVar "x") (PVar "y"))))))
-
-psum :: TypeBinding
-psum = TypeBinding "add" $ trivialScheme (Fun (trivialIntRefinement "x") (Fun (trivialIntRefinement "y") (RefinementType "z" trivialInt [] (Just $ BinaryOp "==" (PVar "z") (BinaryOp "+" (PVar "x") (PVar "y"))))))
-
-builtinfs :: [TypeBinding]
-builtinfs = [psum, psub, pmult]
-
 addPrelude :: [TypeBinding] -> [TypeBinding]
 addPrelude ts = ts -- ++ builtinfs
 

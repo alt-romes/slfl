@@ -112,6 +112,10 @@ instance Substitutable Constraint where
     apply s (Constraint t1 t2) = Constraint (apply s t1) (apply s t2)
 
 
+instance (Substitutable a, Substitutable b) => Substitutable (Either a b) where
+    apply s ei = apply s <$> ei
+
+
 
 
 
