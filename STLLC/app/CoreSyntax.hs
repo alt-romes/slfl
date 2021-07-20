@@ -197,7 +197,7 @@ instance Hashable Type where
         Plus t1 t2 -> hashWithSalt (a+5000) t1 + hashWithSalt (a+5000) t2
         Bang t -> hashWithSalt (a+6000) t
         TypeVar x -> hashWithSalt (a+7000) x
-        ExistentialTypeVar x -> hashWithSalt (a+8000) x
+        ExistentialTypeVar x -> hash "?:)" -- hashWithSalt (a+8000) x
         Sum ts -> sum $ map (hashWithSalt (a+9000)) ts
         ADT tyn tps -> hashWithSalt (a+1000) tyn + sum (map (hashWithSalt (a+1000)) tps)
         RefinementType n tp ls p -> hashWithSalt (a+20000) n + hashWithSalt (a+2000) tp + hashWithSalt (a+20000) ls

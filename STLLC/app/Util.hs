@@ -3,6 +3,8 @@ module Util where
 
 import qualified Data.Map as Map
 import Control.Monad
+import qualified Data.Either as Either
+import qualified Data.Set as Set
 import Data.Maybe
 
 
@@ -35,3 +37,4 @@ mparens s = "(" ++ s ++ ")"
 
 count :: Eq a => a -> [a] -> Int
 count x = length . filter (== x)
+
