@@ -6,6 +6,7 @@ module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     transformType, isFunction) where 
 
 import Control.Monad
+import Control.Monad.State
 import Data.Maybe
 import Data.Hashable
 import Control.Applicative
@@ -77,6 +78,8 @@ data CoreExpr
   
     | CaseOf CoreExpr [(String, CoreExpr)]
 
+    | ADTVal Name (Maybe CoreExpr)
+    
     deriving (Eq)
 
 
@@ -144,7 +147,7 @@ instance (Show TypeBinding) where
 
 
 instance (Show CoreExpr) where
-    show e = showexpr' 0 e
+    show e = runState (showexpr' 0 e) 0
 
 
 instance (Show Type) where 
@@ -239,6 +242,8 @@ transformM f (Mark a n b t ed) = f $ Mark a n b t ed
 transformM f (SumValue mts (s, e)) = f . SumValue mts . (,) s =<< transformM f e
 transformM f (CaseOfSum e ls) = f =<< (CaseOfSum <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
 transformM f (CaseOf e ls) = f =<< (CaseOf <$> transformM f e <*> traverse (\ (s, e) -> (,) s <$> transformM f e) ls)
+transformM f (ADTVal n (Just e)) = f . ADTVal n . Just =<< transformM f e
+transformM f (ADTVal n Nothing) = f $ ADTVal n Nothing
 
 
 transform :: (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
@@ -338,48 +343,58 @@ instance (TypeProperties a, TypeProperties b) => TypeProperties (Either a b) whe
 -- Util
 -------------------------------------------------------------------------------
 
-showexpr' :: Int -> CoreExpr -> String -- Use Int (depth) to indent the code
-showexpr' _ (Lit x) = "Lit(" ++ show x ++ ")"
-showexpr' _ (BLVar x) = "BL(" ++ show x ++ ")"
-showexpr' _ (BUVar x) = "BU(" ++ show x ++ ")"
-showexpr' _ (FLVar x) = "FL(" ++ show x ++ ")"
-showexpr' _ (FUVar x) = "FU(" ++ show x ++ ")"
-showexpr' d (Abs t e) = indent d ++ "(λ" ++ " : " ++ show t ++ " -> " ++ showexpr' (d+1) e ++ ")"
-showexpr' d (App e1 e2) = showexpr' d e1 ++ " " ++ showexpr' d e2
-showexpr' d (TensorValue e1 e2) = "< " ++ showexpr' d e1 ++ " * " ++ showexpr' d e2 ++ " >"
-showexpr' d (LetTensor e1 e2) = indent d ++ "let " ++ "?" ++ "*" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-showexpr' _ UnitValue = "<>"
-showexpr' d (LetUnit e1 e2) = indent d ++ "let _ = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-showexpr' d (WithValue e1 e2) = "< " ++ showexpr' d e1 ++ " & " ++ showexpr' d e2 ++ " >"
-showexpr' d (Fst a@(App _ _)) = "fst (" ++ showexpr' d a ++ ")"
-showexpr' d (Snd a@(App _ _)) = "snd (" ++ showexpr' d a ++ ")"
-showexpr' d (Fst e) = "fst " ++ showexpr' d e
-showexpr' d (Snd e) = "snd " ++ showexpr' d e
-showexpr' d (InjL t e) = "inl " ++ showexpr' d e ++ " : " ++ show t
-showexpr' d (InjR t e) = "inr " ++ show t ++ " : " ++ showexpr' d e
-showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
-                                            indent (d+1) ++ "inl " ++ "?" ++ " => " ++ showexpr' (d+2) e2 ++
-                                            indent (d+1) ++ "| inr " ++ "?" ++ " => " ++ showexpr' (d+2) e3
-showexpr' d (BangValue e) = "! " ++ showexpr' d e ++ ""
-showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-showexpr' _ (Mark i n c t ed ) = "{{ " ++ show i ++ " : " ++ show t ++ " in context" ++ show c ++ " ?? " ++ show ed ++ " }}"
-showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
-    foldl (\p (s', t) -> p ++ indent (d+2) ++ s' ++ " : " ++ show (fromJust t) ++ ";") "" mts
-    ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
-    ++ indent (d+1) ++ "}"
-showexpr' _ (CaseOfSum _ []) = error "Case of sum should have at least one tag"
-showexpr' d (CaseOfSum e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
-    indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " => " ++ showexpr' (d+2) e1 ++
-        foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
-            "| " ++ t ++ " " ++ "?" ++ " => " ++
-                showexpr' (d+2) ex) "" exps
-showexpr' _ (CaseOf _ []) = error "Case of sum should have at least one tag"
-showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
-    indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " => " ++ showexpr' (d+2) e1 ++
-        foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
-            "| " ++ t ++ " " ++ "?" ++ " => " ++
-                showexpr' (d+2) ex) "" exps
+showexpr' :: Int -> CoreExpr -> State Int String -- Use Int (depth) to indent the code
+showexpr' _ (Lit x) = return $ show x
+showexpr' _ (BLVar x) = return $ "BL(" ++ show x ++ ")"
+showexpr' _ (BUVar x) = return $ "BU(" ++ show x ++ ")"
+showexpr' _ (FLVar x) = return $ "FL(" ++ show x ++ ")"
+showexpr' _ (FUVar x) = return $ "FU(" ++ show x ++ ")"
+showexpr' d (Abs t e) = do
+    e' <- showexpr' (d+1) e
+    return $ indent d ++ "(λ -> " ++ e' ++ ")"
+showexpr' d (App e1 e2) = do
+    e1' <- showexpr' d e1
+    e2' <- showexpr' d e2
+    return $ e1' ++ " " ++ e2'
+showexpr' d (TensorValue e1 e2) = do
+    e1' <- showexpr' d e1
+    e2' <- showexpr' d e2
+    return $ "(" ++ e1' ++ ", " ++ e2' ++ ")"
+-- showexpr' d (LetTensor e1 e2) = return $ indent d ++ "let " ++ "?" ++ "*" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+-- showexpr' _ UnitValue = return $ "()"
+-- showexpr' d (LetUnit e1 e2) = return $ indent d ++ "let _ = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+-- showexpr' d (WithValue e1 e2) = return $ "(" ++ showexpr' d e1 ++ " | " ++ showexpr' d e2 ++ ")"
+-- showexpr' d (Fst a@(App _ _)) = return $ "fst (" ++ showexpr' d a ++ ")"
+-- showexpr' d (Snd a@(App _ _)) = ("snd (" ++) <$> showexpr' d a -- <*> pure ")"
+-- showexpr' d (Fst e) = ("fst " ++) <$> showexpr' d e
+-- showexpr' d (Snd e) = "snd " ++ showexpr' d e
+-- showexpr' d (InjL t e) = "inl " ++ showexpr' d e
+-- showexpr' d (InjR t e) = "inr " ++ showexpr' d e
+-- showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
+--                                             indent (d+1) ++ "inl " ++ "?" ++ " -> " ++ showexpr' (d+2) e2 ++
+--                                             indent (d+1) ++ "| inr " ++ "?" ++ " -> " ++ showexpr' (d+2) e3
+-- showexpr' d (BangValue e) = "!" ++ showexpr' d e ++ ""
+-- showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+-- showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
+-- showexpr' _ (Mark i n c t ed ) = "{{ " ++ show i ++ " : " ++ show t ++ " in context" ++ show c ++ " ?? " ++ show ed ++ " }}"
+-- showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
+--     foldl (\p (s', t) -> p ++ indent (d+2) ++ s' ++ " : " ++ show (fromJust t) ++ ";") "" mts
+--     ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
+--     ++ indent (d+1) ++ "}"
+-- showexpr' _ (CaseOfSum _ []) = error "Case of sum should have at least one tag"
+-- showexpr' d (CaseOfSum e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+--     indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " -> " ++ showexpr' (d+2) e1 ++
+--         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
+--             "| " ++ t ++ " " ++ "?" ++ " -> " ++
+--                 showexpr' (d+2) ex) "" exps
+-- showexpr' _ (CaseOf _ []) = error "Case of sum should have at least one tag"
+-- showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+--     indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " -> " ++ showexpr' (d+2) e1 ++
+--         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
+--             "| " ++ t ++ " " ++ "?" ++ " -> " ++
+--                 showexpr' (d+2) ex) "" exps
+-- showexpr' _ (ADTVal n Nothing) = n
+-- showexpr' _ (ADTVal n (Just e)) = n ++ " " ++ show e
 
 
 indent :: Int -> String

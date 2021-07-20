@@ -5,6 +5,7 @@ import Data.List
 import Data.Maybe
 import Debug.Trace
 import Control.Monad.State
+import Control.Monad.Reader
 
 
 import CoreSyntax
@@ -46,7 +47,7 @@ substitute e v = evalState (transformM (substitute' v) e) 0
 -- Main Logic
 -------------------------------------------------------------------------------
 
-eval :: Ctxt -> CoreExpr -> CoreExpr
+eval :: Ctxt -> CoreExpr -> ReaderT [ADTD] Maybe CoreExpr
 
 --- hyp --------------------
 
@@ -56,77 +57,85 @@ eval c@(_, fctxt) (FLVar x) = eval c $ fromJust $ lookup x fctxt
 
 eval c@(bctxt, _) (BUVar x) = eval c $ bctxt !! x
 
-eval c@(_, fctxt) (FUVar x) = eval c $ fromJust $ lookup x fctxt
+eval c@(_, fctxt) (FUVar x) = case lookup x fctxt of
+                                     Just f -> eval c f
+                                     Nothing -> do -- Couldn't find free variable in unrestricted context, so it's an ADT constructor (function that returns adt value)
+                                         adts <- ask
+                                         let argument = case lookup x $ concatMap (\(ADTD _ _ ns) -> ns) adts of 
+                                                          Just t ->
+                                                              case t of
+                                                                Unit -> Nothing
+                                                                _ -> Just $ BLVar 0 in
+                                             return (Abs Nothing (ADTVal x argument))
 
 --- -o ---------------------
 
 --  -oI
-eval _ (Abs t e) = Abs t e
+eval _ (Abs t e) = return $ Abs t e
 
 --  -oE
-eval ctxt@(bctxt, fctxt) (App e1 e2) =
-    let (Abs _ e1') = eval ctxt e1 in
-    let v = eval ctxt e2 in
-        let e1'' = substitute e1' v in
-            eval (v:bctxt, fctxt) e1''
+eval ctxt@(bctxt, fctxt) (App e1 e2) = do
+    Abs _ e1' <- eval ctxt e1
+    v <- eval ctxt e2
+    let e1'' = substitute e1' v in
+        eval (v:bctxt, fctxt) e1''
 
 --- * ----------------------
 
 --  *I
-eval c (TensorValue e1 e2) =
-    let e1' = eval c e1 in
-    let e2' = eval c e2 in
-    TensorValue e1' e2'
+eval c (TensorValue e1 e2) = do
+    e1' <- eval c e1
+    e2' <- eval c e2
+    return $ TensorValue e1' e2'
 
 --  *E
-eval ctxt@(bctxt, fctxt) (LetTensor e1 e2) =
-    let TensorValue e3 e4 = eval ctxt e1 in
+eval ctxt@(bctxt, fctxt) (LetTensor e1 e2) = do
+    TensorValue e3 e4 <- eval ctxt e1
     eval (e4:e3:bctxt, fctxt) e2
 
 --- 1 ----------------------
 
 --  1I
-eval _ UnitValue = UnitValue
+eval _ UnitValue = return UnitValue
 
 --  1E
-eval ctxt (LetUnit e1 e2) =
-    let UnitValue = eval ctxt e1 in
+eval ctxt (LetUnit e1 e2) = do
+    UnitValue <- eval ctxt e1
     eval ctxt e2
 
 --- & ----------------------
 
 --  &I
-eval ctxt (WithValue e1 e2) =
-    let e1' = eval ctxt e1 in
-    let e2' = eval ctxt e2 in
-    WithValue e1' e2'
+eval ctxt (WithValue e1 e2) = do
+    e1' <- eval ctxt e1
+    e2' <- eval ctxt e2
+    return $ WithValue e1' e2'
 
 --  &E
-eval ctxt (Fst e) =
-    let WithValue e1 e2 = eval ctxt e in
+eval ctxt (Fst e) = do
+    WithValue e1 e2 <- eval ctxt e
     eval ctxt e1
 
 --  &E
-eval ctxt (Snd e) =
-    let WithValue e1 e2 = eval ctxt e in
+eval ctxt (Snd e) = do
+    WithValue e1 e2 <- eval ctxt e
     eval ctxt e2
 
 --- + ----------------------
 
 --  +I
-eval ctxt (InjL t e) =
-    let e' = eval ctxt e in
-    InjL t e'
+eval ctxt (InjL t e) = do
+    e' <- eval ctxt e
+    return $ InjL t e'
 
 --  +I
-eval ctxt (InjR t e) =
-    let e' = eval ctxt e in
-    InjR t e'
+eval ctxt (InjR t e) = do
+    e' <- eval ctxt e
+    return $ InjR t e'
 
 --  +E
-eval ctxt (CaseOfPlus e1 e2 e3) =
-    let e1' = eval ctxt e1 in
-    let (bctxt, fctxt) = ctxt in
+eval c@(bctxt, fctxt) (CaseOfPlus e1 e2 e3) = do
+    e1' <- eval c e1
     case e1' of
         (InjL t e) -> eval (e1':bctxt, fctxt) e2
         (InjR t e) -> eval (e1':bctxt, fctxt) e3
@@ -134,19 +143,19 @@ eval ctxt (CaseOfPlus e1 e2 e3) =
 --- ! ----------------------
 
 --  !I
-eval ctxt (BangValue e) =
-    let e' = eval ctxt e in
-    BangValue e'
+eval ctxt (BangValue e) = do
+    e' <- eval ctxt e
+    return $ BangValue e'
 
 --  !E
-eval ctxt@(bctxt, fctxt) (LetBang e1 e2) =
-    let BangValue e1' = eval ctxt e1 in
+eval ctxt@(bctxt, fctxt) (LetBang e1 e2) = do
+    BangValue e1' <- eval ctxt e1
     eval (e1':bctxt, fctxt) e2
 
 --- LetIn -----------------
 
-eval ctxt@(bctxt, fctxt) (LetIn e1 e2) =
-    let e1v = eval ctxt e1 in
+eval ctxt@(bctxt, fctxt) (LetIn e1 e2) = do
+    e1v <- eval ctxt e1
     eval (e1v:bctxt, fctxt) e2
 
 --- Mark for synthesis ---
@@ -155,16 +164,20 @@ eval _ (Mark _ _ _ t _) = errorWithoutStackTrace $ "[Eval] Can't eval synthesis 
 
 --- Sum Type ---------------
 
-eval ctxt (SumValue mts (tag, e)) =
-    let e' = eval ctxt e in
-    SumValue mts (tag, e')
+eval ctxt (SumValue mts (tag, e)) = do
+    e' <- eval ctxt e
+    return $ SumValue mts (tag, e')
 
-eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) =
-    let SumValue mts (tag, e) = eval ctxt e1 in
-        let expbranch = fromJust $ lookup tag exps in -- If it's well typed we can assume the lookup to work
-            eval (e:bctxt, fctxt) expbranch
+eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) = do
+    SumValue mts (tag, e) <- eval ctxt e1
+    let expbranch = fromJust $ lookup tag exps -- If it's well typed we can assume the lookup to work
+    eval (e:bctxt, fctxt) expbranch
 
--- TODO: CaseOf ADT
+eval c (ADTVal x y) = return (ADTVal x y)
+
+eval c (CaseOf _ _) = error "Case Of"
+
+eval c (Lit x) = return (Lit x)
 
 
 
@@ -173,11 +186,11 @@ eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) =
 -------------------------------------------------------------------------------
 
 evalExpr :: CoreExpr -> CoreExpr
-evalExpr = eval ([], [])
+evalExpr e = fromJust $ runReaderT (eval ([], []) e) []
 
 evalModule :: Program -> CoreExpr
 evalModule (Program adts _ _ cbs) =
     case find (\(CoreBinding n _) -> n == "main") cbs of
       Nothing -> errorWithoutStackTrace "[Eval] No main function defined."
-      Just (CoreBinding _ exp) -> eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp
+      Just (CoreBinding _ exp) -> fromJust $ runReaderT (eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp) adts
 

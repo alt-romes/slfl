@@ -76,7 +76,8 @@ maintypecheckModule = maindesugarModule
 
 mainevalModule :: String -> IO CoreExpr
 mainevalModule fname = do
-    cbindings <- maindesugarModule fname
+    synthedp <- mainsynthMarksModule fname
+    let cbindings = desugarModule synthedp -- Desugar already synthetised program
     return $ evalModule cbindings
 
 
