@@ -55,7 +55,7 @@ data Expr
 
     | LetIn Name Expr Expr
 
-    | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme) (Int, [Name])
+    | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme) (Int, [Name], Int)
 
     -- Sum types
     | SumValue [(Name, Maybe Type)] (Name, Expr)

@@ -99,7 +99,7 @@ main = do
     (action:args) <- getArgs
     if action == "bench"
     then do
-        let benchmarks = map (\x -> "bench/" ++ x ++ ".hs") ["llt1", "llt2", "llt3", "llt4", "list1", "list2", "list3", "list4", "list5", "list6", "list8", "maybe1", "maybe2", "maybe3", "tree1", "tree2", "tree3", "tree4", "tree5", "map2", "map3", "map5", "map6", "map8", "map9"]
+        let benchmarks = map (\x -> "bench/" ++ x ++ ".hs") ["llt1", "llt2", "llt3", "llt4", "list1", "list2", "list3", "list4", "list5", "list6", "list7", "list8", "maybe1", "maybe2", "maybe3", "tree1", "tree2", "tree3", "tree4", "tree5", "map2", "map3", "map5", "map6", "map8", "map9"]
         defaultMain [bgroup "synth" (map (\n -> bench n $ nfIO $ (mainsynthMarksModule >=> \(Program _ bs _ _) -> return bs) n) benchmarks)]
     else
         let arg =

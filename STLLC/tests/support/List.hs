@@ -13,11 +13,10 @@ synth append :: (List a -o List a -o List a);
 
 synth map :: ((!(a -o b)) -o List a -o List b);
 
-synth foldl :: (!(b -o a -o b) -o b -o List a -o b);
+synth foldl :: (!(b -o a -o b) -o b -o List a -o b) | choose 1;
 
 synth uncons :: (List a -o Maybe (a * List a));
 
-# is wrong, synth is equal to foldl c parametros trocados -- escrever
 synth foldr :: (!(a -o b -o b) -o b -o List a -o b);
 
 synth insert :: (a -o List a -o List a)

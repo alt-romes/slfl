@@ -696,10 +696,13 @@ synthCtxAllType n mt c i adts t ed touse = do
         else return (exps, memot)
 
 
-synthCtxType :: MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> IO (Expr, MemoTable)
-synthCtxType mt c i adts t ed touse = do
-    (exps, memot) <- synthCtxAllType 1 mt c i adts t ed touse
-    return (head exps, memot)
+synthCtxType :: MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> Int -> IO (Expr, MemoTable)
+synthCtxType mt c i adts t ed touse choice = do
+    (exps, memot) <- synthCtxAllType (choice+1) mt c i adts t ed touse
+    if choice >= length exps
+       then error $ "[Synth] Failed to get choice " ++ show choice ++ " when synthetising " ++ show t
+       else
+        return (exps !! choice, memot)
 
 
 
@@ -722,12 +725,12 @@ synthMarks ex adts = transformM transformfunc ex
         transformfunc :: Expr -> (StateT MemoTable IO) Expr
         transformfunc =
             \case
-                (Mark _ name c@(fc, bc) t (ed, touse)) -> do
+                (Mark _ name c@(fc, bc) t (ed, touse, choice)) -> do
                     mt <- get
                     let sch@(Forall tvs t') = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t
                     case name of
                       Nothing    -> do -- Non-recursive Mark
-                        (exp, memot') <- liftIO $ synthCtxType mt c (length tvs) adts (instantiateFrom 0 sch) ed touse
+                        (exp, memot') <- liftIO $ synthCtxType mt c (length tvs) adts (instantiateFrom 0 sch) ed touse choice
                         modify (`Map.union` memot')
                         return exp
                       Just name' -> -- Recursive Mark
@@ -742,11 +745,11 @@ synthMarks ex adts = transformM transformfunc ex
                                   synthBranches adtcons i = mapM (\(name, vtype) ->
                                         case vtype of
                                           Unit -> do
-                                              (exp, memot') <- liftIO $ synthCtxType mt c i adts t2 0 []
+                                              (exp, memot') <- liftIO $ synthCtxType mt c i adts t2 0 [] choice
                                               modify (`Map.union` memot')
                                               return (name, "", exp)
                                           argty -> do
-                                              (exp, memot') <- liftIO $ synthCtxType mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2 ed touse
+                                              (exp, memot') <- liftIO $ synthCtxType mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2 ed touse choice
                                               modify (`Map.union` memot')
                                               return (name, getName i, exp) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
                                       ) adtcons

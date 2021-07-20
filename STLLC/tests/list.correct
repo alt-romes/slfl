@@ -30,7 +30,7 @@ foldl c d e = let !f = c in
     case e of 
           Nil  -> d
         | Cons g -> 
-            let h*i = g in f (foldl (!f) d i) h;
+            let h*i = g in foldl (!f) (f d h) i;
 
 uncons :: forall a . (List a -o Maybe (a * List a));
 uncons b = case b of 
