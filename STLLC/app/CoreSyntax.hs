@@ -37,6 +37,7 @@ data TypeBinding = TypeBinding Name Scheme deriving (Eq)
 data CoreExpr
 
     = Lit Literal
+    | Arithmetic Name CoreExpr CoreExpr
     | BLVar Int             -- bound linear/restricted var
     | BUVar Int             -- bound unrestricted var
     | FLVar Name          -- free linear/restricted var
@@ -234,6 +235,10 @@ instance Pretty CoreExpr where
         where
             ppr' p ex = case ex of
                 Lit x -> return $ text $ show x
+                Arithmetic a b c -> do
+                    b' <- ppr' p b
+                    c' <- ppr' p c
+                    return $ b' <+> text a <+> c'
                 BLVar x -> return $ text $ show x
                 BUVar x -> return $ text $ show x
                 FLVar x -> return $ text $ show x
@@ -301,7 +306,7 @@ instance Pretty CoreExpr where
                             return $ "|" <+> text t' <+> j <+> "->" <+> ex'
                         ) ls
                     return $ "case" <+> e' <+> "of" <+>
-                                text tag <+> i <+> "->" <+> e1' <>
+                                text tag <+> i <+> "->" <+> e1' <+>
                                     foldl (<+>) P.empty ls'
                 ADTVal n (Just e) -> (text n <+>) <$> ppr' p e
                 ADTVal n Nothing -> return $ text n
@@ -323,6 +328,7 @@ instance Pretty CoreExpr where
 
 transformM :: (Monad m, Applicative m) => (CoreExpr -> m CoreExpr) -> CoreExpr -> m CoreExpr
 transformM f (Lit x) = f $ Lit x
+transformM f (Arithmetic n e1 e2) = f =<< (Arithmetic n <$> transformM f e1 <*> transformM f e2)
 transformM f (BLVar x) = f $ BLVar x
 transformM f (BUVar x) = f $ BUVar x
 transformM f (FLVar x) = f $ FLVar x

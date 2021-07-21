@@ -83,7 +83,6 @@ mainevalModule fname = do
 
 mainsynthMarksModule :: String -> IO Program
 mainsynthMarksModule fname = do
-    bindings <- mainparseModule fname
     ctbindings <- maindesugarModule fname -- TODO: por causa tb de memoization aqui não faz mal chamar tudo de novo em vez de aproveitar os resultados do primeiro parse right
     synthMarksModule ctbindings
 
