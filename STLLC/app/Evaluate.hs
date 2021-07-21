@@ -89,10 +89,10 @@ eval _ (Abs t e) = return $ Abs t e
 
 --  -oE
 eval ctxt@(bctxt, fctxt) (App e1 e2) = do
-    Abs _ e1' <- trace ("eval e1 to abs: " ++ show e1 ++ " and e2 to val " ++ show e2) $ eval ctxt e1
+    Abs _ e1' <- eval ctxt e1
     v <- eval ctxt e2
     let e1'' = substitute e1' v in
-        trace ("substitute " ++ show e1' ++ " with v " ++ show v ++ " to get e1''" ++ show e1'') $ eval (v:bctxt, fctxt) e1''
+        eval (v:bctxt, fctxt) e1''
 
 --- * ----------------------
 
@@ -190,11 +190,11 @@ eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) = do
 eval c (ADTVal x y) = return (ADTVal x y)
 
 eval c@(bctxt, fctxt) (CaseOf e ls) = do
-    ADTVal nam arg <- trace ("Eval of " ++ show e ++ " with " ++ show c) $ eval c e
+    ADTVal nam arg <- eval c e
     let bctxt' = case arg of Just arge -> arge:bctxt; Nothing -> UnitValue:bctxt
     case lookup nam ls of
       Nothing -> error "[Eval] Couldn't find constructor..."
-      Just e' -> trace ("Running eval on " ++ show e' ++ " with ctxt " ++ show bctxt') $ eval (bctxt', fctxt) e'
+      Just e' -> eval (bctxt', fctxt) e'
 
 eval c (Lit x) = return (Lit x)
 

@@ -2,45 +2,44 @@ data State b a = State (!b -o (a * !b));
 
 
 runState :: forall a b . (State b a -o (!b -o (a * !b)));
-runState c d = case c of 
-      State e -> 
-        let !f = d in 
-            let h*i = e (!f) in 
-                let !j = i in (h, (!j));
+runState c d = case c of
+    State e ->
+      let !f = d in
+        let h*i = e (!f) in
+          let !j = i in (h, (!j));
 
 bind :: forall a b c . (State c a -o ((a -o State c b) -o State c b));
-bind d e = case d of 
-      State f -> State (λg -> 
-            let !h = g in 
-                case e 
-                let p*q = f (!h) in 
-                    let !r = q in p of 
-                      State j -> 
-                        let l*m = j (!h) in 
-                            let !n = m in (l, (!n)));
+bind d e = case d of
+    State f ->
+      State (λg -> let !h = g in
+                     case e let p*q = f (!h) in
+                              let !r = q in p of
+                         State j ->
+                           let l*m = j (!h) in
+                             let !n = m in (l, (!n)));
 
 return :: forall a b . (a -o State b a);
-return c = State (λd -> 
-    let !e = d in (c, (!e)));
+return c = State (λd -> let !e = d in
+               (c, (!e)));
 
 get :: forall a . State a a;
-get = State (λb -> 
-    let !c = b in (c, (!c)));
+get = State (λb -> let !c = b in
+               (c, (!c)));
 
 put :: forall a . (!a -o State a 1);
-put b = let !c = b in State (λd -> 
-        let !e = d in ((), (!e)));
+put b = let !c = b in
+  State (λd -> let !e = d in
+                 ((), (!e)));
 
 modify :: forall a . ((!a -o !a) -o State a 1);
-modify b = State (λc -> 
-    let !d = c in 
-        let !f = b (!d) in ((), (!f)));
+modify b = State (λc -> let !d = c in
+               let !f = b (!d) in ((), (!f)));
 
 evalState :: forall a b . (State b a -o (!b -o a));
-evalState c d = case c of 
-      State e -> 
-        let !f = d in 
-            let h*i = e (!f) in 
-                let !j = i in h;
+evalState c d = case c of
+    State e ->
+      let !f = d in
+        let h*i = e (!f) in
+          let !j = i in h;
 
 

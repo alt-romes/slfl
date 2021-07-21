@@ -204,11 +204,11 @@ instance Pretty Type where
         Unit -> char '1'
         With t1 t2 -> parens (pp t1 <+> char '&' <+> pp t2)
         Plus t1 t2 -> parens (pp t1 <+> char '+' <+> pp t2)
-        Bang t -> parens (char '!' <+> pp t)
+        Bang t -> char '!' <> pp t
         TypeVar x -> text $ letters !! x
         ExistentialTypeVar x -> char '?' <> text (letters !! x)
         Sum ts -> "+ {" <+> foldl (\p (s, t) -> p <> text s <+> ":" <+> pp t <> "; ") "" ts <> "}"
-        ADT n ts -> text n <+> foldl (\p -> \case t@ADT {} -> p <+> "(" <> pp t <> ")"; t -> p <+> pp t) "" ts
+        ADT n ts -> text n <> foldl (\p -> \case t@ADT {} -> p <+> "(" <> pp t <> ")"; t -> p <+> pp t) "" ts
         RefinementType n t _ Nothing -> text n <+> "{" <+> pp t <+> "}"
         RefinementType n t l (Just p) -> text n <+> "{" <+> pp t <+> "|" <+> foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> pp p' <+> "=>"}) <+>)) "" l <+> pp p <+> "}"
 

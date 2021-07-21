@@ -2,24 +2,23 @@ main a b = let c*d = b in a c d;
 
 main a b c = a (b, c);
 
-main a = ( (λb -> (fst (a b))) | (λe -> (snd (a e))) );
+main a = ( λb -> (fst (a b)) | λe -> (snd (a e)) );
 
 main a b = ( (fst a) b | (snd a) b );
 
-main a = ( (λb -> a inl b) | (λd -> a inr d) );
+main a = ( λb -> a inl b | λd -> a inr d );
 
-main a b = case b of 
-      inl c -> (fst a) c
-    | inr d -> (snd a) d;
+main a b = case b of
+    inl c -> (fst a) c | inr d -> (snd a) d;
 
-main a = let !b = a in ((!(fst b)), (!(snd b)));
+main a = let !b = a in
+  ((!(fst b)), (!(snd b)));
 
-main a = let b*c = a in 
-    let !d = c in 
-        let !e = b in (!( e | d ));
+main a = let b*c = a in
+  let !d = c in
+    let !e = b in (!( e | d ));
 
-main a = let b*c = a in 
-    let _ = c in b;
+main a = let b*c = a in let _ = c in b;
 
 main a = (a, ());
 
@@ -27,8 +26,8 @@ main a = (fst a);
 
 main a = ( a | a );
 
-main a = let !b = a in (!
-    let !c = b in c);
+main a = let !b = a in
+  (!let !c = b in c);
 
 main a = let !b = a in (!(!b));
 

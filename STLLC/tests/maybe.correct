@@ -10,17 +10,16 @@ empty :: forall a . Maybe a;
 empty = Nothing;
 
 bind :: forall a b . (Maybe a -o (!(a -o Maybe b) -o Maybe b));
-bind c d = case c of 
-      Nothing  -> 
-        let !e = d in Nothing
-    | Just f -> 
-        let !g = d in g f;
+bind c d = case c of
+    Nothing ->
+      let !e = d in Nothing
+  | Just f -> let !g = d in g f;
 
 maybe :: forall a b . (!b -o (!(a -o b) -o (Maybe a -o b)));
-maybe c d e = let !f = c in 
-    let !g = d in 
-        case e of 
-              Nothing  -> f
-            | Just h -> g h;
+maybe c d e = let !f = c in
+  let !g = d in
+    case e of
+        Nothing -> f
+      | Just h -> g h;
 
 

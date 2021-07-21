@@ -99,7 +99,7 @@ instance (Show Binding) where
 
 
 instance (Show Expr) where
-    show = render . ppr 0
+    show = renderStyle (Style PageMode 60 2.0) . ppr 0
 
     -- indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
 
@@ -108,34 +108,34 @@ instance Pretty Expr where
     ppr p e = case e of
         Syntax.Lit l -> ppr p l
         Syntax.Var x -> text x
-        Syntax.Abs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "->" <+> ppr (p+1) e
-        Syntax.Abs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "->" <+> ppr (p+1) e
+        Syntax.Abs x _ e -> parensIf (p>0) $ char 'λ' <> text x <+> "->" <+> ppr (p+1) e
+        -- Syntax.Abs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "->" $$ nest 4 (ppr (p+1) e)
         Syntax.App e1 e2@(App _ _) -> ppr (p+1) e1 <+> parens (ppr (p+1) e2)
         Syntax.App e1 e2 -> ppr (p+1) e1 <+> ppr (p+1) e2
         Syntax.TensorValue e1 e2 -> char '(' <> ppr p e1 <> char ',' <+> ppr p e2 <> char ')'
-        Syntax.LetTensor u v e1 e2 -> text "let" <+> text u <> char '*' <> text v <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
-        Syntax.UnitValue -> text "()"
-        Syntax.LetUnit e1 e2 -> text "let" <+> char '_' <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
-        Syntax.WithValue e1 e2 -> char '(' <> ppr p e1 <+> char '|' <+> ppr p e2 <> char ')'
-        Syntax.Fst e@(App _ _) -> text "fst" <+> parens (ppr (p+1) e)
-        Syntax.Snd e@(App _ _) -> text "snd" <+> parens (ppr (p+1) e)
-        Syntax.Fst e -> text "fst" <+> ppr (p+1) e
-        Syntax.Snd e -> text "snd" <+> ppr (p+1) e
-        Syntax.InjL Nothing e -> text "inl" <+> ppr (p+1) e
-        Syntax.InjL (Just t) e -> text "inl" <+> ppr (p+1) e <+> char ':' <+> pp t
-        Syntax.InjR Nothing e -> text "inr" <+> ppr (p+1) e
-        Syntax.InjR (Just t) e -> text "inr" <+> pp t <+> char ':' <+> ppr (p+1) e
-        Syntax.CaseOfPlus e1 x e2 y e3 -> text "case" <+> ppr p e1 <+> text "of" <+> text "inl" <+> text x <+> text "->" <+> ppr p e2 <+> char '|' <+> text "inr" <+> text y <+> text "->" <+> ppr p e3
+        Syntax.LetTensor u v e1 e2 -> hang ("let" <+> text u <> char '*' <> text v <+> char '=' <+> ppr p e1 <+> "in") 2 (ppr p e2)
+        Syntax.UnitValue -> "()"
+        Syntax.LetUnit e1 e2 -> hang ("let" <+> char '_' <+> char '=' <+> ppr p e1 <+> "in") 2 (ppr p e2)
+        Syntax.WithValue e1 e2 -> char '(' <+> ppr p e1 <+> char '|' <+> ppr p e2 <+> char ')'
+        Syntax.Fst e@(App _ _) -> parens $ "fst" <+> parens (ppr (p+1) e)
+        Syntax.Snd e@(App _ _) -> parens $ "snd" <+> parens (ppr (p+1) e)
+        Syntax.Fst e -> parens $ "fst" <+> ppr (p+1) e
+        Syntax.Snd e -> parens $ "snd" <+> ppr (p+1) e
+        Syntax.InjL _ e -> "inl" <+> ppr (p+1) e
+        -- Syntax.InjL (Just t) e -> "inl" <+> ppr (p+1) e <+> char ':' <+> pp t
+        Syntax.InjR _ e -> "inr" <+> ppr (p+1) e
+        -- Syntax.InjR (Just t) e -> "inr" <+> pp t <+> char ':' <+> ppr (p+1) e
+        Syntax.CaseOfPlus e1 x e2 y e3 -> "case" <+> ppr p e1 <+> "of" $$ nest 4 ("inl" <+> text x <+> "->" <+> ppr p e2 <+> char '|' <+> "inr" <+> text y <+> "->" <+> ppr p e3)
         Syntax.BangValue e -> parens $ char '!' <> ppr p e
-        Syntax.LetBang x e1 e2 -> text "let" <+> char '!' <> text x <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
-        Syntax.LetIn x e1 e2 -> text "let" <+> text x <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
-        Syntax.Mark _ _ _ (Just t) _ -> text "{{" <+> pp t <+> text "}}"
-        Syntax.Mark {} -> text "{{" <+> text "..." <+> text "}}"
-        Syntax.SumValue mts (s, e) -> text "union" <+> char '{' <+> foldl undefined empty mts <+> text s <+> pp e <+> char '}' -- TODO
+        Syntax.LetBang x e1 e2 -> hang ("let" <+> char '!' <> text x <+> char '=' <+> ppr p e1 <+> "in") 2 (ppr p e2)
+        Syntax.LetIn x e1 e2 -> hang ("let" <+> text x <+> char '=' <+> ppr p e1 <+> "in") 2 (ppr p e2)
+        Syntax.Mark _ _ _ (Just t) _ -> "{{" <+> pp t <+> text "}}"
+        Syntax.Mark {} -> "{{" <+> "..." <+> "}}"
+        Syntax.SumValue mts (s, e) -> "union" <+> char '{' <+> foldl undefined empty mts <+> text s <+> pp e <+> char '}' -- TODO
         Syntax.CaseOfSum e ((tag, id, e1):exps) -> undefined -- TODO
-        Syntax.CaseOf e ((tag, id, e1):exps) -> "case" <+> pp e <+> "of" <+>
-                                                    text tag <+> text id <+> "->" <+> pp e1 <+>
-                                                        foldl (\p (t, i, ex) -> p <+> "|" <+> text t <+> text i <+> "->" <+> pp ex) empty exps
+        Syntax.CaseOf e ((tag, id, e1):exps) -> "case" <+> pp e <+> "of" $$
+                nest 2 (hang (space <+> text tag <> (if id == "" then "" else space <> text id) <+> "->") 4 (pp e1)) $$
+                            foldl (\p (t, i, ex) -> p $$ nest 2 (hang ("|" <+> text t <> (if i == "" then "" else space <> text i) <+> "->") 4 (pp ex))) empty exps
         UnrestrictedAbs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "=>" <+> ppr (p+1) e
         UnrestrictedAbs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "=>" <+> ppr (p+1) e
 

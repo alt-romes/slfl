@@ -1,5 +1,6 @@
 module Pretty (Pretty(..), parensIf) where
 
+import Text.PrettyPrint
 
 
 
