@@ -1,4 +1,4 @@
-module Desugar (desugarExpr, desugarModule, builtincfsnames) where
+module Desugar (desugarExpr, desugarModule) where
 
 import Control.Monad.Reader
 import Data.List
@@ -132,21 +132,16 @@ desugar (Syntax.CaseOf e exps) = do
 desugar (Syntax.UnrestrictedAbs i (Just t) e) = desugar (Syntax.Abs i (Just $ Bang t) (Syntax.LetBang i (Syntax.Var i) e))
 desugar (Syntax.UnrestrictedAbs i Nothing e) = desugar (Syntax.Abs i Nothing (Syntax.LetBang i (Syntax.Var i) e))
 
-
+desugar (ExpBop a b c) = do
+    b' <- desugar b
+    c' <- desugar c
+    return $ CExpBop a b' c'
 
 
 
 -------------------------------------------------------------------------------
 -- "Prelude"
 -------------------------------------------------------------------------------
-
-builtincfsnames = ["add", "sub", "mult"]
-builtincfs = CoreBinding "add" (CoreSyntax.Abs Nothing (CoreSyntax.Abs Nothing (Arithmetic "+" (BLVar 1) (BLVar 0)))):
-                CoreBinding "sub" (CoreSyntax.Abs Nothing (CoreSyntax.Abs Nothing (Arithmetic "-" (BLVar 1) (BLVar 0)))):
-                    [CoreBinding "mult" (CoreSyntax.Abs Nothing (CoreSyntax.Abs Nothing (Arithmetic "*" (BLVar 1) (BLVar 0))))]
-
-addCorePrelude :: [CoreBinding] -> [CoreBinding]
-addCorePrelude cs = cs ++ builtincfs
 
 
 addPrelude :: [TypeBinding] -> [TypeBinding]
@@ -164,6 +159,6 @@ desugarExpr exp = runReader (desugar exp) []
 
 
 desugarModule :: Program -> Program
-desugarModule (Program adts bindings ts cs) = Program adts bindings (addPrelude ts) $ addCorePrelude (map desugarModule' bindings)
+desugarModule (Program adts bindings ts cs) = Program adts bindings (addPrelude ts) $ map desugarModule' bindings
     where desugarModule' (Binding name exp) = CoreBinding name $ runReader (desugar exp) [] 
 

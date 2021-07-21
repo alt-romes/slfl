@@ -347,15 +347,15 @@ paexp =  litexp
      <|> parens (do
              funname <- operator
              exps <- many1 paexp
-             let exps' = if funname == "sub" && length exps == 1    -- the subtraction might be a prefix meaning 0 - x
+             let exps' = if funname == "-" && length exps == 1    -- the subtraction might be a prefix meaning 0 - x
                             then Syntax.Lit (LitInt 0):exps
                             else exps
-             return $ applyToParams (Var funname) exps')
+             return $ applyToParams (Syntax.ExpBop funname) exps')
     where
         -- assumes all available functions are binary
         applyToParams vf [] = error "[Refinements] Reached empty list"
         applyToParams vf [e] = e
-        applyToParams vf (e:xs) = Syntax.App (Syntax.App vf e) (applyToParams vf xs)
+        applyToParams vf (e:xs) = vf e (applyToParams vf xs)
 
 
 litexp :: Parser Expr
@@ -364,8 +364,8 @@ litexp =  (Var . show <$> (string "x!" >> natural))
 
 
 operator :: Parser Name
-operator =  (reservedOp "+" >> return "add")
-        <|> (reservedOp "-" >> return "sub")
-        <|> (reservedOp "*" >> return "mult")
+operator =  (reservedOp "+" >> return "+")
+        <|> (reservedOp "-" >> return "-")
+        <|> (reservedOp "*" >> return "*")
 
 

@@ -213,6 +213,32 @@ pairepxr :: Parser Expr
 pairepxr = try tensor -- try tensor because "with" is also between "< >"... looks unclear - seria melhor outra opção :)
         <|> try with
 
+binop :: Parser Expr
+binop = Ex.buildExpressionParser opst aexp
+    where 
+        infixOp x f = Ex.Infix (reservedOp x >> return f)
+        opst = [
+            [
+            infixOp "+" (ExpBop "+") Ex.AssocLeft,
+            infixOp "-" (ExpBop "-") Ex.AssocLeft
+            ],
+            [
+            infixOp "*" (ExpBop "*") Ex.AssocLeft
+            ],
+            [
+            infixOp "!=" (ExpBop "!=") Ex.AssocNone,
+            infixOp "==" (ExpBop "==") Ex.AssocNone,
+            infixOp ">=" (ExpBop ">=") Ex.AssocNone,
+            infixOp ">" (ExpBop ">") Ex.AssocNone,
+            infixOp "<" (ExpBop "<") Ex.AssocNone,
+            infixOp "<=" (ExpBop "<=") Ex.AssocNone
+            ],
+            [
+            infixOp "&&" (ExpBop "&&") Ex.AssocLeft,
+            infixOp "||" (ExpBop "||") Ex.AssocLeft,
+            infixOp "=>" (ExpBop "=>") Ex.AssocRight
+            ]]
+
 
 num :: Parser Expr
 num = Syntax.Lit . LitInt <$> natural
@@ -222,6 +248,7 @@ aexp :: Parser Expr
 aexp =   
          pairepxr
      <|> try unit -- not correctly parsing <<>*<>>
+     <|> try (parens binop)
      <|> parens expr 
      <|> lambda 
      <|> sum

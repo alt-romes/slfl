@@ -27,7 +27,7 @@ substitute :: CoreExpr -> CoreExpr -> CoreExpr
 substitute = substitute' 0
     where
         substitute' :: Int -> CoreExpr -> CoreExpr -> CoreExpr
-        substitute' d (Arithmetic n e1 e2) v = Arithmetic n (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (CExpBop n e1 e2) v = CExpBop n (substitute' d e1 v) (substitute' d e2 v)
         substitute' d bl@(BLVar x) v = if x == d then v else bl
         substitute' d bu@(BUVar x) v = if x == d then v else bu
         substitute' d (Abs t e) v = Abs t $ substitute' (d+1) e v
@@ -199,14 +199,40 @@ eval c@(bctxt, fctxt) (CaseOf e ls) = do
 
 eval c (Lit x) = return (Lit x)
 
-eval c (Arithmetic n x y) = do
-    Lit (LitInt x') <- eval c x
-    Lit (LitInt y') <- eval c y
+eval c (CExpBop n x y) =
     case n of
-      "+" -> return $ Lit $ LitInt (x' + y') 
-      "*" -> return $ Lit $ LitInt (x' * y') 
-      "-" -> return $ Lit $ LitInt (x' - y') 
-
+      "+" -> evalInts >>= \(x',y') -> return $ Lit $ LitInt (x' + y')
+      "*" -> evalInts >>= \(x',y') -> return $ Lit $ LitInt (x' * y')
+      "-" -> evalInts >>= \(x',y') -> return $ Lit $ LitInt (x' - y')
+      "==" -> do
+        x' <- eval c x
+        y' <- eval c y
+        return $ ADTVal (show $ x' == y') Nothing
+      "!=" -> do
+        x' <- eval c x
+        y' <- eval c y
+        return $ ADTVal (show $ x' /= y') Nothing
+      ">=" -> evalInts >>= \(x', y') -> return $ ADTVal (show $ x' >= y') Nothing
+      "<=" -> evalInts >>= \(x', y') -> return $ ADTVal (show $ x' <= y') Nothing
+      ">" -> evalInts >>= \(x', y') -> return $ ADTVal (show $ x' > y') Nothing
+      "<" -> evalInts >>= \(x', y') -> return $ ADTVal (show $ x' < y') Nothing
+      "&&" -> do
+          ADTVal a Nothing <- eval c x
+          ADTVal b Nothing <- eval c y
+          return $ ADTVal (show $ read a && read b) Nothing
+      "||" -> do
+          ADTVal a Nothing <- eval c x
+          ADTVal b Nothing <- eval c y
+          return $ ADTVal (show $ read a || read b) Nothing
+      "=>" -> do
+          ADTVal a Nothing <- eval c x
+          ADTVal b Nothing <- eval c y
+          return $ ADTVal (show $ not (read a) || read b) Nothing
+    where
+        evalInts = do
+            Lit (LitInt x') <- eval c x
+            Lit (LitInt y') <- eval c y
+            return (x', y')
 
 -------------------------------------------------------------------------------
 -- Exported Functions

@@ -13,7 +13,6 @@ import Control.Monad.Writer (WriterT, writer, runWriterT)
 import Refinements
 
 
-import Desugar (builtincfsnames)
 import CoreSyntax
 import Program
 import Constraints
@@ -118,6 +117,44 @@ typeconstraint ce@(Lit (LitInt x)) = do
     lift $ lift $ put (i+1)
     let name = getName i
     return (RefinementType name (TyLit TyInt) [] (Just $ BinaryOp "==" (PVar name) (PNum x)), ce)
+
+typeconstraint ce@(CExpBop n a b) = do
+    case n of
+      "+" -> constrainInts
+      "*" -> constrainInts
+      "-" -> constrainInts
+      "==" -> constrainEq
+      "!=" -> constrainEq
+      ">=" -> constrainIntBool
+      "<=" -> constrainIntBool
+      ">" -> constrainIntBool
+      "<" -> constrainIntBool
+      "&&" -> constrainBools
+      "||" -> constrainBools
+      "=>" -> constrainBools
+  where
+      constrainInts = do
+          (a', ca) <- typeconstraint a
+          (b', cb) <- typeconstraint b
+          writer ((TyLit TyInt, CExpBop n ca cb), [Constraint a' (TyLit TyInt), Constraint b' (TyLit TyInt)])
+
+      constrainEq = do
+          (a', ca) <- typeconstraint a
+          (b', cb) <- typeconstraint b
+          writer ((ADT "Bool" [], CExpBop n ca cb), [Constraint a' b'])
+
+      constrainIntBool = do
+          (a', ca) <- typeconstraint a
+          (b', cb) <- typeconstraint b
+          writer ((ADT "Bool" [], CExpBop n ca cb), [Constraint a' (TyLit TyInt), Constraint b' (TyLit TyInt)])
+
+      constrainBools = do
+          (a', ca) <- typeconstraint a
+          (b', cb) <- typeconstraint b
+          writer ((ADT "Bool" [], CExpBop n ca cb), [Constraint a' (ADT "Bool" []), Constraint b' (ADT "Bool" [])])
+
+
+
 
 --- hyp --------------------
 
@@ -483,8 +520,6 @@ typeinferModule (Program adts bs ts cbs) = do
             case corebindings of
               [] -> return ([], knownts)
               (CoreBinding n ce):corebindings' ->
-                  if n `elem` builtincfsnames then first (CoreBinding n ce:) <$> typeinferModule' corebindings' knownts -- Ignore built-in functions that are added after desugaring to the core bindings, but aren't supposed to be type inferred
-                  else
                   let tbs_pairs = map (\(TypeBinding n t) -> (n, t)) knownts in
                   case lookup n tbs_pairs of                                    -- Check if we already have a type definition (annotation) for this function name
                     Nothing ->                                                  -- We don't have a type for this name yet, add it as a general function so recursion can be type checked

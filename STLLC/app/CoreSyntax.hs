@@ -37,7 +37,7 @@ data TypeBinding = TypeBinding Name Scheme deriving (Eq)
 data CoreExpr
 
     = Lit Literal
-    | Arithmetic Name CoreExpr CoreExpr
+    | CExpBop Name CoreExpr CoreExpr
     | BLVar Int             -- bound linear/restricted var
     | BUVar Int             -- bound unrestricted var
     | FLVar Name          -- free linear/restricted var
@@ -235,10 +235,10 @@ instance Pretty CoreExpr where
         where
             ppr' p ex = case ex of
                 Lit x -> return $ text $ show x
-                Arithmetic a b c -> do
+                CExpBop a b c -> do
                     b' <- ppr' p b
                     c' <- ppr' p c
-                    return $ b' <+> text a <+> c'
+                    return $ parens $ b' <+> text a <+> c'
                 BLVar x -> return $ text $ show x
                 BUVar x -> return $ text $ show x
                 FLVar x -> return $ text $ show x
@@ -310,12 +310,6 @@ instance Pretty CoreExpr where
                                     foldl (<+>) P.empty ls'
                 ADTVal n (Just e) -> (text n <+>) <$> ppr' p e
                 ADTVal n Nothing -> return $ text n
--- showexpr' _ (CaseOf _ []) = error "Case of sum should have at least one tag"
--- showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
---     indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " -> " ++ showexpr' (d+2) e1 ++
---         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
---             "| " ++ t ++ " " ++ "?" ++ " -> " ++
---                 showexpr' (d+2) ex) "" exps
 
             fresh :: State Int Doc
             fresh = get >>= \n -> put (n+1) >> return (text (getName n))
@@ -328,7 +322,7 @@ instance Pretty CoreExpr where
 
 transformM :: (Monad m, Applicative m) => (CoreExpr -> m CoreExpr) -> CoreExpr -> m CoreExpr
 transformM f (Lit x) = f $ Lit x
-transformM f (Arithmetic n e1 e2) = f =<< (Arithmetic n <$> transformM f e1 <*> transformM f e2)
+transformM f (CExpBop n e1 e2) = f =<< (CExpBop n <$> transformM f e1 <*> transformM f e2)
 transformM f (BLVar x) = f $ BLVar x
 transformM f (BUVar x) = f $ BUVar x
 transformM f (FLVar x) = f $ FLVar x
@@ -453,10 +447,6 @@ instance (TypeProperties a, TypeProperties b) => TypeProperties (Either a b) whe
 -- Util
 -------------------------------------------------------------------------------
 
--- showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
---                                             indent (d+1) ++ "inl " ++ "?" ++ " -> " ++ showexpr' (d+2) e2 ++
---                                             indent (d+1) ++ "| inr " ++ "?" ++ " -> " ++ showexpr' (d+2) e3
--- showexpr' _ (Mark i n c t ed ) = "{{ " ++ show i ++ " : " ++ show t ++ " in context" ++ show c ++ " ?? " ++ show ed ++ " }}"
 -- showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
 --     foldl (\p (s', t) -> p ++ indent (d+2) ++ s' ++ " : " ++ show (fromJust t) ++ ";") "" mts
 --     ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
@@ -467,8 +457,3 @@ instance (TypeProperties a, TypeProperties b) => TypeProperties (Either a b) whe
 --         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
 --             "| " ++ t ++ " " ++ "?" ++ " -> " ++
 --                 showexpr' (d+2) ex) "" exps
-
-
-indent :: Int -> String
-indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
-

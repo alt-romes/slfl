@@ -1,35 +1,35 @@
 plus :: (x { Int } -o (y { Int } -o z { Int |  ( z == ( x + y ) ) }));
-plus a b = add b a;
+plus a b = (b + a);
 
 inc :: (x { Int } -o y { Int |  ( y == ( x + 1 ) ) });
-inc = add 1;
+inc a = (1 + a);
 
 deq :: (x { Int } -o y { Int |  ( y == ( x - 1 ) ) });
-deq = add (sub 0 1);
+deq a = ((0 - 1) + a);
 
 mm :: (x { Int } -o (y { Int } -o (z { Int } -o k { Int |  ( k == ( ( x - y ) + z ) ) })));
-mm a b c = add c (add (mult (sub 0 1) b) a);
+mm a b c = (c + (((0 - 1) * b) + a));
 
 plus20 :: (x { Int |  ( x > 0 ) } -o y { Int |  ( y == ( x + 20 ) ) });
-plus20 = add 20;
+plus20 a = (20 + a);
 
 number :: x { Int |  ( ( x > 345 ) && ( x != 346 ) ) };
 number = 347;
 
 add3 :: (x { Int } -o (y { Int } -o (z { Int } -o k { Int |  ( k == ( ( x + y ) + z ) ) })));
-add3 a b c = add c (add b a);
+add3 a b c = (c + (b + a));
 
 fn :: (x { Int } -o (y { Int } -o (z { Int } -o k { Int |  ( ( x + k ) == ( y * z ) ) })));
-fn a b c = add (mult (sub 0 1) a) (mult c b);
+fn a b c = (((0 - 1) * a) + (c * b));
 
 inc :: (x { Int } -o y { Int |  ( y == ( x + 1 ) ) });
-inc = add 1;
+inc a = (1 + a);
 
 shouldntfail :: (x { Int } -o y { Int |  ( y > x ) });
 shouldntfail = inc;
 
 addplus1 :: (x { Int } -o (y { Int } -o z { Int |  ( z == ( ( x + y ) + 1 ) ) }));
-addplus1 a b = add 1 (add b a);
+addplus1 a b = (1 + (b + a));
 
 shouldntfail2 :: (x { Int |  ( x > 0 ) } -o (y { Int |  ( y > 0 ) } -o z { Int |  ( z > ( x + y ) ) }));
 shouldntfail2 = addplus1;
