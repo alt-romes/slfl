@@ -3,7 +3,7 @@ module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
     Literal(..), TyLiteral(..), isInType, trivialInt, isExistentialType,
     Predicate(..), trivialIntRefinement, isInt, isADTBool, transformTypeM,
-    transformType, isFunction) where 
+    transformType, isFunction, fromADTBool) where 
 
 import Prelude hiding ((<>))
 import Control.Monad
@@ -73,7 +73,7 @@ data CoreExpr
 
     | LetIn CoreExpr CoreExpr
 
-    | Mark Int (Maybe Name) ([Maybe Var], [(String, Scheme)]) (Maybe Scheme) (Int, [Name], Int) -- TODO: Once again assuming we can't have free linear variables
+    | Mark Int (Maybe Name) ([Maybe Var], [(String, Scheme)]) (Maybe Scheme) (Int, [Name], Int, Bool) -- TODO: Once again assuming we can't have free linear variables
 
     -- Sum types
     | SumValue [(Name, Maybe Type)] (Name, CoreExpr)
@@ -211,7 +211,7 @@ instance Pretty Type where
         Sum ts -> "+ {" <+> foldl (\p (s, t) -> p <> text s <+> ":" <+> pp t <> "; ") "" ts <> "}"
         ADT n ts -> text n <> foldl (\p -> \case t@ADT {} -> p <+> "(" <> pp t <> ")"; t -> p <+> pp t) "" ts
         RefinementType n t _ Nothing -> text n <+> "{" <+> pp t <+> "}"
-        RefinementType n t l (Just p) -> text n <+> "{" <+> pp t <+> "|" <+> foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> pp p' <+> "=>"}) <+>)) "" l <+> pp p <+> "}"
+        RefinementType n t l (Just p) -> text n <+> "{" <+> pp t <+> "|" <> foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> pp p' <+> "=>"}) <+>)) "" l <+> pp p <+> "}"
 
 
 instance Pretty Literal where
@@ -228,7 +228,7 @@ instance Pretty Predicate where
         PNum n -> text $ show n
         PBool n -> text $ show n
         UnaryOp n p -> text n <+> pp p
-        BinaryOp n p1 p2 -> "(" <+> pp p1 <+> text n <+> pp p2 <+> ")"
+        BinaryOp n p1 p2 -> parensIf (i>0) $ ppr (i+1) p1 <+> text n <+> ppr (i+1) p2
 
 instance Pretty CoreExpr where
     ppr p ex = evalState (ppr' p ex) 0
@@ -236,9 +236,9 @@ instance Pretty CoreExpr where
             ppr' p ex = case ex of
                 Lit x -> return $ text $ show x
                 CExpBop a b c -> do
-                    b' <- ppr' p b
-                    c' <- ppr' p c
-                    return $ parens $ b' <+> text a <+> c'
+                    b' <- ppr' (p+1) b
+                    c' <- ppr' (p+1) c
+                    return $ parensIf (p>0) $ b' <+> text a <+> c'
                 BLVar x -> return $ text $ show x
                 BUVar x -> return $ text $ show x
                 FLVar x -> return $ text $ show x
@@ -394,6 +394,9 @@ isADTBool :: Type -> Bool
 isADTBool t = case t of
                 ADT n _ -> n == "Bool"
                 _ -> False
+
+fromADTBool :: CoreExpr -> Bool
+fromADTBool (ADTVal n _) = read n
 
 trivialRefinement :: Name -> Type -> Type
 trivialRefinement n t = RefinementType n t [] Nothing

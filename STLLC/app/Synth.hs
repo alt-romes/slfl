@@ -17,7 +17,9 @@ import Debug.Trace
 import Refinements
 
 
-import CoreSyntax (Name, Type(..), Scheme(..), isInType, isExistentialType, isFunction)
+import CoreSyntax (CoreBinding(..), Name, Type(..), Scheme(..), isInType, isExistentialType, isFunction, fromADTBool)
+import Evaluate (evalModule)
+import Desugar (desugarModule)
 import Syntax
 import Program
 import Util
@@ -56,8 +58,8 @@ instance Hashable RestrictTag where
 data TraceTag = RightFun Ctxt Type | RightWith Ctxt Type | LeftTensor Ctxt Type Type | LeftUnit Ctxt Type | LeftPlus Ctxt Type Type | LeftSum Type Type | LeftADT Restrictions Ctxt Type Type | MoveLeftADT Restrictions Ctxt Type Type | LeftBang Ctxt Type Type | MoveToDelta (Name, Type) Type | Focus Restrictions Ctxt Type | DecideLeft Type Type | DecideRight Type | DecideLeftBang Restrictions Type Type | DecideLeftBangSch Restrictions Scheme Type | FocusLeftScheme (String, Type) FocusCtxt Type | RightTensor FocusCtxt Type | RightUnit FocusCtxt | RightPlus FocusCtxt Type | RightSum Type | RightADT Name Restrictions FocusCtxt Type | RightBang FocusCtxt Type | LeftFun FocusCtxt Type Type | LeftWith FocusCtxt Type Type | LeftExistentialTV | FocusLeftADT FocusCtxt Type Type | DefaultFocusLeft FocusCtxt (Name, Type) Type | DefaultFocusRight FocusCtxt Type | LeftRefinement Ctxt (Name, Type) Type | FocusLeftRefinement FocusCtxt (Name, Type) Type | RightRefinement FocusCtxt Type | FocusLeftBang FocusCtxt (Name, Type) Type | RightExistentialTV FocusCtxt (Name, Type) Type deriving (Show)
 
 
-runSynth :: Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> Int -> [Name] -> IO ([Expr], MemoTable)
-runSynth n (g, d) t st adtds ed touse = do
+runSynth :: Program -> Int -> (Gamma, Delta) -> Type -> SynthState -> [ADTD] -> Int -> [Name] -> Maybe Expr -> IO ([Expr], MemoTable)
+runSynth prog n (g, d) t st adtds ed touse assertion = do
     (exps_deltas, (memot, _)) <- runReaderT (runStateT (observeManyT n $ synthComplete (g, d, []) t) st) $ initSynthReaderState (case recf of {[] -> ""; ((n, _):_) -> n}) adtds ed
     return (map fst exps_deltas, memot)
 
@@ -66,6 +68,7 @@ runSynth n (g, d) t st adtds ed touse = do
             (e, d', _) <-  memoizesynth synth (Map.empty, [], recf, d, o) t -- synth only with the recursive function
                        <|> memoizesynth synth (Map.empty, [], g, d, o) t    -- synth with the whole context
             guard $ null d'
+            when (isJust assertion) $ guard $ fromADTBool $ evalModule $ desugarModule $ progAddBinds [Binding "main" $ fromJust assertion, Binding (fst $ head recf) e] prog
             guard $ synthResultUses touse e
             return (e, d')
 
@@ -687,18 +690,18 @@ removeadtcons adts (fc, bc) = case adts of -- During the synth process, construc
     (ADTD _ _ cons):xs -> removeadtcons xs (filter (\(n, _) -> isNothing $ lookup n cons) fc, bc)
 
 
-synthCtxAllType :: Int -> MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> IO ([Expr], MemoTable)
-synthCtxAllType n mt c i adts t ed touse = do
+synthCtxAllType :: Program -> Int -> MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> Maybe Expr -> IO ([Expr], MemoTable)
+synthCtxAllType prog n mt c i adts t ed touse assertion = do
     let c' = removeadtcons adts c
-    (exps, memot) <- runSynth n c' t (initSynthState mt i) adts ed touse
+    (exps, memot) <- runSynth prog n c' t (initSynthState mt i) adts ed touse assertion
     if null exps
         then error $ "[Synth] Failed synthesis of: " ++ show t
         else return (exps, memot)
 
 
-synthCtxType :: MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> Int -> IO (Expr, MemoTable)
-synthCtxType mt c i adts t ed touse choice = do
-    (exps, memot) <- synthCtxAllType (choice+1) mt c i adts t ed touse
+synthCtxType :: Program -> MemoTable -> (Gamma, Delta) -> Int -> [ADTD] -> Type -> Int -> [Name] -> Int -> Maybe Expr -> IO (Expr, MemoTable)
+synthCtxType prog mt c i adts t ed touse choice assertion = do
+    (exps, memot) <- synthCtxAllType prog (choice+1) mt c i adts t ed touse assertion
     if choice >= length exps
        then error $ "[Synth] Failed to get choice " ++ show choice ++ " when synthetising " ++ show t
        else
@@ -712,25 +715,25 @@ synthCtxType mt c i adts t ed touse choice = do
 -------------------------------------------------------------------------------
 
 synthAllType :: Type -> IO [Expr]
-synthAllType t = fst <$> synthCtxAllType 5 Map.empty ([], []) 0 [] t 0 [] -- Not really *all* bc runSynth might loop forever?
+synthAllType t = fst <$> synthCtxAllType trivialProgram 5 Map.empty ([], []) 0 [] t 0 [] Nothing -- Not really *all* bc runSynth might loop forever?
 
 
 synthType :: Type -> IO Expr
 synthType t = head <$> synthAllType (instantiateFrom 0 $ generalize (Map.empty, [], [], []) t)
 
 
-synthMarks :: Expr -> [ADTD] -> (StateT MemoTable IO) Expr -- replace all placeholders in an expression with a synthetized expr
-synthMarks ex adts = transformM transformfunc ex
+synthMarks :: Program -> Expr -> [ADTD] -> (StateT MemoTable IO) Expr -- replace all placeholders in an expression with a synthetized expr
+synthMarks prog ex adts = transformM transformfunc ex
     where
         transformfunc :: Expr -> (StateT MemoTable IO) Expr
         transformfunc =
             \case
-                (Mark _ name c@(fc, bc) t (ed, touse, choice)) -> do
+                (Mark _ name c@(fc, bc) t (ed, touse, choice, assertion)) -> do
                     mt <- get
                     let sch@(Forall tvs t') = fromMaybe (error "[Synth] Failed: Marks can't be synthetized without a type.") t
                     case name of
                       Nothing    -> do -- Non-recursive Mark
-                        (exp, memot') <- liftIO $ synthCtxType mt c (length tvs) adts (instantiateFrom 0 sch) ed touse choice
+                        (exp, memot') <- liftIO $ synthCtxType prog mt c (length tvs) adts (instantiateFrom 0 sch) ed touse choice assertion
                         modify (`Map.union` memot')
                         return exp
                       Just name' -> -- Recursive Mark
@@ -745,11 +748,11 @@ synthMarks ex adts = transformM transformfunc ex
                                   synthBranches adtcons i = mapM (\(name, vtype) ->
                                         case vtype of
                                           Unit -> do
-                                              (exp, memot') <- liftIO $ synthCtxType mt c i adts t2 0 [] choice
+                                              (exp, memot') <- liftIO $ synthCtxType prog mt c i adts t2 0 [] choice assertion
                                               modify (`Map.union` memot')
                                               return (name, "", exp)
                                           argty -> do
-                                              (exp, memot') <- liftIO $ synthCtxType mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2 ed touse choice
+                                              (exp, memot') <- liftIO $ synthCtxType prog mt ((name', Left sch):fc, (getName i, argty):(name', instantiateFrom 0 sch):bc) (i+1) adts t2 ed touse choice assertion
                                               modify (`Map.union` memot')
                                               return (name, getName i, exp) -- TODO: Inverter ordem fun - hyp ou hyp - fun em delta? vai definir qual é tentado primeiro
                                       ) adtcons
@@ -761,13 +764,13 @@ synthMarks ex adts = transformM transformfunc ex
 
 -- pre: program has been type inferred
 synthMarksModule :: Program -> IO Program
-synthMarksModule (Program adts bs ts cs) = do
+synthMarksModule p@(Program adts bs ts cs) = do
     synthbs <- synthMarksModule' Map.empty bs
     return $ minimize $ Program adts synthbs ts cs
     where
         synthMarksModule' :: MemoTable -> [Binding] -> IO [Binding]
         synthMarksModule' _ [] = return []
         synthMarksModule' memot ((Binding n e):xs) = do
-            (syne, memot') <- runStateT (synthMarks e adts) memot
+            (syne, memot') <- runStateT (synthMarks p e adts) memot
             (Binding n syne :) <$> synthMarksModule' memot' xs
 

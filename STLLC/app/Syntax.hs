@@ -59,7 +59,7 @@ data Expr
 
     | LetIn Name Expr Expr
 
-    | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme) (Int, [Name], Int)
+    | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme) (Int, [Name], Int, Maybe Expr)
 
     -- Sum types
     | SumValue [(Name, Maybe Type)] (Name, Expr)
@@ -108,7 +108,7 @@ instance (Show Expr) where
 instance Pretty Expr where
     ppr p e = case e of
         Syntax.Lit l -> ppr p l
-        Syntax.ExpBop n e1 e2 -> parens $ ppr p e1 <+> text n <+> ppr p e2
+        Syntax.ExpBop n e1 e2 -> parensIf (p>0) $ ppr (p+1) e1 <+> text n <+> ppr (p+1) e2
         Syntax.Var x -> text x
         Syntax.Abs x _ e -> parensIf (p>0) $ char 'λ' <> text x <+> "->" <+> ppr (p+1) e
         -- Syntax.Abs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "->" $$ nest 4 (ppr (p+1) e)

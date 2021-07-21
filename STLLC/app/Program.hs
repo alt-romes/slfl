@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Program (Program(..), ADTD(..), trivialProgram, completeFrontendMarksCtx, builtinfs) where
+module Program (Program(..), ADTD(..), trivialProgram, completeFrontendMarksCtx, builtinfs, progAddBinds) where
 
 import qualified Data.Map as Map
 import GHC.Generics (Generic)
@@ -56,6 +56,11 @@ instance Show ADTD where
 -------------------------------------------------------------------------------
 -- Functions
 -------------------------------------------------------------------------------
+
+
+progAddBinds nbs (Program ads bs ts cs) = Program ads (nbs ++ bs) ts cs
+
+
 
 trivialProgram :: Program
 trivialProgram = Program [] [] [] []

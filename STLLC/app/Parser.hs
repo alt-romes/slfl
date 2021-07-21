@@ -214,7 +214,7 @@ pairepxr = try tensor -- try tensor because "with" is also between "< >"... look
         <|> try with
 
 binop :: Parser Expr
-binop = Ex.buildExpressionParser opst aexp
+binop = Ex.buildExpressionParser opst (aexp' True)
     where 
         infixOp x f = Ex.Infix (reservedOp x >> return f)
         opst = [
@@ -245,10 +245,13 @@ num = Syntax.Lit . LitInt <$> natural
 
 
 aexp :: Parser Expr 
-aexp =   
+aexp = aexp' False
+    
+aexp' :: Bool -> Parser Expr 
+aexp' wparens =   
          pairepxr
      <|> try unit -- not correctly parsing <<>*<>>
-     <|> try (parens binop)
+     <|> try ((if wparens then parens else id) binop)
      <|> parens expr 
      <|> lambda 
      <|> sum
@@ -276,14 +279,14 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme plhty) (0, [], 0)
+            return $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme plhty) (0, [], 0, Nothing)
 
         emptymark = do
             reservedOp "..."
             reservedOp "}}"
             i <- getState
             putState $ i+1
-            return $ Syntax.Mark i Nothing ([], []) Nothing (0, [], 0)
+            return $ Syntax.Mark i Nothing ([], []) Nothing (0, [], 0, Nothing)
 
 
 
@@ -293,7 +296,7 @@ mark = reservedOp "{{" >> (typedmark <|> emptymark)
 -- Type Parsing
 -------------------------------------------------------------------------------
 
-ty :: Parser Type 
+ty :: Parser Type
 ty = tylit <|> parens type'
 
 
@@ -429,13 +432,15 @@ typeannot = do
         tvn <- many1 (choice [reservedOp "a" >> return 0, reservedOp "b" >> return 1, reservedOp "c" >> return 2, reservedOp "d" >> return 3, reservedOp "e" >> return 4, reservedOp "f" >> return 5]) -- TODO: anything would be better :p
         dot
         return tvn)
-    Left . TypeBinding name . Forall tyvarnames <$> ty
+    Left . TypeBinding name . Forall tyvarnames <$> (try type' <|> tylit)
 
-
-letsynth :: Parser (Either TypeBinding Binding)
-letsynth = do
-    reserved "synth"
+commonsynth = do
     (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
+    assertion <- optionMaybe (try $ do
+        reservedOp "|"
+        reserved "assert"
+        binop
+        )
     choice <- option 0 (try $ do
         reservedOp "|"
         reserved "choose"
@@ -446,39 +451,29 @@ letsynth = do
         reserved "using"
         parens $ many1 identifier
         )
-    depth <- option 1 (do
+    depth <- option 1 (try $ do
         reservedOp "|"
         reserved "depth"
         natural
         )
     i <- getState
     putState $ i+1
-    return $ Right $ Binding name $ Syntax.Mark i Nothing ([], []) (Just $ trivialScheme t) (fromIntegral depth, usenames, fromIntegral choice)
+    return (\recn -> Right $ Binding name $ Syntax.Mark i recn ([], []) (Just $ trivialScheme t) (fromIntegral depth, usenames, fromIntegral choice, assertion), name)
+
+letsynth :: Parser (Either TypeBinding Binding)
+letsynth = do
+    reserved "synth"
+    (f, _) <- commonsynth
+    return $ f Nothing
 
 
 synthrec :: Parser (Either TypeBinding Binding)
 synthrec = do
     reserved "synth"
     reserved "rec"
-    (Left (TypeBinding name (Forall _ t))) <- typeannot -- TODO: right now marks ignore the schemes, but we could make them such that marks have schemes and the synth function instantiates them
-    choice <- option 0 (try $ do
-        reservedOp "|"
-        reserved "choose"
-        natural
-        )
-    usenames <- option [] (do
-        reservedOp "|"
-        reserved "using"
-        parens $ many1 identifier
-        )
-    depth <- option 1 (do
-        reservedOp "|"
-        reserved "depth"
-        natural
-        )
-    i <- getState
-    putState $ i+1
-    return $ Right $ Binding name $ Syntax.Mark i (Just name) ([], []) (Just $ trivialScheme t) (fromIntegral depth, usenames, fromIntegral choice)
+    (f, name) <- commonsynth
+    return $ f (Just name)
+
 
 
 datacon :: Parser (Name, Type)
