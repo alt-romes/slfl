@@ -242,8 +242,8 @@ evalExpr :: CoreExpr -> CoreExpr
 evalExpr e = fromJust $ runReaderT (eval ([], []) e) []
 
 evalModule :: Program -> CoreExpr
-evalModule (Program adts _ _ cbs) =
-    case find (\(CoreBinding n _) -> n == "main") cbs of
+evalModule p@(Program adts _ _ cbs) =
+    traceShow p $ case find (\(CoreBinding n _) -> n == "main") cbs of
       Nothing -> errorWithoutStackTrace "[Eval] No main function defined."
       Just (CoreBinding _ exp) -> fromJust $ runReaderT (eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp) adts
 

@@ -58,7 +58,9 @@ instance Show ADTD where
 -------------------------------------------------------------------------------
 
 
-progAddBinds nbs (Program ads bs ts cs) = Program ads (nbs ++ bs) ts cs
+progAddBinds nbs (Program ads bs ts cs) = Program ads (filter (\(Binding n _) -> n `notElem` newnames) bs ++ nbs) ts cs
+    where
+        newnames = map (\(Binding n _) -> n) nbs
 
 
 

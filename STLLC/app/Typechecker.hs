@@ -333,7 +333,7 @@ typeconstraint (LetIn e1 e2) = do
 
 --- Synth marker -----------
 
-typeconstraint (Mark i n _ t ed) = do
+typeconstraint (Mark i n _ t (am,bm,cm,dm)) = do
     tv <- fresh
     c@(bc, fc) <- get
     let t' = fromMaybe (trivialScheme tv) t
@@ -341,7 +341,16 @@ typeconstraint (Mark i n _ t ed) = do
       Forall [] t'' -> do
         vari <- lift $ lift get
         lift $ lift $ put (vari + length (ftv t''))
-        return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t'') ed)
+        case dm of
+          Nothing -> return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t'') (am,bm,cm,Nothing))
+          Just dmexp -> let dm' = typeinfer fc dmexp in
+            case dm' of
+              Nothing -> error $ "[Typeinfer] Assertion expression " ++ show dm ++ " failed to typecheck."
+              Just (dmty, dmce, _, _) ->
+                  if dmty /= ADT "Bool" []
+                     then error "[Typeinfer] Assertion should have type Bool"
+                     else
+                        return (t'', Mark i n (bc, fc) (Just $ Forall (Set.toList $ ftv t'') t'') (am,bm,cm,Just dmce))
       _ -> error "Type inference shouldn't have marks with bound polimorfic variables"
 
 --- Sum --------------------

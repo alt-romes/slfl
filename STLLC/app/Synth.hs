@@ -68,7 +68,7 @@ runSynth prog n (g, d) t st adtds ed touse assertion = do
             (e, d', _) <-  memoizesynth synth (Map.empty, [], recf, d, o) t -- synth only with the recursive function
                        <|> memoizesynth synth (Map.empty, [], g, d, o) t    -- synth with the whole context
             guard $ null d'
-            when (isJust assertion) $ guard $ fromADTBool $ evalModule $ desugarModule $ progAddBinds [Binding "main" $ fromJust assertion, Binding (fst $ head recf) e] prog
+            when (isJust assertion) $ guard $ fromADTBool $ evalModule $ desugarModule $ progAddBinds [Binding (fst $ head recf) e, Binding "main" $ fromJust assertion] prog
             guard $ synthResultUses touse e
             return (e, d')
 
@@ -133,6 +133,8 @@ memoizefocusSch syn fty c@(cs, r, g, d) ty = memoize (Just (Just (Left fty))) (c
 allowrecursion :: Synth a -> Synth a
 allowrecursion = local (\(b,c,d,(fn, _),ed) -> (b,c,d,(fn, True),ed))
 
+disallowrecursion :: Synth a -> Synth a
+disallowrecursion = local (\(b,c,d,(fn, _),ed) -> (b,c,d,(fn, False),ed))
 
 addconstraint :: Subst -> Constraint -> Synth Subst
 addconstraint subs c = do
@@ -427,18 +429,20 @@ focus c goal =
               _ -> do
                   foldr ((<|>) . (\case
                                     (n, Right x) -> addtrace (DecideLeftBang rs x goal) $ do
-                                        rs' <- managerestrictions n (Right x)
-                                        memoizefocus' focus' (Just (n, x)) (cs, rs', g, din) goal;
+                                        (rs', allowrec) <- managerestrictions n (Right x)
+                                        (if allowrec then id else disallowrecursion) $
+                                            memoizefocus' focus' (Just (n, x)) (cs, rs', g, din) goal;
                                     (n, Left sch) -> addtrace (DecideLeftBangSch rs sch goal) $ do
-                                        rs' <- managerestrictions n (Left sch)
-                                        memoizefocusSch focusSch (n, sch) (cs, rs', g, din) goal)) empty g
+                                        (rs', allowrec) <- managerestrictions n (Left sch)
+                                        (if allowrec then id else disallowrecursion) $
+                                            memoizefocusSch focusSch (n, sch) (cs, rs', g, din) goal)) empty g
                                  where
-                                     managerestrictions :: Name -> Either Scheme Type -> Synth Restrictions
+                                     managerestrictions :: Name -> Either Scheme Type -> Synth (Restrictions, Bool)
                                      managerestrictions n x = do    
                                          (recname, recallowed) <- getRecInfo  -- Restrict usage of recursive function if it isn't allowed
                                          guard $ recname /= n || recallowed
                                          checkbinaryrestrictions DecideLeftBangR (x, goal) rs >>= guard -- Restrict re-usage of decide left bang to synth the same goal a second time, if using a function
-                                         return $ addbinaryrestriction DecideLeftBangR x goal rs
+                                         return (addbinaryrestriction DecideLeftBangR x goal rs, recname /= n)
 
         
             
@@ -765,12 +769,12 @@ synthMarks prog ex adts = transformM transformfunc ex
 -- pre: program has been type inferred
 synthMarksModule :: Program -> IO Program
 synthMarksModule p@(Program adts bs ts cs) = do
-    synthbs <- synthMarksModule' Map.empty bs
+    synthbs <- synthMarksModule' p Map.empty bs
     return $ minimize $ Program adts synthbs ts cs
     where
-        synthMarksModule' :: MemoTable -> [Binding] -> IO [Binding]
-        synthMarksModule' _ [] = return []
-        synthMarksModule' memot ((Binding n e):xs) = do
+        synthMarksModule' :: Program -> MemoTable -> [Binding] -> IO [Binding]
+        synthMarksModule' _ _ [] = return []
+        synthMarksModule' p memot ((Binding n e):xs) = do
             (syne, memot') <- runStateT (synthMarks p e adts) memot
-            (Binding n syne :) <$> synthMarksModule' memot' xs
+            (Binding n syne :) <$> synthMarksModule' (progAddBinds [Binding n syne] p) memot' xs
 
