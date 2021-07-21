@@ -1,11 +1,11 @@
-{-# LANGUAGE LambdaCase, DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE LambdaCase, DeriveGeneric, DeriveAnyClass, OverloadedStrings #-}
 module Syntax (Binding(..), Expr(..), Pattern(..), transformM, transform, isInExpr) where 
 
 import Data.Maybe
 import Control.Monad.State
 import GHC.Generics (Generic)
 import Control.DeepSeq
-import Prelude hiding (Bool, (<>))
+import Prelude hiding ((<>))
 import Text.PrettyPrint
 import Data.Functor.Identity
 
@@ -99,93 +99,61 @@ instance (Show Binding) where
 
 
 instance (Show Expr) where
-    show e = showexpr' 0 e
-        where
-            showexpr' :: Int -> Expr -> String -- Use Int (depth) to indent the code
-            showexpr' d (Lit x) = show x
-            showexpr' d (Var x) = x
-            -- showexpr' d (Abs x (Just t) e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -o " ++ showexpr' (d+1) e ++ ")"
-            showexpr' d (Abs x _ e) = "(λ" ++ x ++ " -> " ++ showexpr' (d+1) e ++ ")"
-            showexpr' d (App e1 e2@(App _ _)) = showexpr' d e1 ++ " (" ++ showexpr' d e2 ++ ")"
-            showexpr' d (App e1 e2) = showexpr' d e1 ++ " " ++ showexpr' d e2
-            showexpr' d (TensorValue e1 e2) = "(" ++ showexpr' d e1 ++ ", " ++ showexpr' d e2 ++ ")"
-            showexpr' d (LetTensor u v e1 e2) = indent d ++ "let " ++ u ++ "*" ++ v ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-            showexpr' d UnitValue = "()"
-            showexpr' d (LetUnit e1 e2) = indent d ++ "let _ = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-            showexpr' d (WithValue e1 e2) = "( " ++ showexpr' d e1 ++ " | " ++ showexpr' d e2 ++ " )"
-            showexpr' d (Fst a@(App _ _)) = "(fst (" ++ showexpr' d a ++ "))"
-            showexpr' d (Snd a@(App _ _)) = "(snd (" ++ showexpr' d a ++ "))"
-            showexpr' d (Fst e) = "(fst " ++ showexpr' d e ++ ")"
-            showexpr' d (Snd e) = "(snd " ++ showexpr' d e ++ ")"
-            -- showexpr' d (InjL (Just t) e) = "inl " ++ showexpr' d e ++ " : " ++ show t
-            showexpr' d (InjL _ e@(App _ _)) = "inl (" ++ showexpr' d e ++ ")"
-            showexpr' d (InjL _ e) = "inl " ++ showexpr' d e
-            -- showexpr' d (InjR (Just t) e) = "inr " ++ show t ++ " : " ++ showexpr' d e
-            showexpr' d (InjR _ e@(App _ _)) = "inr (" ++ showexpr' d e ++ ")"
-            showexpr' d (InjR _ e) = "inr " ++ showexpr' d e
-            showexpr' d (CaseOfPlus e1 x e2 y e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
-                                                        indent (d+1) ++ "  inl " ++ x ++ " -> " ++ showexpr' (d+2) e2 ++
-                                                        indent (d+1) ++ "| inr " ++ y ++ " -> " ++ showexpr' (d+2) e3
-            showexpr' d (BangValue e) = "(!" ++ showexpr' d e ++ ")"
-            showexpr' d (LetBang x e1 e2) = indent d ++ "let !" ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-            showexpr' d (LetIn x e1 e2) = indent d ++ "let " ++ x ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
-            showexpr' d (Mark _ _ _ (Just t) _) = "{{ " ++ show t ++ " }}"
-            showexpr' d Mark {} = "{{ ... }}"
-            showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
-                foldl (\p (s, mt) -> p ++ indent (d+2) ++ s ++ maybe "" (\t -> " : " ++ show t) mt ++ ";") "" mts
-                ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
-                ++ indent (d+1) ++ "}"
-            showexpr' d (CaseOfSum e ((tag, id, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
-                                                        indent (d+1) ++ "  " ++ tag ++ " " ++ id ++ " -> " ++ showexpr' (d+2) e1 ++
-                                                        foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
-                                                            "| " ++ t ++ " " ++ i ++ " -> " ++
-                                                                showexpr' (d+2) ex) "" exps
+    show = render . ppr 0
 
-            showexpr' d (CaseOf e ((tag, id, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
-                                                        indent (d+1) ++ "  " ++ tag ++ " " ++ id ++ " -> " ++ showexpr' (d+2) e1 ++
-                                                        foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
-                                                            "| " ++ t ++ " " ++ i ++ " -> " ++
-                                                                showexpr' (d+2) ex) "" exps
-
-            -- showexpr' d (UnrestrictedAbs x (Just t) e) = indent d ++ "(λ" ++ x ++ " : " ++ show t ++ " -> " ++ showexpr' (d+1) e ++ ")"
-            showexpr' d (UnrestrictedAbs x _ e) = indent d ++ "(λ" ++ x ++ " => " ++ showexpr' (d+1) e ++ ")"
-
-            indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
-    -- TODO: Pretty print:
-    -- show = render . ppr 0
+    -- indent d = (if d == 0 then "" else "\n") ++ replicate (4*d) ' '
 
 
 instance Pretty Expr where
     ppr p e = case e of
         Syntax.Lit l -> ppr p l
         Syntax.Var x -> text x
-        Syntax.Abs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "-o" <+> ppr (p+1) e
-        Syntax.Abs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "-o" <+> ppr (p+1) e
+        Syntax.Abs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "->" <+> ppr (p+1) e
+        Syntax.Abs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "->" <+> ppr (p+1) e
+        Syntax.App e1 e2@(App _ _) -> ppr (p+1) e1 <+> parens (ppr (p+1) e2)
         Syntax.App e1 e2 -> ppr (p+1) e1 <+> ppr (p+1) e2
-        Syntax.TensorValue e1 e2 -> char '<' <+> ppr p e1 <+> char '*' <+> ppr p e2 <+> char '>'
+        Syntax.TensorValue e1 e2 -> char '(' <> ppr p e1 <> char ',' <+> ppr p e2 <> char ')'
         Syntax.LetTensor u v e1 e2 -> text "let" <+> text u <> char '*' <> text v <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
-        Syntax.UnitValue -> text "<>"
+        Syntax.UnitValue -> text "()"
         Syntax.LetUnit e1 e2 -> text "let" <+> char '_' <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
-        Syntax.WithValue e1 e2 -> char '<' <+> ppr p e1 <+> char '&' <+> ppr p e2 <+> char '>'
-        Syntax.Fst e@App(_ _) -> text "fst" <+> parens ppr (p+1) e
-        Syntax.Snd e@App(_ _) -> text "snd" <+> parens ppr (p+1) e
+        Syntax.WithValue e1 e2 -> char '(' <> ppr p e1 <+> char '|' <+> ppr p e2 <> char ')'
+        Syntax.Fst e@(App _ _) -> text "fst" <+> parens (ppr (p+1) e)
+        Syntax.Snd e@(App _ _) -> text "snd" <+> parens (ppr (p+1) e)
         Syntax.Fst e -> text "fst" <+> ppr (p+1) e
         Syntax.Snd e -> text "snd" <+> ppr (p+1) e
         Syntax.InjL Nothing e -> text "inl" <+> ppr (p+1) e
         Syntax.InjL (Just t) e -> text "inl" <+> ppr (p+1) e <+> char ':' <+> pp t
         Syntax.InjR Nothing e -> text "inr" <+> ppr (p+1) e
         Syntax.InjR (Just t) e -> text "inr" <+> pp t <+> char ':' <+> ppr (p+1) e
-        Syntax.CaseOfPlus e1 x e2 y e3 -> text "case" <+> ppr p e1 <+> text "of" <+> text "inl" <+> text x <+> text "=>" <+> ppr p e2 <+> char '|' <+> text "inr" <+> text y <+> text "=>" <+> ppr p e3
-        Syntax.BangValue e -> char '!' <+> ppr p e
+        Syntax.CaseOfPlus e1 x e2 y e3 -> text "case" <+> ppr p e1 <+> text "of" <+> text "inl" <+> text x <+> text "->" <+> ppr p e2 <+> char '|' <+> text "inr" <+> text y <+> text "->" <+> ppr p e3
+        Syntax.BangValue e -> parens $ char '!' <> ppr p e
         Syntax.LetBang x e1 e2 -> text "let" <+> char '!' <> text x <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
         Syntax.LetIn x e1 e2 -> text "let" <+> text x <+> char '=' <+> ppr p e1 <+> text "in" <+> ppr p e2
-        Syntax.Mark _ _ _ Nothing -> text "{{" <+> text "..." <+> text "}}"
-        Syntax.Mark _ _ _ (Just t) -> text "{{" <+> ppr p t <+> text "}}"
+        Syntax.Mark _ _ _ (Just t) _ -> text "{{" <+> pp t <+> text "}}"
+        Syntax.Mark {} -> text "{{" <+> text "..." <+> text "}}"
         Syntax.SumValue mts (s, e) -> text "union" <+> char '{' <+> foldl undefined empty mts <+> text s <+> pp e <+> char '}' -- TODO
         Syntax.CaseOfSum e ((tag, id, e1):exps) -> undefined -- TODO
-        Syntax.CaseOf e ((tag, id, e1):exps) -> undefined -- TODO
-        UnrestrictedAbs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "->" <+> ppr (p+1) e
-        UnrestrictedAbs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "->" <+> ppr (p+1) e
+        Syntax.CaseOf e ((tag, id, e1):exps) -> "case" <+> pp e <+> "of" <+>
+                                                    text tag <+> text id <+> "->" <+> pp e1 <+>
+                                                        foldl (\p (t, i, ex) -> p <+> "|" <+> text t <+> text i <+> "->" <+> pp ex) empty exps
+        UnrestrictedAbs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "=>" <+> ppr (p+1) e
+        UnrestrictedAbs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "=>" <+> ppr (p+1) e
+
+        -- showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
+        --     foldl (\p (s, mt) -> p ++ indent (d+2) ++ s ++ maybe "" (\t -> " : " ++ show t) mt ++ ";") "" mts
+        --     ++ indent (d+2) ++ s ++ " " ++ show e ++ ";"
+        --     ++ indent (d+1) ++ "}"
+        -- showexpr' d (CaseOfSum e ((tag, id, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+        --                                             indent (d+1) ++ "  " ++ tag ++ " " ++ id ++ " -> " ++ showexpr' (d+2) e1 ++
+        --                                             foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
+        --                                                 "| " ++ t ++ " " ++ i ++ " -> " ++
+        --                                                     showexpr' (d+2) ex) "" exps
+
+        -- showexpr' d (CaseOf e ((tag, id, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+        --                                             indent (d+1) ++ "  " ++ tag ++ " " ++ id ++ " -> " ++ showexpr' (d+2) e1 ++
+        --                                             foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
+        --                                                 "| " ++ t ++ " " ++ i ++ " -> " ++
+        --                                                     showexpr' (d+2) ex) "" exps
 
 
 

@@ -352,6 +352,7 @@ typeconstraint (CaseOf e exps) = do
                 ctx' <- get
                 return $ Just (t', s, ce, ctx')
             Just (Forall ns (ADT _ _)) -> do -- Constructor does not take an argument
+                addtobunrctx $ Forall [] Unit
                 (t', ce) <- typeconstraint ex
                 ctx' <- get
                 return $ Just (t', s, ce, ctx')

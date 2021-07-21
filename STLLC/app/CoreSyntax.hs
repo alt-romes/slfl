@@ -1,11 +1,11 @@
-{-# LANGUAGE LambdaCase, DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE LambdaCase, DeriveGeneric, DeriveAnyClass, OverloadedStrings #-}
 module CoreSyntax (CoreExpr(..), Type(..), Scheme(..), Name, CoreBinding(..),
     TypeBinding(..), Var(..), Mult(..), transformM, transform, trivialScheme,
     Literal(..), TyLiteral(..), isInType, trivialInt, isExistentialType,
     Predicate(..), trivialIntRefinement, isInt, isADTBool, transformTypeM,
     transformType, isFunction) where 
 
-import Prelude hiding (Bool, (<>))
+import Prelude hiding ((<>))
 import Control.Monad
 import Control.Monad.State
 import Data.Maybe
@@ -14,7 +14,7 @@ import Control.Applicative
 import GHC.Generics (Generic)
 import Control.DeepSeq
 import Data.Bifunctor
-import Text.PrettyPrint
+import Text.PrettyPrint as P
 import Data.Functor.Identity
 
 
@@ -149,15 +149,10 @@ instance (Show TypeBinding) where
 
 
 instance (Show CoreExpr) where
-    show e = runState (showexpr' 0 e) 0
+    show = render . ppr 0
 
 
 instance (Show Type) where 
-    show (Sum ts) = "+ { " ++ foldl (\p (s, t) -> p ++ s ++ " : " ++ show t ++ "; ") "" ts ++ "}"
-    show (ADT n ts) = n ++ concatMap ((" " ++) . (\case t@ADT {} -> "(" ++ show t ++ ")"; t -> show t)) ts
-    show (RefinementType n t _ Nothing) = n ++ " { " ++ show t ++ " }"
-    show (RefinementType n t l (Just p)) = n ++ " { " ++ show t ++ " | " ++ foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> show p' ++ " => "}) ++)) "" l ++ show p ++ " }"
-    -- TODO: Rest of Pretty instance
     show = render . ppr 0
 
 
@@ -174,11 +169,7 @@ instance (Show TyLiteral) where
 
 
 instance Show Predicate where
-    show (PVar n) = n
-    show (PNum n) = show n
-    show (PBool n) = show n
-    show (UnaryOp n p) = n ++ show p
-    show (BinaryOp n p1 p2) = "(" ++ show p1 ++ " " ++ n ++ " " ++ show p2 ++ ")"
+    show = render . ppr 0
 
 
 instance Hashable Scheme where
@@ -187,7 +178,7 @@ instance Hashable Scheme where
 
 instance Hashable Type where
     hashWithSalt a t = case t of
-        Unit -> hashWithSalt (a+10) "Unit"
+        Unit -> hashWithSalt (a+10) ("Unit" :: String)
         TyLit l -> hashWithSalt a l
         Fun t1 t2 -> hashWithSalt (a+2000) t1 + hashWithSalt (a+2000) t2
         Tensor t1 t2 -> hashWithSalt (a+3000) t1 + hashWithSalt (a+3000) t2
@@ -195,7 +186,7 @@ instance Hashable Type where
         Plus t1 t2 -> hashWithSalt (a+5000) t1 + hashWithSalt (a+5000) t2
         Bang t -> hashWithSalt (a+6000) t
         TypeVar x -> hashWithSalt (a+7000) x
-        ExistentialTypeVar x -> hash "?:)" -- hashWithSalt (a+8000) x
+        ExistentialTypeVar x -> hash ("?:)" :: String) -- hashWithSalt (a+8000) x
         Sum ts -> sum $ map (hashWithSalt (a+9000)) ts
         ADT tyn tps -> hashWithSalt (a+1000) tyn + sum (map (hashWithSalt (a+1000)) tps)
         RefinementType n tp ls p -> hashWithSalt (a+20000) n + hashWithSalt (a+2000) tp + hashWithSalt (a+20000) ls
@@ -203,12 +194,12 @@ instance Hashable Type where
 
 
 instance Hashable TyLiteral where
-    hashWithSalt a TyInt = hashWithSalt (a+10) "TyInt"
+    hashWithSalt a TyInt = hashWithSalt (a+10) ("TyInt" :: String)
 
 instance Pretty Type where
     ppr p t = case t of
         TyLit l -> text $ show l
-        Fun t1 t2 -> parens (pp t1 <+> text "-o" <+> pp t2)
+        Fun t1 t2 -> parens (pp t1 <+> "-o" <+> pp t2)
         Tensor t1 t2 -> parens (pp t1 <+> char '*' <+> pp t2)
         Unit -> char '1'
         With t1 t2 -> parens (pp t1 <+> char '&' <+> pp t2)
@@ -216,13 +207,113 @@ instance Pretty Type where
         Bang t -> parens (char '!' <+> pp t)
         TypeVar x -> text $ letters !! x
         ExistentialTypeVar x -> char '?' <> text (letters !! x)
-        Sum ts -> undefined -- TODO
-        ADT t -> text t
+        Sum ts -> "+ {" <+> foldl (\p (s, t) -> p <> text s <+> ":" <+> pp t <> "; ") "" ts <> "}"
+        ADT n ts -> text n <+> foldl (\p -> \case t@ADT {} -> p <+> "(" <> pp t <> ")"; t -> p <+> pp t) "" ts
+        RefinementType n t _ Nothing -> text n <+> "{" <+> pp t <+> "}"
+        RefinementType n t l (Just p) -> text n <+> "{" <+> pp t <+> "|" <+> foldr (\(RefinementType _ _ _ mp) -> ((case mp of {Nothing -> ""; Just p' -> pp p' <+> "=>"}) <+>)) "" l <+> pp p <+> "}"
 
 
 instance Pretty Literal where
-    ppr p (Nat i) = integer i
+    ppr p (LitInt i) = integer i
 
+
+instance Pretty Scheme where
+    ppr p (Forall ns t) = (if null ns then P.empty else foldl (\p n -> p <+> text (letters !! n)) "forall" ns <+> ".") <> pp t
+
+
+instance Pretty Predicate where
+    ppr i p = case p of
+        PVar n -> text n
+        PNum n -> text $ show n
+        PBool n -> text $ show n
+        UnaryOp n p -> text n <+> pp p
+        BinaryOp n p1 p2 -> "(" <+> pp p1 <+> text n <+> pp p2 <+> ")"
+
+instance Pretty CoreExpr where
+    ppr p ex = evalState (ppr' p ex) 0
+        where
+            ppr' p ex = case ex of
+                Lit x -> return $ text $ show x
+                BLVar x -> return $ text $ show x
+                BUVar x -> return $ text $ show x
+                FLVar x -> return $ text $ show x
+                FUVar x -> return $ text $ show x
+                Abs t e -> do
+                    e' <- ppr' p e
+                    i <- fresh
+                    return $ parensIf (p>0) $ char 'λ' <> i <+> "->" <+> pp e
+                App e1 e2 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    return $ e1' <+> e2'
+                TensorValue e1 e2 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    return $ parens $ e1' <> "," <+> e2'
+                LetTensor e1 e2 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    i <- fresh
+                    j <- fresh
+                    return $ "let" <+> i <> "*" <> j <+> "=" <+> e1' <+> "in" <+> e2' 
+                UnitValue -> return "()"
+                LetUnit e1 e2 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    return $ "let" <+> "_" <+> "=" <+> e1' <+> "in" <+> e2' 
+                WithValue e1 e2 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    return $ parens $ e1' <+> "|" <+> e2'
+                Fst e@(App _ _) -> ("fst" <+>) . parens <$> ppr' p e
+                Snd e@(App _ _) -> ("snd" <+>) . parens <$> ppr' p e
+                Fst e -> ("fst" <+>) <$> ppr' p e
+                Snd e -> ("snd" <+>) <$> ppr' p e
+                InjL _ e -> ("inl" <+>) <$> ppr' p e
+                InjR _ e -> ("inr" <+>) <$> ppr' p e
+                CaseOfPlus e1 e2 e3 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    e3' <- ppr' p e3
+                    i <- fresh
+                    j <- fresh
+                    return $ "case" <+> e1' <+> "of" <+> "inl" <+> i <+> "->" <+> e2' <+> "|" <+> "inr" <+> j <+> "->" <+> e3'
+                BangValue e -> ("!" <>) <$> ppr' p e
+                LetBang e1 e2 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    i <- fresh
+                    return $ "let" <+> "!" <> i <+> "=" <+> e1' <+> "in" <+> e2'
+                LetIn e1 e2 -> do
+                    e1' <- ppr' p e1
+                    e2' <- ppr' p e2
+                    i <- fresh
+                    return $ "let" <+> i <+> "=" <+> e1' <+> "in" <+> e2'
+                e@(Mark _ _ _ (Just t) _) -> return $ "{{" <+> pp t <+> "}}"
+                e@Mark {} -> return "{{ ... }}"
+                CaseOf e ((tag, e1):ls) -> do
+                    e' <- ppr' p e
+                    e1' <- ppr' p e1
+                    i <- fresh
+                    ls' <- mapM (\(t', ex) -> do
+                            j <- fresh
+                            ex' <- ppr' p ex
+                            return $ "|" <+> text t' <+> j <+> "->" <+> ex'
+                        ) ls
+                    return $ "case" <+> e' <+> "of" <+>
+                                text tag <+> i <+> "->" <+> e1' <>
+                                    foldl (<+>) P.empty ls'
+                ADTVal n (Just e) -> (text n <+>) <$> ppr' p e
+                ADTVal n Nothing -> return $ text n
+-- showexpr' _ (CaseOf _ []) = error "Case of sum should have at least one tag"
+-- showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
+--     indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " -> " ++ showexpr' (d+2) e1 ++
+--         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
+--             "| " ++ t ++ " " ++ "?" ++ " -> " ++
+--                 showexpr' (d+2) ex) "" exps
+
+            fresh :: State Int Doc
+            fresh = get >>= \n -> put (n+1) >> return (text (getName n))
 
 
 
@@ -356,39 +447,9 @@ instance (TypeProperties a, TypeProperties b) => TypeProperties (Either a b) whe
 -- Util
 -------------------------------------------------------------------------------
 
-showexpr' :: Int -> CoreExpr -> State Int String -- Use Int (depth) to indent the code
-showexpr' _ (Lit x) = return $ show x
-showexpr' _ (BLVar x) = return $ "BL(" ++ show x ++ ")"
-showexpr' _ (BUVar x) = return $ "BU(" ++ show x ++ ")"
-showexpr' _ (FLVar x) = return $ "FL(" ++ show x ++ ")"
-showexpr' _ (FUVar x) = return $ "FU(" ++ show x ++ ")"
-showexpr' d (Abs t e) = do
-    e' <- showexpr' (d+1) e
-    return $ indent d ++ "(λ -> " ++ e' ++ ")"
-showexpr' d (App e1 e2) = do
-    e1' <- showexpr' d e1
-    e2' <- showexpr' d e2
-    return $ e1' ++ " " ++ e2'
-showexpr' d (TensorValue e1 e2) = do
-    e1' <- showexpr' d e1
-    e2' <- showexpr' d e2
-    return $ "(" ++ e1' ++ ", " ++ e2' ++ ")"
--- showexpr' d (LetTensor e1 e2) = return $ indent d ++ "let " ++ "?" ++ "*" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
--- showexpr' _ UnitValue = return $ "()"
--- showexpr' d (LetUnit e1 e2) = return $ indent d ++ "let _ = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
--- showexpr' d (WithValue e1 e2) = return $ "(" ++ showexpr' d e1 ++ " | " ++ showexpr' d e2 ++ ")"
--- showexpr' d (Fst a@(App _ _)) = return $ "fst (" ++ showexpr' d a ++ ")"
--- showexpr' d (Snd a@(App _ _)) = ("snd (" ++) <$> showexpr' d a -- <*> pure ")"
--- showexpr' d (Fst e) = ("fst " ++) <$> showexpr' d e
--- showexpr' d (Snd e) = "snd " ++ showexpr' d e
--- showexpr' d (InjL t e) = "inl " ++ showexpr' d e
--- showexpr' d (InjR t e) = "inr " ++ showexpr' d e
 -- showexpr' d (CaseOfPlus e1 e2 e3) = indent d ++ "case " ++ showexpr' d e1 ++ " of " ++
 --                                             indent (d+1) ++ "inl " ++ "?" ++ " -> " ++ showexpr' (d+2) e2 ++
 --                                             indent (d+1) ++ "| inr " ++ "?" ++ " -> " ++ showexpr' (d+2) e3
--- showexpr' d (BangValue e) = "!" ++ showexpr' d e ++ ""
--- showexpr' d (LetBang e1 e2) = indent d ++ "let !" ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
--- showexpr' d (LetIn e1 e2) = indent d ++ "let " ++ "?" ++ " = " ++ showexpr' d e1 ++ " in " ++ showexpr' (d+1) e2
 -- showexpr' _ (Mark i n c t ed ) = "{{ " ++ show i ++ " : " ++ show t ++ " in context" ++ show c ++ " ?? " ++ show ed ++ " }}"
 -- showexpr' d (SumValue mts (s, e)) = indent d ++ "union {" ++
 --     foldl (\p (s', t) -> p ++ indent (d+2) ++ s' ++ " : " ++ show (fromJust t) ++ ";") "" mts
@@ -400,14 +461,6 @@ showexpr' d (TensorValue e1 e2) = do
 --         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
 --             "| " ++ t ++ " " ++ "?" ++ " -> " ++
 --                 showexpr' (d+2) ex) "" exps
--- showexpr' _ (CaseOf _ []) = error "Case of sum should have at least one tag"
--- showexpr' d (CaseOf e ((tag, e1):exps)) = indent d ++ "case " ++ showexpr' d e ++ " of " ++
---     indent (d+1) ++ "  " ++ tag ++ " " ++ "?" ++ " -> " ++ showexpr' (d+2) e1 ++
---         foldl (\p (t, ex) -> p ++ indent (d+1) ++ 
---             "| " ++ t ++ " " ++ "?" ++ " -> " ++
---                 showexpr' (d+2) ex) "" exps
--- showexpr' _ (ADTVal n Nothing) = n
--- showexpr' _ (ADTVal n (Just e)) = n ++ " " ++ show e
 
 
 indent :: Int -> String

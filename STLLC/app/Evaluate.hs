@@ -2,6 +2,7 @@
 module Evaluate (evalExpr, evalModule) where
 
 import Data.List
+import Data.Bifunctor
 import Data.Maybe
 import Debug.Trace
 import Control.Monad.State
@@ -23,20 +24,34 @@ type Ctxt = (BoundCtxt, FreeCtxt)
 -------------------------------------------------------------------------------
 
 substitute :: CoreExpr -> CoreExpr -> CoreExpr
-substitute e v = evalState (transformM (substitute' v) e) 0
+substitute = substitute' 0
     where
-        substitute' :: CoreExpr -> CoreExpr -> State Int CoreExpr
-        substitute' v bl@(BLVar x) = do
-            d <- get
-            if x == d
-               then return v
-               else return bl
-        substitute' v bu@(BUVar x) = do
-            d <- get
-            if x == d
-               then return v
-               else return bu
-        substitute' v e = return e
+        substitute' :: Int -> CoreExpr -> CoreExpr -> CoreExpr
+        substitute' d bl@(BLVar x) v = if x == d then v else bl
+        substitute' d bu@(BUVar x) v = if x == d then v else bu
+        substitute' d (Abs t e) v = Abs t $ substitute' (d+1) e v
+        substitute' d (App e1 e2) v = App (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (TensorValue e1 e2) v = TensorValue (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (LetTensor e1 e2) v = LetTensor (substitute' d e1 v) (substitute' (d+2) e2 v)
+        substitute' d (LetUnit e1 e2) v = LetUnit (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (WithValue e1 e2) v = WithValue (substitute' d e1 v) (substitute' d e2 v)
+        substitute' d (Fst e) v = Fst $ substitute' d e v
+        substitute' d (Snd e) v = Snd $ substitute' d e v
+        substitute' d (InjL t e) v = InjL t $ substitute' d e v
+        substitute' d (InjR t e) v = InjR t $ substitute' d e v
+        substitute' d (CaseOfPlus e1 e2 e3) v = CaseOfPlus (substitute' d e1 v) (substitute' (d+1) e2 v) (substitute' (d+1) e3 v)
+        substitute' d (BangValue e) v = BangValue (substitute' d e v)
+        substitute' d (LetBang e1 e2) v = LetBang (substitute' d e1 v) (substitute' (d+1) e2 v)
+        substitute' d (LetIn e1 e2) v = LetIn (substitute' d e1 v) (substitute' (d+1) e2 v)
+        substitute' d (SumValue _ _) v = undefined
+        substitute' d (CaseOfSum _ _) v = undefined
+        substitute' d (CaseOf e ls) v = CaseOf (substitute' d e v) (map (second $ \e' -> substitute' (d+1) e' v) ls)
+        substitute' d (ADTVal e (Just ls)) v = ADTVal e (Just $ substitute' d ls v)
+
+        substitute' d e v = e      -- atomic expressions
+
+        -- substitute' v adtv@(ADTVal _ (Just x)) = return x
+        -- substitute' v adtv@(ADTVal _ Nothing) = error "[Eval] This shouldn't happen right? :)"
 
 
 
@@ -61,12 +76,11 @@ eval c@(_, fctxt) (FUVar x) = case lookup x fctxt of
                                      Just f -> eval c f
                                      Nothing -> do -- Couldn't find free variable in unrestricted context, so it's an ADT constructor (function that returns adt value)
                                          adts <- ask
-                                         let argument = case lookup x $ concatMap (\(ADTD _ _ ns) -> ns) adts of 
-                                                          Just t ->
-                                                              case t of
-                                                                Unit -> Nothing
-                                                                _ -> Just $ BLVar 0 in
-                                             return (Abs Nothing (ADTVal x argument))
+                                         case lookup x $ concatMap (\(ADTD _ _ ns) -> ns) adts of 
+                                            Just t ->
+                                              case t of
+                                                Unit -> return $ ADTVal x Nothing
+                                                _ -> return (Abs Nothing (ADTVal x (Just $ BLVar 0)))
 
 --- -o ---------------------
 
@@ -75,10 +89,10 @@ eval _ (Abs t e) = return $ Abs t e
 
 --  -oE
 eval ctxt@(bctxt, fctxt) (App e1 e2) = do
-    Abs _ e1' <- eval ctxt e1
+    Abs _ e1' <- trace ("eval e1 to abs: " ++ show e1 ++ " and e2 to val " ++ show e2) $ eval ctxt e1
     v <- eval ctxt e2
     let e1'' = substitute e1' v in
-        eval (v:bctxt, fctxt) e1''
+        trace ("substitute " ++ show e1' ++ " with v " ++ show v ++ " to get e1''" ++ show e1'') $ eval (v:bctxt, fctxt) e1''
 
 --- * ----------------------
 
@@ -175,7 +189,12 @@ eval ctxt@(bctxt, fctxt) (CaseOfSum e1 exps) = do
 
 eval c (ADTVal x y) = return (ADTVal x y)
 
-eval c (CaseOf _ _) = error "Case Of"
+eval c@(bctxt, fctxt) (CaseOf e ls) = do
+    ADTVal nam arg <- trace ("Eval of " ++ show e ++ " with " ++ show c) $ eval c e
+    let bctxt' = case arg of Just arge -> arge:bctxt; Nothing -> UnitValue:bctxt
+    case lookup nam ls of
+      Nothing -> error "[Eval] Couldn't find constructor..."
+      Just e' -> trace ("Running eval on " ++ show e' ++ " with ctxt " ++ show bctxt') $ eval (bctxt', fctxt) e'
 
 eval c (Lit x) = return (Lit x)
 
