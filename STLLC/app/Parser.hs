@@ -44,13 +44,6 @@ tensor = do
     return $ Syntax.TensorValue e1 e2 
 
 
-lettensorpattern :: Parser Pattern
-lettensorpattern = do
-    i1 <- identifier
-    reservedOp "*"
-    TensorPattern i1 <$> identifier
-
-
 -- 1
 unit :: Parser Expr 
 unit = reserved "()" >> return Syntax.UnitValue -- TODO : <<><*><>> breaks...
@@ -122,30 +115,81 @@ bang = do
     Syntax.BangValue <$> expr
 
 
-letbangpattern :: Parser Pattern
-letbangpattern = do
-    reservedOp "!"
-    BangPattern <$> identifier
+-- lettensorpattern :: Parser Pattern
+-- lettensorpattern = do
+--     i1 <- identifier
+--     reservedOp "*"
+--     TensorPattern i1 <$> identifier
 
 
-letexp :: Parser Expr
-letexp = do
+-- letbangpattern :: Parser Pattern
+-- letbangpattern = do
+--     reservedOp "!"
+--     BangPattern <$> identifier
+
+pattern :: Parser Pattern
+pattern = Ex.buildExpressionParser opst ((reserved "_" >> return UnitPattern) <|> (VanillaPattern <$> identifier) <|> parens pattern)
+    where 
+        infixOp x f = Ex.Infix (reservedOp x >> return f)
+        prefixOp x f = Ex.Prefix (reservedOp x >> return f)
+        opst = [
+            [
+            prefixOp "!" BangPattern
+            ],
+            [
+            infixOp "*" TensorPattern Ex.AssocLeft
+            ]]
+
+
+
+-- Moved to desugar
+-- letexp :: Parser Expr
+-- letexp = do
+--     reserved "let"
+--     pat <- letpattern
+--     reserved "="
+--     e1 <- expr
+--     reserved "in"
+--     e2 <- expr
+--     case pat of
+--         TensorPattern i1 i2 -> return $ Syntax.LetTensor i1 i2 e1 e2
+--         UnitPattern -> return $ Syntax.LetUnit e1 e2
+--         BangPattern i1 -> return $ Syntax.LetBang i1 e1 e2
+--         VanillaPattern i1 -> return $ Syntax.LetIn i1 e1 e2
+
+letexppattern :: Parser Expr
+letexppattern = do
     reserved "let"
-    pat <- letpattern
+    pat <- pattern
     reserved "="
     e1 <- expr
     reserved "in"
-    e2 <- expr
-    case pat of
-        TensorPattern i1 i2 -> return $ Syntax.LetTensor i1 i2 e1 e2
-        UnitPattern -> return $ Syntax.LetUnit e1 e2
-        BangPattern i1 -> return $ Syntax.LetBang i1 e1 e2
-        VanillaPattern i1 -> return $ Syntax.LetIn i1 e1 e2
+    Syntax.LetInPattern pat e1 <$> expr
 
 
-letpattern :: Parser Pattern
-letpattern = do
-    try lettensorpattern <|> try letunitpattern <|> try letbangpattern <|> letinpattern
+casebranchpat :: Parser (String, Pattern, Expr)
+casebranchpat = do
+    tag <- identifier
+    pat <- option UnitPattern pattern -- TODO: shouldn't be possible for sum types, but sum types should be generalized to adts?
+    reservedOp "->"
+    e <- expr
+    return (tag, pat, e)
+
+
+caseofpattern :: Parser Expr
+caseofpattern = do
+    reserved "case"
+    e1 <- expr
+    reserved "of"
+    c1 <- casebranchpat
+    cls <- many (do {reservedOp "|"; casebranchpat})
+    return $ Syntax.CaseOfPattern e1 (c1:cls)
+
+
+
+-- letpattern :: Parser Pattern
+-- letpattern = do
+--     try lettensorpattern <|> try letunitpattern <|> try letbangpattern <|> letinpattern
 
 
 letinpattern :: Parser Pattern
@@ -206,7 +250,8 @@ caseadt = do
 caseof :: Parser Expr
 caseof = try casesum
       <|> try caseplus
-      <|> caseadt
+      -- <|> caseadt
+      <|> caseofpattern
 
 
 pairepxr :: Parser Expr
@@ -259,7 +304,8 @@ aexp' wparens =
      <|> plus
      <|> caseof
      <|> bang
-     <|> letexp
+     -- <|> letexp
+     <|> letexppattern
      <|> variable
      <|> mark
      <|> num
@@ -311,6 +357,13 @@ tylit =     sumty
         <|> (reservedOp "d" >> return (TypeVar 3))
         <|> (reservedOp "e" >> return (TypeVar 4))
         <|> (reservedOp "f" >> return (TypeVar 5))
+        <|> (reservedOp "g" >> return (TypeVar 6))
+        <|> (reservedOp "h" >> return (TypeVar 7))
+        <|> (reservedOp "i" >> return (TypeVar 8))
+        <|> (reservedOp "s" >> return (TypeVar 18))
+        <|> (reservedOp "x" >> return (TypeVar 23))
+        <|> (reservedOp "y" >> return (TypeVar 24))
+        <|> (reservedOp "z" >> return (TypeVar 25))
         <|> adty -- TODO: can't write ADTs starting by any of those letters above ^:) e não consegui resolver com o try (fazer "starts with uppercase" e assim)
 
 
@@ -501,7 +554,7 @@ val = Right . Binding "main" <$> expr
 
 top :: Parser (Either TypeBinding Binding)
 top = do
-    x <- try synthrec <|> try letsynth <|> try typeannot <|> try letdecl <|> try val
+    x <- try synthrec <|> try letsynth <|> try typeannot <|> try letdecl <|> val
     optional (reservedOp ";") -- !TODO: Necessário para saber onde uma função termina. Sem o ponto e vírgula não há distinção sobre o que é um identificador de função e o que é uma top level declaration..
     return x
 

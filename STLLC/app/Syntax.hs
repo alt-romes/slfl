@@ -57,7 +57,7 @@ data Expr
 
     -- Non-canonical
 
-    | LetIn Name Expr Expr
+    | LetIn Name Expr Expr 
 
     | Mark Int (Maybe Name) ([(Name, Either Scheme Type)], [(Name, Type)]) (Maybe Scheme) (Int, [Name], Int, Maybe Expr)
 
@@ -69,16 +69,19 @@ data Expr
 
     -- Added sugar :)
 
+    | CaseOfPattern Expr [(Name, Pattern, Expr)]
+    | LetInPattern Pattern Expr Expr
     | UnrestrictedAbs Name (Maybe Type) Expr
+
     deriving (Generic, NFData, Eq)
 
 
 data Pattern
-    = TensorPattern Name Name
+    = TensorPattern Pattern Pattern
     | UnitPattern
-    | BangPattern Name
-    
+    | BangPattern Pattern
     | VanillaPattern Name
+    deriving (Generic, NFData, Eq)
 
 
 
@@ -131,6 +134,7 @@ instance Pretty Expr where
         Syntax.BangValue e -> parens $ char '!' <> ppr p e
         Syntax.LetBang x e1 e2 -> hang ("let" <+> char '!' <> text x <+> char '=' <+> ppr p e1 <+> "in") 2 (ppr p e2)
         Syntax.LetIn x e1 e2 -> hang ("let" <+> text x <+> char '=' <+> ppr p e1 <+> "in") 2 (ppr p e2)
+        Syntax.LetInPattern x e1 e2 -> hang ("let" <+> pp x <+> char '=' <+> ppr p e1 <+> "in") 2 (ppr p e2)
         Syntax.Mark _ _ _ (Just t) _ -> "{{" <+> pp t <+> text "}}"
         Syntax.Mark {} -> "{{" <+> "..." <+> "}}"
         Syntax.SumValue mts (s, e) -> "union" <+> char '{' <+> foldl undefined empty mts <+> text s <+> pp e <+> char '}' -- TODO
@@ -138,6 +142,9 @@ instance Pretty Expr where
         Syntax.CaseOf e ((tag, id, e1):exps) -> "case" <+> pp e <+> "of" $$
                 nest 2 (hang (space <+> text tag <> (if id == "" then "" else space <> text id) <+> "->") 4 (pp e1)) $$
                             foldl (\p (t, i, ex) -> p $$ nest 2 (hang ("|" <+> text t <> (if i == "" then "" else space <> text i) <+> "->") 4 (pp ex))) empty exps
+        Syntax.CaseOfPattern e ((tag, pat, e1):exps) -> "case" <+> pp e <+> "of" $$
+                nest 2 (hang (space <+> text tag <> (if pat == UnitPattern then "" else space <> pp pat) <+> "->") 4 (pp e1)) $$
+                            foldl (\p (t, pat', ex) -> p $$ nest 2 (hang ("|" <+> text t <> (if pat' == UnitPattern then "" else space <> pp pat') <+> "->") 4 (pp ex))) empty exps
         UnrestrictedAbs x Nothing e -> parensIf (p>0) $ char 'λ' <> text x <+> text "=>" <+> ppr (p+1) e
         UnrestrictedAbs x (Just t) e -> parensIf (p>0) $ char 'λ' <> text x <+> char ':' <+> pp t <+> text "=>" <+> ppr (p+1) e
 
@@ -156,6 +163,15 @@ instance Pretty Expr where
         --                                             foldl (\p (t, i, ex) -> p ++ indent (d+1) ++ 
         --                                                 "| " ++ t ++ " " ++ i ++ " -> " ++
         --                                                     showexpr' (d+2) ex) "" exps
+
+instance Pretty Pattern where
+    ppr d p = case p of
+        TensorPattern p1 p2 -> parensIf (d>0) $ ppr (d+1) p1 <> char '*' <> ppr (d+1) p2
+        BangPattern p1 -> parensIf (d>0) $ char '!' <> ppr (d+1) p1
+        VanillaPattern n -> text n
+        UnitPattern -> "_"
+
+
 
 
 
@@ -189,6 +205,9 @@ transformM f (SumValue mts (s, e)) = f . SumValue mts . (,) s =<< transformM f e
 transformM f (CaseOfSum e ls) = f =<< (CaseOfSum <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
 transformM f (CaseOf e ls) = f =<< (CaseOf <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
 transformM f (UnrestrictedAbs x t e) = f . UnrestrictedAbs x t =<< transformM f e
+transformM f (CaseOfPattern e ls) = f =<< (CaseOfPattern <$> transformM f e <*> traverse (\ (s, s', e) -> (,,) s s' <$> transformM f e) ls)
+transformM f (LetInPattern pat e1 e2) = f =<< (LetInPattern pat <$> transformM f e1 <*> transformM f e2)
+
 
 
 transform :: (Expr -> Expr) -> Expr -> Expr
