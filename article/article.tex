@@ -850,7 +850,11 @@ recursive function with a list argument (whose type is defined as
 calls are only allowed when considering a judgment of the form
 $\textrm {List} \vdash C$, i.e.~when a list value is available to
 produce the goal $C$, and only in the \emph{Cons}
-branch. % (TODO: rewrite? O bold é meio estranho não?)
+branch. Furthermore, we also forbid the usage of the recursive function when
+synthesizing arguments to use it.
+% TODO : não sei se precisa de melhor explicação mas foi uma coisa que fiz para
+% não gerar um programa recursivo.
+% (TODO: rewrite? O bold é meio estranho não?)
 
 
 \mypara{Polymorphic Types} A polymorphic specification is a type of form
@@ -1050,7 +1054,6 @@ name and $h_{\tilde{i}}$ its predicate for every refinement type in the
 propositional contexts; and $\textsc{sat}(p_{\tilde{y}} \Rightarrow p_{\tilde{x}})$ is a call to an SMT solver that
 determines universal satisfiability of the implication between predicates (the
 left focused proposition subtypes the goal).
-
 \begin{mathpar}
     \infer*[right=(refR)]
     { \textsc{getModel}(p) = M }
@@ -1060,6 +1063,16 @@ left focused proposition subtypes the goal).
     \infer*[right=(refL)]
     { \textsc{sat}(p_{\tilde{y}} \Rightarrow p_{\tilde{x}}) }
     {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\tilde{y}\{A\ \vert\ p_{\tilde{y}}\}\Downarrow\ \vdash x : \tilde{x}\{A\ \vert\ p_{\tilde{x}}\} }
+\end{mathpar}
+
+
+\mypara{Optimizations} To speed up the process and get a cleaner and sometimes more correct
+output, we add a rule that lets us ``skip some rules'' if left focused on a
+$\bang$-ed proposition, and the goal is $\bang$-ed:
+\begin{mathpar}
+    \infer*[right=($\bang\Downarrow$L)]
+    { \Theta/\Theta';\Rho;\Gamma;\Delta; A\Downarrow\ \vdash M : C}
+    {\Theta/\Theta';\Rho;\Gamma;\Delta; \bang A\Downarrow\ \vdash M : \bang C}
 \end{mathpar}
 
 
