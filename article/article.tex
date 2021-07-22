@@ -1020,12 +1020,46 @@ type substitution needn't be explicit in the rule:
     T_{\overline\beta}}
 \end{mathpar}
 
-\mypara{Refinement Types} Their syntax is... Their rules are...
+\mypara{Refinement Types} Refinement types are defined as a types
+with a name and with a predicate (a non-existing predicate is the same as it
+being always \emph{true}); dependent types are functions with
+refinement types in which the argument type name can be used in the predicates
+of the return type (e.g. $x\{\mathsf{Int}\} \lolli y\{\mathsf{Int}\ \vert\ y = x\}$ specifies a function that
+takes an Int named $x$ and produces an Int whose value is equal to the input $x$). We extend
+the types syntax with our refinement types syntax:
+\[
+\begin{tabular}{lclc}
+    $\tau$ & $\ ::=\ $ & $\dots\ \vert\ \langle\emph{name}\rangle \{\tau\ \vert\ P\}$ \\
+    $P$ & $\ ::=\ $ & $P = P\ \vert\ P \neq P\ \vert\ P \vee P\ \vert\ P \wedge
+    P\ \vert\ P \Rightarrow P\ \vert\ n = n\ \vert\ n \neq n$ \\
+    & & $\vert\ n \leq n\ \vert\ n \geq n\ \vert\ n < n\ \vert\ n > n\ \vert\
+    true\ \vert\ false\ \vert\ \langle\emph{name}\rangle$ \\
+    $n$ & $\ ::=\ $ & $n * n\ \vert\ n + n\ \vert\ n - n\ \vert\
+    \langle\emph{natural}\rangle\ \vert\ \langle\emph{name}\rangle$
+    \\
+\end{tabular}
+\]
+The addition of refinement types to the synthesizer doesn't
+interfere with the rest of the process. We define the following right and
+left rule, to synthesize or consume in synthesis a refinement type, where
+$\textsc{getModel}(p)$ is a call to an SMT solver that returns a model of an
+uninterpreted function that satisfies
+$\forall_{\tilde{1},\tilde{2},\dots,\tilde{n}}\ h_{\tilde{1}} \Rightarrow h_{\tilde{2}} \Rightarrow \dots
+\Rightarrow h_{\tilde{n}} \Rightarrow p$, where $\tilde{i}$ is the refinement type
+name and $h_{\tilde{i}}$ its predicate for every refinement type in the
+propositional contexts; and $\textsc{sat}(p_{\tilde{y}} \Rightarrow p_{\tilde{x}})$ is a call to an SMT solver that
+determines universal satisfiability of the implication between predicates (the
+left focused proposition subtypes the goal).
 
 \begin{mathpar}
     \infer*[right=(refR)]
-    {  }
-    {  }
+    { \textsc{getModel}(p) = M }
+    {\Theta/\Theta';\Rho;\Gamma;\Delta \vdash M : \tilde{x}\{A\ \vert\
+    p\}\Uparrow }
+    \and
+    \infer*[right=(refL)]
+    { \textsc{sat}(p_{\tilde{y}} \Rightarrow p_{\tilde{x}}) }
+    {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\tilde{y}\{A\ \vert\ p_{\tilde{y}}\}\Downarrow\ \vdash x : \tilde{x}\{A\ \vert\ p_{\tilde{x}}\} }
 \end{mathpar}
 
 
