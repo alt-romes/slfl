@@ -1177,22 +1177,23 @@ interface is available from the repository~\cite{github repo}.
 
 \section{Related Work}
 
-Type-based program synthesis is a vast field of study and so it
-follows that a lot of literature is available to inspire and
-complement our work. Most works~\cite{DBLP:conf/lopstr/HughesO20,DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16} follow some variation of the
-synthesis-as-proof-search approach, however, the process is novel for
-each, due to a variety of different rich types explored, and their
-respective corresponding logics and programming languages; or nuances
-of the synthesis process itself, such as complementing types with
-program examples; or even the programming paradigm of the output
-produced (e.g. generating heap manipulating
-programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).  Some other
-common patterns we might want to follow are the use of type
-refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16} and the support for synthesis of recursive
-functions~\cite{DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15}.  These works share some common ground, and base
-themselves of the same works we do -- most famously the Curry-Howard
-correspondence, but also, for example, works on focusing-based
-proof-search~\cite{10.1093/logcom/2.3.297}.
+Type-based program synthesis is a vast field of study and so it follows that a
+lot of literature is available to inspire and complement our work. Most
+works~\cite{DBLP:conf/lopstr/HughesO20,DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
+follow some variation of the synthesis-as-proof-search approach. However, the
+process is novel for each due to a variety of different rich types explored and
+their corresponding logics and languages; or nuances of the synthesis process
+itself, such as complementing types with program examples; or even the
+programming paradigm of the output produced (e.g. generating heap manipulating
+programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).  Some other common
+patterns we follow are the use of type
+refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16}, polymorphic types, and the
+support for synthesis of recursive
+functions~\cite{DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15}. These
+works share some common ground with each other and with us -- most
+famously the Curry-Howard correspondence, but also, for example, 
+focusing-based proof-search~\cite{10.1093/logcom/2.3.297}.
+% TODO: sinto que precisava de um toque...
 
 % \mypara{Type-and-Example-Directed Program Synthesis} This
 % work~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
@@ -1213,22 +1214,23 @@ proof-search~\cite{10.1093/logcom/2.3.297}.
 % or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
   
 \mypara{Program Synthesis from Polymorphic Refinement Types} The
-work~\cite{DBLP:conf/pldi/PolikarpovaKS16} also studies synthesis
-recursive functional programs but in a more ``advanced'' setting. The
-specification is a combination of two rich forms of types: polymorphic and
-refinement types (which correspond to a first-order logic through the
-Curry-Howard isomorphism) -- this is an interesting combination that offers
-``expressive power and decidability, which enables automatic
-verification--and hence synthesis--of nontrivial programs''.  Their
-approach to refinement types consists of a new algorithm that supports
-decomposition of the refinement specification, allowing for separation
-between the language of specification and programs and making the
-approach amenable to compositional synthesis techniques.
+work~\cite{DBLP:conf/pldi/PolikarpovaKS16} also studies synthesis of recursive
+functional programs in an ``advanced'' context. Their specifications combine two
+rich forms of types: polymorphic and refinement types (which correspond to a
+first-order logic through the Curry-Howard isomorphism). Their approach to
+refinement types consists of a new algorithm that supports decomposition of the
+refinement specification, allowing for separation between the language of
+specification and programs and making the approach amenable to compositional
+synthesis techniques. We also support polymorphism and refinements, however, our
+refinements are somewhat underdeveloped and don't have an important role in our
+process, in contrast to their strong use of refinements to guide their
+synthesizer. Instead, our synthesizer leverages the expressiveness of linear
+types and techniques for proof-search in linear logic to guide its process.
 
 \mypara{Resourceful Program Synthesis from Graded Linear Types} The
 work~\cite{DBLP:conf/lopstr/HughesO20} synthetises programs using an
 approach very similar to our own.  The work employs so-called graded
-modal types, which is an refinement of pure linear types -- a more
+modal types, which is a refinement of pure linear types -- a more
 \emph{fine-grained} version, since it allows for quantitative
 specification of resource usage, in contrast to ours either
 \emph{linear} or \emph{unrestricted} (via the linear logic
@@ -1236,11 +1238,10 @@ exponential) use of assumptions.  Their resource management is more
 complex, and so they provide solutions which adapt Hodas and Miller's
 resource management
 approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
--- the model we will be using.
+-- which, in contrast, is the model use in our work.
 
 They also use focusing as a solution to trim down search space and to
-ensure that synthesis only produces well-typed programs, and our
-solution will use the same literature as a base.  However, since their
+ensure that synthesis only produces well-typed programs. However, since their
 underlying logic is \emph{modal} rather than purely \emph{linear}, it
 lacks a clear correspondence with concurrent session-typed
 programs~\cite{DBLP:journals/mscs/CairesPT16,DBLP:conf/concur/CairesP10},
@@ -1387,8 +1388,6 @@ The benchmarks are separated into groups: theorems of linear logic, recursive
 ADTs, refinements. For each goal we analyze if the synthesis process terminated
 according to what was expected, the mean time and standard deviation, if the
 resulting program fullfills its intended purpose
-
-% TODO: Utilizamos qual argumento primeiro ??? para \omega com ++ ou : ?
 
 \begin{center}
     \begin{tabular}{ |c|c|c|c|c| }
