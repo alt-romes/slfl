@@ -362,8 +362,10 @@ synchronous and asynchronous. Asynchronous connectives are those whose
 right rules are \emph{invertible}, i.e. they can be applied eagerly
 during proof search without losing provability and so the order in
 which these rules are applied is irrelevant, and whose left rules
-are not invertible. Synchronous connectives are dual. \todo{Say which
-  are which}
+are not invertible. Synchronous connectives are dual. The asynchronous \todo{Escrever isto depois
+de apresentar o linear $\lambda$-calculus?} 
+connectives are $\lolli$ and $\with$ and the synchronous are
+$\tensor,\textbf{1},\oplus,\bang$.
 
 Given this separation, focusing divides proof search into two
 phases: %
@@ -399,7 +401,7 @@ non-invertible rules are written $\Gamma;\Delta; B \Downarrow\ \vdash A$.
 % Esta parte em geral está a ficar pouco coerente, com a introdução do focusing,
   % a suposta introdução dos judgments, e a introdução da gramática... deixa
 
-The core language is a simply-typed linear lambda calculus with linear
+The core language is a simply-typed linear $\lambda$-calculus with linear
 functions ($\lolli$), additive ($\with$) and multiplicative ($\tensor$) pairs,
 multiplicative unit (\textbf{1}), additive sums ($\oplus$)
 and the exponential modality ($\bang$) (to internalize unrestricted use of variables), for
@@ -429,7 +431,7 @@ Putting together linear logic and linear lambda calculus through the Curry-Howar
 management, and focusing, we get the following core formal system (%heavily
 inspired
 by Frank Pfenning's notes on focusing for linear logic~\cite{FPnotes...}) -- in which the
-rule ($\lolli R$) is read: to synthesize a program of type $A \lolli B$ while inverting
+rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
 context $\Delta$, and inversion context $\Omega$, synthetise a program of type $B$ with
 an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
@@ -462,7 +464,7 @@ We begin with the right invertible rules:
 When we reach a non-invertible proposition on the right, we start inverting the
 $\Omega$ context. The rule to transition to inversion on the left is:
 \begin{mathpar}
-    \infer*[right=($\Uparrow R$)]
+    \infer*[right=($\Uparrow$R)]
     {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
     right asynchronous}}
     {\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
@@ -513,7 +515,7 @@ Followed by the left invertible rules:
 When we find a synchronous (i.e. non-invertible) proposition in $\Omega$,
 we simply move it to the linear context $\Delta$, and keep inverting on the left:
 \begin{mathpar}
-    \infer*[right=($\Uparrow L$)]
+    \infer*[right=($\Uparrow$L)]
     {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
     \textrm{not left asynchronous}}
     {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
@@ -540,8 +542,17 @@ rules:
     {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
 \end{mathpar}
 
-\todo[inline]{Aqui tens de explicar uma regra pelo menos}
-The decision rules are followed by either left or right focus rules:
+The decision rules are followed by either left or right focus rules. The left
+focus rule $\lolli$L is read ``to synthesize a program of type $C$ with input
+linear context $\Delta$ and while left focused on a proposition $x$ of type $A
+\lolli B$, synthesize a program $M$ of type $C$ with input $\Delta$ and 
+left focused ($\Downarrow$) on $y$ of type
+$B$, and output the context $\Delta'$ (with the unused
+linear propositions); then, switching to the right inversion judgment ($\Uparrow$), synthesize a program $N$ of type $A$ with input
+$\Delta'$ and output context $\Delta''$; finally, replace in $M$ all occurrences
+of variable $y$ with program $x\ N$ (apply $x$ to $N$)''. It can be understood
+as the synthesis of a program of type $C$ using the return value (of type $B$) from the function $A \lolli B$, and then the
+synthesis of an argument of type $A$ to apply the function to.
 \begin{mathpar}
     \infer*[right=($\tensor R$)]
     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
@@ -660,10 +671,7 @@ constructor:
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ C_n\ y_n
     \rightarrow M_n : C}
 \end{mathpar}
-
-
-where the ADT $T$ and its constructors stand for any ADT with form
-\begin{minted}{haskell}
+where the ADT $T$ and its constructors stand for any ADT with form \begin{minted}{haskell}
     data T = C1 X1 | C2 X2 | ... | Cn Xn
 \end{minted}
 
@@ -807,9 +815,9 @@ three following rules ensure this:
 % uma coisa antiga que ficou resolvida mais tarde com outra modificação e então
 % é agora inutil. Talvez seja demais adicionar à regra
 %
-The rules above ensure that a recursive ADT will be deconstructed
+Altogether, the rules above ensure that a recursive ADT will be deconstructed
 once, and that subsequent equal ADTs will only be useable from the linear
-context -- essentially forcing it to be used to instantiate another proposition,
+context -- essentially forcing them to be used to instantiate another proposition,
 which will typically be an argument for the recursive call.
 
 
@@ -868,16 +876,13 @@ $\tau'$ is an \emph{instantiation} of type scheme $\forall \overline{\alpha}.\
     \tau \Uparrow}
 \end{mathpar}
 %
-As such, the construction of a derivation in which the only rule that
-can derive an atom is the \textsc{init} rule corresponds to the
-synthesis of a program where some expressions are treated agnostically
--- nothing constrains their type -- i.e.~the program is
-polymorphic. The simplest example is the polymorphic function
-\emph{id} of type $\forall \alpha .\ \alpha \lolli \alpha$. The
-program synthesized from that specification is $\lambda x . x$, a
-lambda abstraction that does not constrain the type of its parameter
-$x$ in any way.
-% TODO: \todo{R : rewrite this? não estranho?}
+As such, the construction of a derivation in which the only rule that can derive
+an atom is the \textsc{init} rule corresponds to the synthesis of a program
+where some expressions are treated agnostically (nothing constrains their type),
+i.e.~a polymorphic program. The simplest example is the polymorphic function
+\emph{id} of type $\forall \alpha .\ \alpha \lolli \alpha$. The program
+synthesized from that specification is $\lambda x . x$, a lambda abstraction
+that does not constrain the type of its parameter $x$ in any way.
 
 The main challenge of polymorphism in synthesis is the usage of schemes from the
 unrestricted context.  To begin with, $\Gamma$ now holds both (monomorphic)
@@ -1032,7 +1037,9 @@ full program in the \synname\ language, and is called to generate terms marked
 (by the syntax \emph{\{\{ ... \}\}}) for
 synthesis. The main pipeline consists of:
 \[
-    \textrm{Parsing} \rightarrow \textrm{Desugaring} \rightarrow \textrm{Inference} \rightarrow \textrm{Synthesis}
+    \textrm{Parsing} \rightarrow \textrm{Desugaring} \rightarrow
+    \textrm{Inference} \rightarrow \textrm{Synthesis} \rightarrow
+    \textrm{Evaluation}
 \]
 
 The parsing module converts ADT declarations and top level functions written in
@@ -1055,10 +1062,21 @@ found in the AST, all the inferrence context up to that point is added to the
 mark, and if not explicit, its type is inferred, essentially defining the synth
 context and synth goal.
 
-The synthesis module iterates over the synthesis marks and runs the
-synthetiser with its context and goal for each mark, minimizing the
-resulting expression (i.e.~$\eta$-reducing it), and replacing the mark
-in the frontend AST with the synthed program.
+The synthesis module iterates over the synthesis marks and runs the synthetiser
+with the respective context and goal for each mark. The resulting expression is checked
+against the synthesis constraints defined through some keywords, continuing
+synthesis if they are violated: ``using'' guarantees that certain functions are
+used in the program body, and ``assert'' evaluates the given assertion within the
+synthesized program to a validating boolean.  Additionally, the keyword
+``depth'' controls the \emph{existential depth} (seen
+in~\ref{sec:formal_system}), and ``choose'' selects a different result as long
+as one is available. Finally, the expression is minimized (i.e.~$\eta$-reduced),
+and the mark in the frontend AST is replaced with the synthesized program. 
+
+The evaluation module evaluates the function named ``main'' within the
+complete synthesized program, returning a final value.
+
+
 
 
 \subsection{Implementation}
@@ -1107,8 +1125,9 @@ equal inputs.
 For our synthesizer, two calls are equivalent when
 contexts $\Theta, \Rho, \Gamma, \Delta$, $\Omega$, (or alternatively
 the left focus), and the goal, are equivalent. Because comparing all
-of these is slow, our implementation hashes the relevant values and
-uses the result as the key\todo{via a hashconsing library?}.
+of these is slow, our implementation hashes the relevant values via a hashing
+library (\emph{Hashable}~\cite{https://hackage.haskell.org/package/hashable}) and
+uses the result as the key.
 %
 Furthermore, a branch we want to memoize
 might fail, not providing any result -- we also want to record
