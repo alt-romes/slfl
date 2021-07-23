@@ -1030,6 +1030,9 @@ $\bang$-ed proposition, and the goal is $\bang$-ed:
 
 
 
+
+
+
 \section{Architecture}\label{sec:architecture}
 
 The \synname\ synthesizer operates as part of the pipeline that processes a
@@ -1177,6 +1180,24 @@ interface is available from the repository~\cite{sili_repo}.
 % A implementação foi feita em haskell e o código está disponível em X e há um
 % live demo com exemplos pré-feitos em Y?
 
+
+To showcase the expressiveness of our synthesizer, we present as
+examples the input and output program for \emph{reverse}.
+Note how we can guide the synthesis using the assertion mechanism to 
+supply an example:
+
+{\small
+\begin{minted}{haskell}
+synth reverse :: List a -o List a -o List a
+  | assert (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil))); 
+\end{minted}
+
+\begin{minted}{haskell}
+reverse b c = case b of
+    Nil -> c
+  | Cons e*f -> reverse f (Cons (e, c));
+\end{minted}
+}
 
 
 
@@ -1459,23 +1480,6 @@ program.
   \end{center}
 }
 
-To further showcase the expressiveness of our synthesizer, we present as
-examples the input and output program for \emph{reverse}.
-Note how we can guide the synthesis using the assertion mechanism to 
-supply an example:
-{\small
-\begin{minted}{haskell}
-synth reverse :: List a -o List a -o List a
-  | assert 
-  (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil))); 
-\end{minted}
-
-\begin{minted}{haskell}
-reverse b c = case b of
-    Nil -> c
-  | Cons e*f -> reverse f (Cons (e, c));
-\end{minted}
-}
 
 
 
