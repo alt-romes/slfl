@@ -1464,7 +1464,8 @@ supply an example:
 {\small
 \begin{minted}{haskell}
 synth reverse :: List a -o List a -o List a
-  | assert (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil))); 
+  | assert 
+  (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil))); 
 \end{minted}
 
 \begin{minted}{haskell}
