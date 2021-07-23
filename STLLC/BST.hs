@@ -13,11 +13,4 @@ size b = case b of
 
 synth singleton :: (a -o BST a);
 
-
-synth insert :: (!a -o BST a -o BST a)
-  | assert
-  let s*t = size (insert (!1) (singleton 1)) in
-      let s1 * t1 = size (Node ((1, Empty), singleton 1)) in
-          ((s == (s1 + 2)) && (t != t1));
-
-
+synth insert :: (!a -o BST a -o BST a);

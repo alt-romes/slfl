@@ -104,8 +104,11 @@ of our framework named \synname, examining technical details and key
 implementation challenges (\S~\ref{sec:architecture}). Finally, 
 we evaluate our work through expressiveness and performance benchmarks
 (\S~\ref{sec:evaluation}) and discuss related work
-(\S~\ref{sec:related}). Appendix~\ref{sec:background} lists
-foo. Appendix~\ref{} details blah.
+(\S~\ref{sec:related}). Appendix~\ref{sec:background} covers background
+concepts such as \emph{linear logic} and \emph{sequent calculus}.
+Appendix~\ref{sec:final_system} presents the final set of inference
+rules, putting together everything seen in \S~\ref{sec:formal_system}.
+Appendix~\ref{sec:examples} lists concrete examples of synthesis with \synname.
 
 %This work explores the synthesis of linear functional
 %programs from types based on linear logic propositions (i.e.~linear
@@ -138,9 +141,9 @@ foo. Appendix~\ref{} details blah.
 
 \section{Overview}\label{sec:overview}
 
-The \synname\ synthetiser combines linear types with recursion,
+The \synname\ synthesizer combines linear types with recursion,
 parametric polymorphism, recursive algebraic data types, and
-refinement types. The synthetiser is built on top of a system of proof-search for
+refinement types. The synthesizer is built on top of a system of proof-search for
 linear logic. Proof search relates to program synthesis via the Curry-Howard
 correspondence~\cite{}, which states that \emph{propositions in a logic} are
 \emph{types}, and \emph{proofs} of those propositions are well-typed
@@ -162,7 +165,7 @@ constraining the space of valid programs.  % TODO: Reword?
 The core of the synthesis is a \emph{sound} and \emph{complete} system
 consisting of \emph{bottom-up} proof-search in propositional linear
 logic based on \emph{focusing}~\cite{}. Our approach, being grounded
-by propositions-as-types, ensures that all synthetised programs
+by propositions-as-types, ensures that all synthesized programs
 (i.e.~proofs) are well-typed \emph{by construction} (i.e.~if the
 synthesis procedure produces a program, then the program intrinsically
 satisfies its specification). Moreover, we can leverage the modularity
@@ -175,7 +178,7 @@ structure while preserving the correctness of programs by
 construction.
 
 The \synname\ programming language is naturally developed alongside
-the synthetiser. Synthesis goals are inserted in the program by use of
+the synthesizer. Synthesis goals are inserted in the program by use of
 a \emph{synth} keyword or mark, indicating a program should be
 generated for a given type. Additionally, it opens the possibility of
 synthesis within a context, that is, with knowledge of other functions and
@@ -209,7 +212,7 @@ that takes as arguments an unrestricted ($\bang$) linear function\footnote{might
 linearly in its body} 
 that converts $a$s in $b$s, a list of $a$s, and produces a
 list of $b$s, written $\bang(a \lolli b) \lolli List\ a \lolli List\ b$, isn't
-satisfied by the program \mintinline{haskell}{(\x -> \y -> Nil)}. To synthetise
+satisfied by the program \mintinline{haskell}{(\x -> \y -> Nil)}. To synthesize
 a valid program from it, \mintinline{haskell}{(List a)} has to be deconstructed,
 and its constructor arguments used. \synname\ would output the following
 function (\emph{map}) without relying on any additional information:
@@ -235,7 +238,7 @@ As an example, from the specification $x \{Int\} \lolli y \{Int\} \lolli z
 \{Int\} \lolli k \{Int\ \vert\ x + k = y * z\}$ (a function that takes three
 integers and produces an integer that satisfies the given predicate), the
 program\ \mintinline{haskell}{(\a -> \b -> \c -> ((0 - 1) * a) + (c * b))} is
-synthetised.
+synthesized.
 
 \mypara{Guiding the Search} Specifications can be additionally
 augmented with four keywords: ``using'', ``depth'', ``assert'' and ``choose''.
@@ -329,12 +332,12 @@ recursion) must be developed.
 
 In this section we formalize  the techniques that guide
 synthesis from our more expressive specifications, alongside the already well
-defined rules that model the core of the synthetiser, putting together a
+defined rules that model the core of the synthesizer, putting together a
 \emph{sound} set of inference rules that characterizes our framework
 for linear synthesis of
 recursive programs from specifications with the select richer types,
 % TODO: Better?....
-and describes the system in enough detail for the synthetiser to be reproducible
+and describes the system in enough detail for the synthesizer to be reproducible
 by a theory-driven implementation.
 
 We note that a \emph{sound} set of rules guarantees we cannot synthesize
@@ -471,7 +474,7 @@ inspired
 by~\cite{FPnotes...}) -- in which the
 rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
-context $\Delta$, and inversion context $\Omega$, synthetise a program of type $B$ with
+context $\Delta$, and inversion context $\Omega$, synthesize a program of type $B$ with
 an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
 resulting in the program $M$ and output linear
 context $\Delta'$ that cannot contain the added hypothesis $x{:}A$. Finally, the
@@ -643,8 +646,8 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
 
 \end{array}
   \]
-The rules written above together make the core of our synthetiser. Next, we'll
-present new rules that align and build on top of these to synthetise recursive
+The rules written above together make the core of our synthesizer. Next, we'll
+present new rules that align and build on top of these to synthesize recursive
 programs from more expressive (richer) types.
 
 \mypara{Algebraic Data Types} In its simplest form, an algebraic data type (ADT)
@@ -763,7 +766,7 @@ derivation for the goal $T$ is also infinite.
 %
 To account for this situation, we impede the decomposition of an ADT in subsequent
 proofs of its branches, and, symmetrically, don't allow construction of an
-ADT when trying to synthetise an argument for its constructor.
+ADT when trying to synthesize an argument for its constructor.
 %
 %
 For this, we need two more contexts, $\Rho_C$
@@ -985,7 +988,7 @@ constrain $c$ can be unified with those in $\Theta$:
 
 \mypara{Further Challenges} We now consider two more sources of infinite
 recursion in the synthesis process. The first is the use of an unrestricted
-function to synthetise a term of type $\tau$ that in turn will require a term of
+function to synthesize a term of type $\tau$ that in turn will require a term of
 the same type $\tau$. An example is the sub-goal judgment $(a \lolli
 b \lolli b); (a \lolli b \lolli b) \Downarrow\ \vdash b$ that
 appears while synthesizing \emph{foldr} -- we apply ($\lolli$L)
@@ -993,7 +996,7 @@ until we can use \textsc{init} ($b \Downarrow\ \vdash b$), and then we must
 synthesize an argument of type $b$. Without any additional restrictions, we
 may become again left focused on $(a \lolli b \lolli b)$, and again require $b$,
 and on and on. The solution will be to disallow the usage of the same function
-to synthetise the same goal a second time further down in the derivation.
+to synthesize the same goal a second time further down in the derivation.
 
 % TODO TODO: Big rewrite
 The other situation occurs when using an unrestricted polymorphic function that
@@ -1015,10 +1018,10 @@ wouldn't terminate in a reasonable amount of time.
 % restricting solely the used function, is $O(n!)$~\ref{exemplo_apendice?}.
 %
 As such, we'll instead forbid the usage of \emph{all} unrestricted polymorphic
-functions to synthetise any existential type if, altogether, we've already used
+functions to synthesize any existential type if, altogether, we've already used
 $d_e$ times a polymorphic function for \emph{any} existential sub-goal, where
 $d_e$ is a \emph{constant existential depth} that controls the maximum depth of
-``existential synthetis''. \todo{alinhar mais com a premissa
+``existential synthesis''. \todo{alinhar mais com a premissa
   respectiva da regra}
 %
 % This approach reduces the complexity of our proof-search algorithm for
@@ -1050,7 +1053,7 @@ variables in ADT constructors, we must guarantee that the
 destructing an ADT, type variables in constructor parameters are substituted by
 the actual type (i.e. to construct \mintinline{haskell}{List Int} with
 \mintinline{haskell}{data List a = Cons (a *
-List a)}, we wouldn't try to synthetise \mintinline{haskell}{(a * List a)},
+List a)}, we wouldn't try to synthesize \mintinline{haskell}{(a * List a)},
 but rather \mintinline{haskell}{(Int * List Int)}). To unify $T_{\overline\alpha}$ with $T_{\overline\beta}$,
 the sets of type parameters $\overline\alpha$ and $\overline\beta$ must satisfy $|\overline\alpha| = |\overline\beta|$
 together with $\forall i\ 0 \leq i \land i < |\overline\alpha| \land
@@ -1118,7 +1121,7 @@ $\bang$-ed proposition, and the goal is $\bang$-ed:
 
 \section{Architecture}\label{sec:architecture}
 
-The \synname\ synthetiser operates as part of the pipeline that processes a
+The \synname\ synthesizer operates as part of the pipeline that processes a
 full program in the \synname\ language, and is called to generate terms marked
 (by the syntax \emph{\{\{ ... \}\}}) for
 synthesis. The main pipeline consists of:
@@ -1148,7 +1151,7 @@ found in the AST, all the inferrence context up to that point is added to the
 mark, and if not explicit, its type is inferred, essentially defining the synth
 context and synth goal.
 
-The synthesis module iterates over the synthesis marks and runs the synthetiser
+The synthesis module iterates over the synthesis marks and runs the synthesizer
 with the respective context and goal for each mark. The resulting expression is checked
 against the synthesis constraints defined through some keywords, continuing
 synthesis if they are violated: ``using'' guarantees that certain functions are
@@ -1174,7 +1177,7 @@ during proof construction we must choose one of multiple rules to
 apply, and in the event of not being able to construct the proof
 following that choice, we want to backtrack to the decision point and
 attempt to derive a proof taking a different route. To this effect,
-our prototype synthetiser depends on the Haskell library \emph{LogicT}, "a backtracking
+our prototype synthesizer depends on the Haskell library \emph{LogicT}, "a backtracking
 logic-programming monad"~\cite{logict}.
 % Special attention is
 % required for ADTs. When deconstructing an ADT, since all branches must be
@@ -1199,10 +1202,10 @@ formulas directly. For satisfying formulas, for instance, when
 typechecking, or left focused on a refinement type, we use the library
 API as an oracle.
 
-\mypara{Memoization} Some proofs attempt to synthetise the same
+\mypara{Memoization} Some proofs attempt to synthesize the same
 sub-goal with the same premises more than once. Since these proof
 attempts might be expensive performance-wise, and we can rely on the
-program's determinism (equal calls to synthetise result in equal
+program's determinism (equal calls to synthesize result in equal
 outcomes), we added memoization to our synthesizer -- an optimization
 technique that stores function calls and returns cached values for
 equal inputs.
@@ -1260,7 +1263,7 @@ interface is available from the repository~\cite{github repo}.
 
 
 
-\section{Related Work}
+\section{Related Work}\label{sec:related}
 
 Type-based program synthesis is a vast field of study and so it follows that a
 lot of literature is available to inspire and complement our work. Most
@@ -1312,7 +1315,7 @@ Instead, our synthesizer leverages the expressiveness of linear
 types and techniques for proof-search in linear logic to guide its process.
 
 \mypara{Resourceful Program Synthesis from Graded Linear Types} The
-work~\cite{DBLP:conf/lopstr/HughesO20} synthetises programs using an
+work~\cite{DBLP:conf/lopstr/HughesO20} synthesizes programs using an
 approach very similar to our own.  The work employs so-called graded
 modal types, which is a refinement of pure linear types -- a more
 \emph{fine-grained} version, since it allows for quantitative
@@ -1737,7 +1740,7 @@ argument $N$ but potentially deep in the structure of $M$.
 
 We'll define our inference rules for synthesis under the sequent
 calculus system, for it simplifies the work to be done in the
-synthetiser.
+synthesizer.
 
 
 \mypara{Resource-Management}
@@ -1789,5 +1792,12 @@ does not affect the outcome of the search, leaving only the
 non-determinism that pertains to unknowns (or ``don't know''
 non-determinism), identifying precisely the points at which
 backtracking is necessary.
+
+\section{Formal System}%
+\label{sec:final_system}
+
+\section{Examples}%
+\label{sec:examples}
+
 
 \end{document}
