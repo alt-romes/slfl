@@ -1,6 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 module Synth (synthAllType, synthType, synthMarks, synthMarksModule, synth) where
 
+import System.Timeout
+import Control.Monad
+import Control.Concurrent.Async
+import Control.Concurrent
 import Data.List
 import Text.Read (readMaybe)
 import qualified Data.Set as Set
@@ -68,7 +72,74 @@ runSynth prog n (g, d) t st adtds ed touse assertion = do
             (e, d', _) <-  memoizesynth synth (Map.empty, [], recf, d, o) t -- synth only with the recursive function
                        <|> memoizesynth synth (Map.empty, [], g, d, o) t    -- synth with the whole context
             guard $ null d'
-            when (isJust assertion) $ guard $ fromADTBool $ evalModule $ desugarModule $ progAddBinds [Binding (fst $ head recf) e, Binding "main" $ fromJust assertion] prog
+            when (isJust assertion) (guard =<< liftIO (do
+                -- Attempt to evaluate the program, cancelling the thread running it after x time (deeming the program to be infinitely recursive (since no complex assertions are expected))
+
+                x <- timeout 5000 $ do
+                    return $! fromADTBool $ -- Important: The use of if is crucial to force strict evaluation, without it the timeout won't work and eval might run forever
+                                 evalModule $
+                                   desugarModule $
+                                     progAddBinds [Binding (fst $ head recf) e, Binding "main" $ fromJust assertion] prog
+                case x of
+                  Nothing -> return False
+                  Just y -> return y
+
+                -- x <- timeout 5000 $ do
+                --         if fromADTBool $ -- Important: The use of if is crucial to force strict evaluation, without it the timeout won't work and eval might run forever
+                --              evalModule $
+                --                desugarModule $
+                --                  progAddBinds [Binding (fst $ head recf) e, Binding "main" $ fromJust assertion] prog
+                --          then return True
+                --          else return False
+                -- case x of
+                --   Nothing -> return False
+                --   Just y -> return y
+
+                -- -- Loops forever, despite the timeout
+                -- x <- timeout 10000 $ do
+                --         return $ fromADTBool $
+                --              evalModule $
+                --                desugarModule $
+                --                  progAddBinds [Binding (fst $ head recf) e, Binding "main" $ fromJust assertion] prog
+                -- case x of
+                --   Nothing -> return False
+                --   Just y -> return y
+
+                -- resVar <- newEmptyMVar
+
+                -- evalt  <- forkIO (do            -- If the program doesn't terminate fast enough, the thread above will have already placed "False" in the MVar, 
+                --         let evalres = 1 == length [0..]
+                --         -- let evalres = fromADTBool $
+                --         --                   evalModule $
+                --         --                       desugarModule $
+                --         --                           progAddBinds [Binding (fst $ head recf) e, Binding "main" $ fromJust assertion] prog
+                --         putMVar resVar evalres -- Program successfully terminated, and the assertion result is returned
+                --         return ()
+                --     )
+
+                -- delayt <- forkIO (do
+                --     threadDelay 200000
+                --     putMVar resVar False
+                --     killThread evalt       -- Kill the "false" thread
+                --                  )         -- If the timeout thread finishes, the assertion fails
+
+
+                -- takeMVar resVar
+    
+                -- res <- race (withAsync (threadDelay 1000 >> return "f") wait)
+                --             (withAsync (return $
+                --                 fromADTBool $
+                --                     evalModule $
+                --                         desugarModule $
+                --                             progAddBinds [Binding (fst $ head recf) e, Binding "main" $ fromJust assertion] prog) wait)
+                -- case res of
+                --   Left _ -> undefined
+                --   Right x -> undefined
+
+                -- case ver of
+                --   Nothing -> trace "finished false - " $ return False  
+                --   Just b -> return b     
+              ))
             guard $ synthResultUses touse e
             return (e, d')
 
@@ -109,8 +180,8 @@ memoize maybefocus c@(cs,r,g,d,o) t syn = do -- TODO: Can possibly be improved/o
              (do lift $ put (Map.insert key Nothing memot, i)
                  empty)
        Just Nothing ->
-           -- empty
-           syn
+           empty
+           -- syn
        Just (Just (e, d', cs', deltai)) -> do 
            -- lift $ put (memot, i + deltai)
            -- return (e, d', cs') -- TODO: I think this has some issues with variable names that might collide

@@ -1071,8 +1071,8 @@ output, we add a rule that lets us ``skip some rules'' if left focused on a
 $\bang$-ed proposition, and the goal is $\bang$-ed:
 \begin{mathpar}
     \infer*[right=($\bang\Downarrow$L)]
-    { \Theta/\Theta';\Rho;\Gamma;\Delta; A\Downarrow\ \vdash M : C}
-    {\Theta/\Theta';\Rho;\Gamma;\Delta; \bang A\Downarrow\ \vdash M : \bang C}
+    { \Theta/\Theta';\Rho;\Gamma;\Delta; x{:}A\Downarrow\ \vdash M : C}
+    {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
 \end{mathpar}
 
 
@@ -1187,8 +1187,8 @@ functions in the unrestricted context, or more complex
 specifications. For example, if we add a new function \emph{read} to
 the unrestricted context in the \emph{array} problem seen in
 Section~\ref{sec:overview}, synthesis with memoization will take
-around $5s$, while synthesis without memoization doesn't terminate
-even after $15m$ running.
+around $9s$, while synthesis without memoization doesn't terminate in less than
+$15m$ running.
 %
 The implementation could be improved by better combining the
 memoization with the LogicT monad transformer (remembering decisions across
