@@ -26,8 +26,7 @@
 % TODO: Temos de ter o título assim? ficava mais fixe sem o número e sem o
 % supervisor :P
 \title{Synthesis of Linear Functional Programs}
-\author{Rodrigo Mesquita - Nº 55902 \\
-    Supervisor: Bernardo Toninho}
+\author{Rodrigo Mesquita \and Bernardo Toninho}
 \date{July 2021}
 \institute{NOVA School of Science and Technology}
 
@@ -143,7 +142,7 @@ parametric polymorphism, recursive algebraic data types, and
 refinement types. The synthesizer is built on top of a system of proof-search for
 linear logic. Proof search relates to program synthesis via the Curry-Howard
 correspondence~\cite{curry:34,howard:80,DBLP:journals/cacm/Wadler15}, which states that \emph{propositions in a logic} are
-\emph{types}, and \emph{proofs} of those propositions are well-typed
+\emph{types}, and their \emph{proofs} are well-typed
 \emph{programs} -- finding a proof of a proposition is finding a program with
 that type.
 
@@ -1080,6 +1079,25 @@ complete synthesized program, returning a final value. When evaluating
 synthesis assertions, a timeout is used to interrupt possibly non-terminating
 programs.
 
+\mypara{Example} To showcase the expressiveness of our synthesizer, we present as
+examples the input and output program for \emph{reverse}.
+Note how we can guide the synthesis using the assertion mechanism to 
+supply an example:
+
+{\small
+\begin{minted}{haskell}
+synth reverse :: List a -o List a -o List a
+  | assert (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil))); 
+\end{minted}
+
+\begin{minted}{haskell}
+reverse b c = case b of
+    Nil -> c
+  | Cons e*f -> reverse f (Cons (e, c));
+\end{minted}
+}
+
+
 
 
 
@@ -1179,25 +1197,6 @@ interface is available from the repository~\cite{sili_repo}.
 
 % A implementação foi feita em haskell e o código está disponível em X e há um
 % live demo com exemplos pré-feitos em Y?
-
-
-\noindent \emph{Example.} To showcase the expressiveness of our synthesizer, we present as
-examples the input and output program for \emph{reverse}.
-Note how we can guide the synthesis using the assertion mechanism to 
-supply an example:
-
-{\small
-\begin{minted}{haskell}
-synth reverse :: List a -o List a -o List a
-  | assert (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil))); 
-\end{minted}
-
-\begin{minted}{haskell}
-reverse b c = case b of
-    Nil -> c
-  | Cons e*f -> reverse f (Cons (e, c));
-\end{minted}
-}
 
 
 
@@ -2055,15 +2054,12 @@ foldr c d e = let !f = c in
 insert :: forall a . (a -o (List a -o List a));
 insert b c = case c of
     Nil -> Cons (b, Nil)
-  | Cons g ->
-      let h*i = g in
-        Cons (h, insert b i);
+  | Cons h*i -> Cons (h, insert b i);
 
 concat :: forall a . (List (List a) -o List a);
 concat b = case b of
     Nil -> Nil
-  | Cons c ->
-      let d*e = c in
+  | Cons d*e ->
         case d of
             Nil -> concat e
           | Cons k ->
