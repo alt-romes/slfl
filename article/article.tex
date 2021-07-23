@@ -885,7 +885,7 @@ constrain $c$ can be unified with those in $\Theta$:
     {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
     x{:}?\alpha \Downarrow\ \vdash x : C}
     \and
-    \infer*[right=($\Downarrow L?$)]
+    \infer*[right=($\Downarrow ?L$)]
     {\textsc{unify}(?\alpha
     \mapsto A, \Theta)}
     {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
@@ -1809,9 +1809,18 @@ backtracking is necessary.
     {\Gamma; \Delta/\Delta' ; A \Downarrow\ \vdash C}
     {\Gamma; \Delta, A/\Delta';\cdot \Uparrow\ \vdash C}
 \and
+    \mprset{flushleft}
     \infer*[right=(decideL!)]
-    {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash C}
-    {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+    {
+    (A, C) \notin \Rho_{L!}
+    \\
+    \textsc{isExist}(C) \Rightarrow |\{u\ |\
+    (f,u)\in\Rho_{L!},\textsc{isPoly}(f),\textsc{isExist}(u)\}| < d_e
+    \\
+    \Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!}');\Gamma, A; \Delta/\Delta' ; A
+    \Downarrow\ \vdash C
+    }
+    {\Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!});\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
 \and
   \infer*[right=($\lolli L$)]
     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C \and \Gamma;
@@ -1861,33 +1870,6 @@ backtracking is necessary.
     {\Gamma; \Delta/\Delta'; A \Downarrow\ \vdash C}
 \and
     \infer*[right=(adtR)]
-    {\Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow}
-    {\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
-\and
-    \mprset{flushleft}
-    \infer*[right=(adtL)]
-    {
-        \Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
-        \and
-        y_1 \notin \Delta'_1
-        \\
-        \Gamma ; \Delta/ \Delta'_2 ; \Omega, y_2{:}X_2 \Uparrow\ \vdash M_2 : C
-        \\
-        y_2 \notin \Delta'_2
-        \\\\
-        \\ \dots
-        \\
-        \Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
-        \\
-        y_n \notin \Delta'_n
-        \\
-        \Delta'_1 = \Delta'_2 = \dots = \Delta'_n
-    }
-    {\Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
-    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ C_n\ y_n
-    \rightarrow M_n : C}
-\and
-    \infer*[right=(adtR)]
     {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
     T \notin \Rho_C}
     {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
@@ -1921,14 +1903,15 @@ backtracking is necessary.
     }
     {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}
 \and
-    \infer*[right=(adt-init)]
-    {  }
-    {\Rho; \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash x : T}
-\and
     \infer*[right=(adt$\Downarrow$L)]
     {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Uparrow\ \vdash M :
     T \and T \notin \Rho_D}
     {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash M : T}
+\and
+    \infer*[right=(adt-init)]
+    {\textsc{unify}(T_{\overline\alpha} \mapsto T_{\overline\beta}, \Theta)}
+    {\Theta/\Theta,T_{\overline\alpha} \mapsto T_{\overline\beta},\Rho; \Gamma; \Delta/\Delta'; x{:}T_{\overline\alpha} \Downarrow\ \vdash x :
+    T_{\overline\beta}}
 \and
     \infer*[right=($\forall R$)]
     { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \tau' \Uparrow \and \forall
@@ -1953,29 +1936,11 @@ backtracking is necessary.
     {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
     x{:}?\alpha \Downarrow\ \vdash x : C}
 \and
-    \infer*[right=($\Downarrow L?$)]
+    \infer*[right=($\Downarrow ?L$)]
     {\textsc{unify}(?\alpha
     \mapsto A, \Theta)}
     {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
     x{:}A \Downarrow\ \vdash x : ?\alpha}
-\and
-    \mprset{flushleft}
-    \infer*[right=(decideL!)]
-    {
-    (A, C) \notin \Rho_{L!}
-    \\
-    \textsc{isExist}(C) \Rightarrow |\{u\ |\
-    (f,u)\in\Rho_{L!},\textsc{isPoly}(f),\textsc{isExist}(u)\}| < d_e
-    \\
-    \Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!}');\Gamma, A; \Delta/\Delta' ; A
-    \Downarrow\ \vdash C
-    }
-    {\Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!});\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
-\and
-    \infer*[right=(adt-init)]
-    {\textsc{unify}(T_{\overline\alpha} \mapsto T_{\overline\beta}, \Theta)}
-    {\Theta/\Theta,T_{\overline\alpha} \mapsto T_{\overline\beta},\Rho; \Gamma; \Delta/\Delta'; x{:}T_{\overline\alpha} \Downarrow\ \vdash x :
-    T_{\overline\beta}}
 \and
     \infer*[right=(refR)]
     { \textsc{getModel}(p) = M }
@@ -2077,8 +2042,7 @@ foldl c d e = let !f = c in
 uncons :: forall a . (List a -o Maybe (a * List a));
 uncons b = case b of
     Nil -> Nothing
-  | Cons c ->
-      let d*e = c in Just (d, e);
+  | Cons c -> let d*e = c in Just (d, e);
 
 foldr :: forall a b . (!(a -o (b -o b)) -o (b -o (List a -o b)));
 foldr c d e = let !f = c in
