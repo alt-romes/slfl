@@ -1181,7 +1181,7 @@ interface is available from the repository~\cite{sili_repo}.
 % live demo com exemplos pré-feitos em Y?
 
 
-To showcase the expressiveness of our synthesizer, we present as
+\noindent \emph{Example.} To showcase the expressiveness of our synthesizer, we present as
 examples the input and output program for \emph{reverse}.
 Note how we can guide the synthesis using the assertion mechanism to 
 supply an example:
@@ -1996,19 +1996,19 @@ backtracking is necessary.
 \section{Examples}%
 \label{sec:examples}
 
-\paragraph{Maybe}
-input:
+\mypara{Maybe}\
+\\
+Input program:
 \begin{minted}{haskell}
 data Maybe a = Nothing | Just a;
 data List a = Nil | Cons (a * List a);
-
 
 synth return :: a -o Maybe a;
 synth empty :: Maybe a;
 synth bind :: Maybe a -o (a -o Maybe b) -> Maybe b;
 synth maybe :: b -> (a -o b) -> Maybe a -o b;
 \end{minted}
-output:
+Output program:
 \begin{minted}{haskell}
 return :: forall a . (a -o Maybe a);
 return = Just;
@@ -2028,6 +2028,142 @@ maybe c d e = let !f = c in
     case e of
         Nothing -> f
       | Just h -> g h;
+\end{minted}
+
+\mypara{List}\
+\\
+Input program:
+\begin{minted}{haskell}
+data List a = Nil | Cons (a * List a);
+data Maybe a = Nothing | Just a;
+
+synth singleton :: a -o List a;
+synth append :: List a -o List a -o List a;
+synth map :: (!(a -o b)) -o List a -o List b;
+synth foldl :: !(b -o a -o b) -o b -o List a -o b | choose 1;
+synth uncons :: List a -o Maybe (a * List a);
+synth foldr :: !(a -o b -o b) -o b -o List a -o b;
+synth insert :: a -o List a -o List a;
+synth concat :: List (List a) -o List a;
+\end{minted}
+Ouput program:
+\begin{minted}{haskell}
+singleton :: forall a . (a -o List a);
+singleton b = Cons (b, Nil);
+
+append :: forall a . (List a -o (List a -o List a));
+append b c = case b of
+    Nil -> c
+  | Cons d ->
+      let e*f = d in
+        Cons (e, append f c);
+
+map :: forall a b . (!(a -o b) -o (List a -o List b));
+map c d = let !e = c in
+  case d of
+      Nil -> Nil
+    | Cons f ->
+        let g*h = f in
+          Cons (e g, map (!e) h);
+
+foldl :: forall a b . (!(b -o (a -o b)) -o (b -o (List a -o b)));
+foldl c d e = let !f = c in
+  case e of
+      Nil -> d
+    | Cons g ->
+        let h*i = g in
+          foldl (!f) (f d h) i;
+
+uncons :: forall a . (List a -o Maybe (a * List a));
+uncons b = case b of
+    Nil -> Nothing
+  | Cons c ->
+      let d*e = c in Just (d, e);
+
+foldr :: forall a b . (!(a -o (b -o b)) -o (b -o (List a -o b)));
+foldr c d e = let !f = c in
+  case e of
+      Nil -> d
+    | Cons g ->
+        let h*i = g in
+          f h (foldr (!f) d i);
+
+insert :: forall a . (a -o (List a -o List a));
+insert b c = case c of
+    Nil -> Cons (b, Nil)
+  | Cons g ->
+      let h*i = g in
+        Cons (h, insert b i);
+
+concat :: forall a . (List (List a) -o List a);
+concat b = case b of
+    Nil -> Nil
+  | Cons c ->
+      let d*e = c in
+        case d of
+            Nil -> concat e
+          | Cons k ->
+              let l*m = k in
+                Cons (l, concat (Cons (m, e)));
+\end{minted}
+
+\mypara{State} (with a slight optimization that will be added as a control keyword
+futurely, that allows bind using runState to terminate in a reasonable time)
+\\
+Input program:
+\begin{minted}{haskell}
+data State b a = State (!b -o (a * !b));
+
+synth runState :: State b a -o (!b -o (a * !b));
+synth bind :: (State c a -o (a -o State c b) -o State c b) | using (runState);
+synth return :: a -o State b a;
+synth get :: State a a;
+synth put :: !a -o (State a 1);
+synth modify :: (!a -o !a) -o State a 1;
+synth evalState :: State b a -o !b -o a;
+\end{minted}
+Output program:
+\begin{minted}{haskell}
+data State b a = State (!b -o (a * !b));
+
+runState :: forall a b . (State b a -o (!b -o (a * !b)));
+runState c !f = case c of
+    State e ->
+        let h*i = e (!f) in
+          let !j = i in (h, (!j));
+
+bind :: forall a b c . (State c a -o ((a -o State c b) -o State c b));
+bind bs bt = case bs of
+    State bu ->
+      State (λbv -> let !bw = bv in
+                      let cu*cv = bu (!bw) in
+                        let !cw = cv in
+                          (let dr*ds = runState (bt cu) (!cw) in
+                             let !dt = ds in dr, (!cw)));
+
+return :: forall a b . (a -o State b a);
+return c = State (λd -> let !e = d in
+               (c, (!e)));
+
+get :: forall a . State a a;
+get = State (λb -> let !c = b in
+               (c, (!c)));
+
+put :: forall a . (!a -o State a 1);
+put b = let !c = b in
+  State (λd -> let !e = d in
+                 ((), (!e)));
+
+modify :: forall a . ((!a -o !a) -o State a 1);
+modify b = State (λc -> let !d = c in
+               let !f = b (!d) in ((), (!f)));
+
+evalState :: forall a b . (State b a -o (!b -o a));
+evalState c d = case c of
+    State e ->
+      let !f = d in
+        let h*i = e (!f) in
+          let !j = i in h;
 \end{minted}
 
 \end{document}
