@@ -109,8 +109,8 @@ memoize maybefocus c@(cs,r,g,d,o) t syn = do -- TODO: Can possibly be improved/o
              (do lift $ put (Map.insert key Nothing memot, i)
                  empty)
        Just Nothing ->
-           empty
-           -- syn
+           -- empty
+           syn
        Just (Just (e, d', cs', deltai)) -> do 
            -- lift $ put (memot, i + deltai)
            -- return (e, d', cs') -- TODO: I think this has some issues with variable names that might collide
@@ -476,8 +476,8 @@ focus c goal =
 
         ---- *R
         focus' Nothing c@(cs, rs, g, d) (Tensor a b) = addtrace (RightTensor c (Tensor a b)) $ do
-            (expa, d', cs') <- case a of { ADT _ _ -> memoizefocus focus c a; _ -> memoizefocus' focus' Nothing c a }
-            (expb, d'', cs'') <- case b of { ADT _ _ -> memoizefocus focus (cs', rs, g, d') b; _ -> memoizefocus' focus' Nothing (cs', rs, g, d') b }
+            (expa, d', cs') <- focusROption c a
+            (expb, d'', cs'') <- focusROption (cs', rs, g, d') b
             return (TensorValue expa expb, d'', cs'')
 
         ---- 1R
@@ -486,17 +486,17 @@ focus c goal =
             
         ---- +R
         focus' Nothing c (Plus a b) = addtrace (RightPlus c (Plus a b)) $ do
-            (il, d', cs') <- case a of { ADT _ _ -> memoizefocus focus c a; _ -> memoizefocus' focus' Nothing c a }
+            (il, d', cs') <- focusROption c a
             return (InjL (Just b) il, d', cs')
             `interleave` do
-            (ir, d', cs') <- case b of { ADT _ _ -> memoizefocus focus c b; _ -> memoizefocus' focus' Nothing c b }
+            (ir, d', cs') <- focusROption c b
             return (InjR (Just a) ir, d', cs')
 
         ---- sumR
         focus' Nothing c (Sum sts) = addtrace (RightSum (Sum sts)) $
             foldr (interleave . (\(tag, goalt) ->
                 do
-                   (e, d', cs') <- case goalt of { ADT _ _ -> memoizefocus focus c goalt; _ -> memoizefocus' focus' Nothing c goalt }
+                   (e, d', cs') <- focusROption c goalt
                    let smts = map (second Just) $ delete (tag, goalt) sts
                    return (SumValue smts (tag, e), d', cs')
                 )) empty sts
@@ -504,7 +504,7 @@ focus c goal =
         ---- adtR
         focus' Nothing c@(cs, rs, g, d) (ADT tyn pts) = do
             cons <- getadtcons (ADT tyn pts)
-            foldr (interleave . (\(tag, argty) ->
+            foldr ((<|>) . (\(tag, argty) ->
                 addtrace (RightADT tag rs c (ADT tyn pts)) $
                    case argty of
                      Unit -> return (Var tag, d, cs)        -- The branch where this constructor is used might fail later e.g. if an hypothesis isn't consumed from delta when it should have
@@ -519,7 +519,7 @@ focus c goal =
                             then empty
                             else do
                                 let rs' = addrestriction ConstructADT (ADT tyn pts) rs     -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
-                                (arge, d', cs') <- case argtype of { ADT _ _ -> memoizefocus focus (cs, rs', g, d) argtype; _ -> memoizefocus' focus' Nothing (cs, rs', g, d) argtype }
+                                (arge, d', cs') <- focusROption (cs, rs', g, d) argtype
                                 return (App (Var tag) arge, d', cs')
                 )) empty cons
             -- When we're right focused, we might continue right focused as we construct the proof (e.g. RightTensor),
@@ -679,6 +679,21 @@ focus c goal =
 
         focus' Nothing c@(cs, rs, g, d) goal = addtrace (DefaultFocusRight c goal) $
             memoizesynth synth (cs, rs, g, d, []) goal
+
+
+        ---- if focus object is synchronous and needs to consider the contexts to be satisfied, focus on a proposition, instead of solely focusing right
+        focusROption c goal =
+            -- TODO: This choice between focus or right focus has potential for errors if we forget cases that should focus (and allow for left decisions) in synchronous propositions that will fail if just focused right,
+            -- for example, previously existential variables would be right focused on, and many programs were hidden.
+            -- things like refinement types should be considered, right now they aren't contemplated in the process here...
+            if case goal of
+                ADT _ _ -> True
+                ExistentialTypeVar _ -> True
+                _ -> False
+            then
+                memoizefocus focus c goal
+            else
+                memoizefocus' focus' Nothing c goal
 
 
 
