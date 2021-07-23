@@ -1,1 +1,1 @@
-synth goal :: (( (a * b) -o c ) -o ( a -o ( b -o c ) ))
+synth goal :: (((a + b) * c) -o (( a * c ) + ( b * c)));

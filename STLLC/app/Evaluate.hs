@@ -243,7 +243,7 @@ evalExpr e = fromJust $ runReaderT (eval ([], []) e) []
 
 evalModule :: Program -> CoreExpr
 evalModule p@(Program adts _ _ cbs) =
-    traceShow p $ case find (\(CoreBinding n _) -> n == "main") cbs of
+    case find (\(CoreBinding n _) -> n == "main") cbs of
       Nothing -> errorWithoutStackTrace "[Eval] No main function defined."
       Just (CoreBinding _ exp) -> case runReaderT (eval ([], map (\(CoreBinding n e) -> (n, e)) cbs) exp) adts of
                                     Nothing -> error "[Eval] Evaluation failed, this shouldn't happen and might be because maybe an assertion typechecked incorrectly (haven't tried fixing this bug yet :))"

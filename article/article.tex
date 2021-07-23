@@ -298,7 +298,8 @@ distinct synths and spaces of valid programs.
 
 \mypara{Core Rules} The system comprises of proof search in
 (intuitionistic) linear logic sequent calculus, based on a system of
-resource management~\cite{resman} and focusing.
+resource management~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
+and focusing.
 
 The core language is a simply-typed linear $\lambda$-calculus with linear
 functions ($\lolli$), additive ($\with$) and multiplicative
@@ -593,7 +594,7 @@ connective. In effect, the inference rules for a simple ADT are a generalized
 form of the $\oplus$ rules.  Therefore, there's one left rule for ADTs, and an
 arbitrary number of right rules, one for each constructor, where ADT $T$ and
 its constructors stand for any ADT defined as \mintinline{haskell}{data T = C1
-X1 | C2 X2 | ... | Cn Xn}
+X1 | C2 X2 | ... | Cn Xn}:
 %
 \begin{mathpar}
     \infer*[right=(adtR)]
@@ -904,7 +905,6 @@ may become again left focused on $(a \lolli b \lolli b)$, and again require $b$,
 and on and on. The solution will be to disallow the usage of the same function
 to synthesize the same goal a second time further down in the derivation.
 
-% TODO TODO: Big rewrite
 The other situation occurs when using an unrestricted polymorphic function that
 requires synthesis of a term with an existential type when the goal is an
 existential type. In contrast to the previous problem, the type of the goal and
@@ -916,26 +916,31 @@ $?\beta$ (not $?\sigma$). We want to forbid the usage of the \emph{same}
 function to attain \emph{any} existential goal, provided that function might
 create existential sub-goals (i.e. it's polymorphic). However, we noticed that,
 even though for most tried problems this ``same function'' approach worked,
-context-heavy problems such as \emph{array} (seen in Section~\ref{sec:overview})
+context-heavy problems such as \emph{array} (seen in \S~\ref{sec:overview})
 wouldn't terminate in a reasonable amount of time.
 %
 % In fact, with $n$ polymorphic functions in the unrestricted context, the
 % complexity of searching for a program of any existential type $?\alpha$, while
 % restricting solely the used function, is $O(n!)$~\ref{exemplo_apendice?}.
 %
-As such, we'll instead forbid the usage of \emph{all} unrestricted polymorphic
-functions to synthesize any existential type if, altogether, we've already used
-$d_e$ times a polymorphic function for \emph{any} existential sub-goal, where
-$d_e$ is a \emph{constant existential depth} that controls the maximum depth of
-``existential synthesis''. \todo{alinhar mais com a premissa
-  respectiva da regra}
+As such, we'll instead define that, given an existential\footnote{a type 
+is existential when any of its components is an existential type variable} goal $C$,
+we can only ``decide left!'' on a proposition $A$ if, altogether, 
+the amount of times we've ``decided left!'' on an polymorphic function to produce
+an existential goal is less than a \emph{constant ``existential depth''} $d_e$
+(which controls a \emph{depth} aspect of the synthesis process).
 %
 % This approach reduces the complexity of our proof-search algorithm for
 % existential types to $O(\tfrac{n!}{d_e!}) = O(n^{d_e})$.
 
 Extending the restrictions context ($\Rho$) with restrictions on using the
 unrestricted context ($\Rho_{L!}$), we modify \textsc{decideLeft!} to formalize
-the previous paragraph:
+the two previous paragraphs, where $\textsc{isExist}(C)$ is true if $C$ is an
+existential type, $\textsc{isPoly}(f)$ is true if $f$ is universally
+quantified (i.e. $f$ has form $\forall\overline{\alpha} f'$), and
+$\Rho_{L!}' = \Rho_{L!},(A, C)$ if $A$ is a function and $\Rho_{L!}' =
+\Rho_{L!}$ otherwise:
+%
 \begin{mathpar}
     \mprset{flushleft}
     \infer*[right=(decideL!)]
@@ -943,14 +948,13 @@ the previous paragraph:
     (A, C) \notin \Rho_{L!}
     \\
     \textsc{isExist}(C) \Rightarrow |\{u\ |\
-    (f,u)\in\Rho_{L!},\textsc{isExist}(u),\textsc{isPoly}(f)\}| < d_e
+    (f,u)\in\Rho_{L!},\textsc{isPoly}(f),\textsc{isExist}(u)\}| < d_e
     \\
     \Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!}');\Gamma, A; \Delta/\Delta' ; A
     \Downarrow\ \vdash C
     }
     {\Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!});\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
     \\
-    \Rho_{L!}' =\ \textbf{if}\ \textsc{isFunction}(A)\ \textbf{then}\ \Rho_{L!},(A, C)\ \textbf{else}\ \Rho_{L!}
 \end{mathpar}
 
 \mypara{Polymorphic ADTs} To allow type parameters and the use of universally quantified type
@@ -972,13 +976,12 @@ type substitution needn't be explicit in the rule:
     T_{\overline\beta}}
 \end{mathpar}
 
-\mypara{Refinement Types} Refinement types are defined as a types
-with a name and with a predicate (a non-existing predicate is the same as it
-being always \emph{true}); dependent types are functions with
-refinement types in which the argument type name can be used in the predicates
-of the return type (e.g. $x\{\mathsf{Int}\} \lolli y\{\mathsf{Int}\ \vert\ y = x\}$ specifies a function that
-takes an Int named $x$ and produces an Int whose value is equal to the input $x$). We extend
-the types syntax with our refinement types syntax:
+\mypara{Refinement Types} Refinement types are types with a predicate (a non-existing predicate is the same as it
+being \emph{true}); dependent types are functions with
+refinement types in which the argument type is labeled and said label can be used in the predicates
+of the return type (e.g. $(x : \mathsf{Int}) \lolli \{y : \mathsf{Int}\ \vert\ y = x\}$ specifies a function that
+takes an Int and returns an Int of equal value). We extend
+the types syntax with our refinement types:
 \[
 \begin{tabular}{lclc}
     $\tau$ & $\ ::=\ $ & $ \dots \vert\  (x:\tau) \lolli \sigma\ \vert\  \{x:\tau\ \vert\ P\}$ \\
@@ -996,21 +999,23 @@ interfere with the rest of the process. We define the following right and
 left rule, to synthesize or consume in synthesis a refinement type, where
 $\textsc{getModel}(p)$ is a call to an SMT solver that returns a model of an
 uninterpreted function that satisfies
-$\forall_{\tilde{1},\tilde{2},\dots,\tilde{n}}\ h_{\tilde{1}} \Rightarrow h_{\tilde{2}} \Rightarrow \dots
-\Rightarrow h_{\tilde{n}} \Rightarrow p$, where $\tilde{i}$ is the refinement type
-name and $h_{\tilde{i}}$ its predicate for every refinement type in the
-propositional contexts; and $\textsc{sat}(p_{\tilde{y}} \Rightarrow p_{\tilde{x}})$ is a call to an SMT solver that
+$\forall_{a,b,\dots,n}\ h_{a} \Rightarrow h_{b} \Rightarrow \dots
+\Rightarrow h_{n} \Rightarrow p$, where $n$ is the refinement type label
+and $h_{n}$ its predicate, with $a,\dots,n$ standing for the label of every refinement type
+in the propositional contexts;
+and $\textsc{sat}(p_{a} \Rightarrow p_{b})$ is a call to an SMT solver that
 determines universal satisfiability of the implication between predicates (the
 left focused proposition subtypes the goal).
 \begin{mathpar}
     \infer*[right=(refR)]
     { \textsc{getModel}(p) = M }
-    {\Theta/\Theta';\Rho;\Gamma;\Delta \vdash M : \tilde{x}\{A\ \vert\
+    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta' \vdash M : \{a : A\ \vert\
     p\}\Uparrow }
     \and
     \infer*[right=(refL)]
-    { \textsc{sat}(p_{\tilde{y}} \Rightarrow p_{\tilde{x}}) }
-    {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\tilde{y}\{A\ \vert\ p_{\tilde{y}}\}\Downarrow\ \vdash x : \tilde{x}\{A\ \vert\ p_{\tilde{x}}\} }
+    { \textsc{sat}(p_{a} \Rightarrow p_{b}) }
+    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta'; x{:}(\{a : A\ \vert\
+    p_{a}\})\Downarrow\ \vdash x : \{b : A\ \vert\ p_{b}\} }
 \end{mathpar}
 
 
@@ -1047,35 +1052,38 @@ representation~\cite{locally nameless}, in which all bound variables
 are represented with Debruijn indices rather than names (i.e.~using
 the distance to the binding site in terms of the number of traversed
 binders),
-% TODO: não ficou muito mais claro :\todo{Explica o que e isto}
 This way inference can be done without worrying about name conflicts.
 
 The inference module will traverse the list of ASTs in order (top-down), and
 infer the type of all functions defined by the user, checking the inferred
-type against a possible user given type annotation. Whenever a synth mark is
+type against a possible user given type annotation. Whenever a synthesis mark is
 found in the AST, all the inferrence context up to that point is added to the
-mark, and if not explicit, its type is inferred, essentially defining the synth
-context and synth goal.
+mark, and, if not explicit, its type is inferred, essentially defining the
+synthesis context and synthesis goal.
 
-The synthesis module iterates over the synthesis marks and runs the synthesizer
+The synthesis module iterates over the marks and runs the synthesizer
 with the respective context and goal for each mark. The resulting expression is checked
 against the synthesis constraints defined through some keywords, continuing
 synthesis if they are violated: ``using'' guarantees that certain functions are
-used in the program body, and ``assert'' evaluates the given assertion within the
+used in the program body (to invalidate valid program without them), and ``assert'' evaluates the given assertion within the
 synthesized program to a validating boolean.  Additionally, the keyword
 ``depth'' controls the \emph{existential depth} (seen
-in~\ref{sec:formal_system}), and ``choose'' selects a different result as long
+in \S~\ref{sec:formal_system}), and ``choose'' selects a different result as long
 as one is available. Finally, the expression is minimized (i.e.~$\eta$-reduced),
 and the mark in the frontend AST is replaced with the synthesized program. 
 
 The evaluation module evaluates the function named ``main'' within the
-complete synthesized program, returning a final value.
+complete synthesized program, returning a final value. When evaluating
+synthesis assertions, a timeout is used to interrupt possibly non-terminating
+programs.
 
 
 
 
 \subsection{Implementation}
 
+The implementation was carried out in Haskell. We highlight some key points. The
+project and source code are available from the repository~\cite{sili_repo}.
 
 \mypara{Backtracking} Although focusing reduces non-determinism
 during proof search, it cannot fully eliminate it. At several points
@@ -1161,7 +1169,7 @@ what was supposed to happen.
 \mypara{Interface} A simple, syntax-highlighted, web interface was developed
 alongside a server to make possible experimenting with the \synname\ 
 language without having to download and compile the complete toolchain. The web
-interface is available from the repository~\cite{github repo}.
+interface is available from the repository~\cite{sili_repo}.
 
 % A implementação foi feita em haskell e o código está disponível em X e há um
 % live demo com exemplos pré-feitos em Y?
@@ -1179,15 +1187,15 @@ process is novel for each due to a variety of different rich types explored and
 their corresponding logics and languages; or nuances of the synthesis process
 itself, such as complementing types with program examples; or even the
 programming paradigm of the output produced (e.g. generating heap manipulating
-programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).  Some other common
-patterns we follow are the use of type
-refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16}, polymorphic types, and the
-support for synthesis of recursive
-functions~\cite{DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15}. These
-works share some common ground with each other and with us -- most
-famously the Curry-Howard correspondence, but also, for example, 
-focusing-based proof-search~\cite{10.1093/logcom/2.3.297}.
-% TODO: sinto que precisava de um toque...
+programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
+% Some other common
+% patterns we follow are the use of type
+% refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16}, polymorphic types, and the
+% support for synthesis of recursive
+% functions~\cite{DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15}. These
+% works share some common ground with each other and with us -- most
+% famously the Curry-Howard correspondence, but also, for example, 
+% focusing-based proof-search~\cite{10.1093/logcom/2.3.297}.
 
 % \mypara{Type-and-Example-Directed Program Synthesis} This
 % work~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
@@ -1210,39 +1218,48 @@ focusing-based proof-search~\cite{10.1093/logcom/2.3.297}.
 \mypara{Program Synthesis from Polymorphic Refinement Types} The
 work~\cite{DBLP:conf/pldi/PolikarpovaKS16} also studies synthesis of recursive
 functional programs in an ``advanced'' context. Their specifications combine two
-rich forms of types: polymorphic and refinement types (which correspond to a
-first-order logic through the Curry-Howard isomorphism). Their approach to
+rich forms of types: polymorphic and refinement types.
+% (which correspond to a
+% first-order logic through the Curry-Howard isomorphism).
+Their approach to
 refinement types consists of a new algorithm that supports decomposition of the
-refinement specification, allowing for separation between the language of
-specification and programs and making the approach amenable to compositional
-synthesis techniques. We also support refinements (and polymorphism),
+refinement specification.
+%,allowing for separation between the language of
+%specification and programs and making the approach amenable to compositional
+%synthesis techniques.
+We also support refinements (and polymorphism),
 but they are not as integrated in the synthesis process as in \cite{DBLP:conf/pldi/PolikarpovaKS16}.
 Instead, our synthesizer leverages the expressiveness of linear
 types and techniques for proof-search in linear logic to guide its process.
 
 \mypara{Resourceful Program Synthesis from Graded Linear Types} The
 work~\cite{DBLP:conf/lopstr/HughesO20} synthesizes programs using an
-approach very similar to our own.  The work employs so-called graded
-modal types, which is a refinement of pure linear types -- a more
-\emph{fine-grained} version, since it allows for quantitative
+approach similar ours. It employs so-called graded
+modal types, which are a refinement of pure linear types
+% -- a more
+% \emph{fine-grained} version 
+that allows for quantitative
 specification of resource usage, in contrast to ours either
 \emph{linear} or \emph{unrestricted} (via the linear logic
-exponential) use of assumptions.  Their resource management is more
+exponential) use of assumptions. Their resource management is more
 complex, and so they provide solutions which adapt Hodas and Miller's
-resource management
-approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
--- which, in contrast, is the model use in our work.
-
+approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}.
+% -- which, in contrast, is the one used in our work.
+%
 They also use focusing as a solution to trim down search space and to
 ensure that synthesis only produces well-typed programs. However, since their
 underlying logic is \emph{modal} rather than purely \emph{linear}, it
 lacks a clear correspondence with concurrent session-typed
 programs~\cite{DBLP:journals/mscs/CairesPT16,DBLP:conf/concur/CairesP10},
-which is a crucial avenue of future work. Moreover, their use grading
+which is a crucial avenue of future work. Moreover, their use of grading
 effectively requires constraint solving to be integrated with the
 synthesis procedure, which can limit the effectiveness of the overall
-approach as one scales to more sophisticated settings (e.g.~refinement
-types). \todo{but we have polymorphism and recursion}
+approach.
+% as one scales to more sophisticated settings (e.g.~refinement
+% types).
+Additionally, Our system extends the focusing-based system with
+recursion, ADTs, polymorphism and refinements to synthesize
+more expressive programs.
 
 % \item Resource-guided synthesis \cite{DBLP:conf/pldi/KnothWP019}
 % This resource-guided means something a bit different. Programs satisfy
@@ -1377,63 +1394,65 @@ types). \todo{but we have polymorphism and recursion}
 
 \section{Evaluation}\label{sec:evaluation}
 
-The benchmarks are separated into groups: theorems of linear logic, recursive
-ADTs, refinements. For each goal we analyze if the synthesis process terminated
-according to what was expected, the mean time and standard deviation, if the
-resulting program fullfills its intended purpose
+The benchmarks\footnote{Considering the full pipeline pass; 2017 MBP; 8GB RAM;
+2.3Ghz Intel Core i5; with benchmarking library Criterion} are separated into groups: theorems of linear logic, recursive
+ADTs, refinements. The first table displays successful synthesis -- for each
+goal we analyze the mean time and standard deviation, the conditions used to
+guide the output, and the components (other functions) used in the resulting
+program.
 
-\begin{figure}[t]
+% TODO Verificar nomes dos linear logic theoresm...
 {\scriptsize
 \begin{center}
     \begin{tabular}{ |c|c|c|c|c| }
         \hline
-        Group & Goal & Avg. time + $\sigma$ & Found & Is expected \\
+        Group & Goal & Avg. time $\pm\,\sigma$ & Keywords & Components \\
         \hline
-        \multirow{4}{4em}{Linear Logic Theor.} & uncurry & 1s & yes & yes \\ 
-        & curry & 2s & yes & yes \\ 
-        & call by name?? & 2s & yes & yes \\ 
-        & 0/1?? & 2s & yes & yes \\ 
+        \multirow{4}{4em}{Linear Logic Theor.} & uncurry & $133\mu s\pm 4.9\mu s$ &&\\ 
+        & distributivity & $179\mu s\pm 5.0\mu s$ && \\ 
+        & call by name & $196\mu s\pm 4.6\mu s$ && \\ 
+        & 0/1 & $294\mu s\pm 5.3\mu s$ && \\ 
         \hline
-        \multirow{8}{4em}{List} & singleton & 3s & yes & yes \\ 
-        & insert & 2s & yes & unordered \\ 
-        & map & 1s & yes & yes \\ 
-        & append & 2s & yes & yes \\ 
-        & foldl & 2s & yes & got (foldl . reverse) \\ 
-        & foldr & 2s & yes & yes \\ 
-        & concat & $\infty$ & no & no \\ 
-        & uncons & 1s & yes & yes \\
+        \multirow{7}{4em}{List} & map & $288\mu s\pm 7.2\mu s$  && \\ 
+        & append & $292\mu s\pm 7.0\mu s$ & & \\ 
+        & foldl & $1.69ms\pm 5.3\mu s$ & \emph{choose 1} & \\ 
+        & foldr & $704\mu s\pm 10\mu s$ && \\ 
+        & concat & $505\mu s\pm 18\mu s$ && \\
+        & uncons & $215\mu s\pm 15\mu s$ && \\
+        & reverse & $17.4ms\pm 515\mu s$ & \emph{reverse [1,2] == [2,1]} & \\ 
         \hline
-        \multirow{3}{4em}{Maybe} & return & 1s & yes & yes \\ 
-        & $>>=$ & 1s & yes & yes \\
-        & maybe & 1s & yes & yes \\
-        & list to maybe & 12s & no & yes \\
+        \multirow{2}{4em}{Maybe} & $>>=$ & $194\mu s\pm 5.3\mu s$ && \\ 
+        & maybe & $161\mu s\pm 4.8\mu s$&& \\
         \hline
-        \multirow{5}{4em}{Binary Tree} & singleton & 1s & yes & yes \\ 
-        & insert & 1s & yes & unordered \\
-        & map & 1s & yes & yes \\
-        & append & 1s & yes & appends to rightmost leaf \\
-        & join node & 1s & yes & joins at rightmost leaf \\
+        \multirow{7}{4em}{State} & runState & $190\mu s\pm 6.8\mu s$ && \\ 
+        & $>>=$ & $979\mu s\pm 23\mu s$ && \\
+        & $>>=$ & $\infty$ & \emph{using (runState)} & \\
+        & get & $133\mu s\pm 3.8\mu s$ && \\
+        & put & $146\mu s\pm 3.4\mu s$ && \\
+        & modify & $219\mu s\pm 4.9\mu s$ && \\
+        & evalState & $156\mu s\pm 4.0\mu s$ && \\
+        % \multirow{5}{4em}{Binary Tree} & singleton & 1s & yes & yes \\ 
+        % & insert & 1s & yes & unordered \\
+        % & map & 1s & yes & yes \\
+        % & append & 1s & yes & appends to rightmost leaf \\
+        % & join node & 1s & yes & joins at rightmost leaf \\
+        % \hline
+        % \multirow{7}{4em}{Map} & singleton & 1s & yes & yes \\ 
+        % & insert & 1s & yes & unordered \\
+        % & insertWithKey & 1s & yes & ignores function \\
+        % & union & 1s & yes & ignores keys \\
+        % & mapAccum & 1s & no & ?? \\
+        % & map & 1s & yes & yes \\
+        % & mapKeys & 1s & yes & yes \\
         \hline
-        \multirow{7}{4em}{Map} & singleton & 1s & yes & yes \\ 
-        & insert & 1s & yes & unordered \\
-        & insertWithKey & 1s & yes & ignores function \\
-        & union & 1s & yes & ignores keys \\
-        & mapAccum & 1s & no & ?? \\
-        & map & 1s & yes & yes \\
-        & mapKeys & 1s & yes & yes \\
+        \multirow{1}{4em}{Misc} & either & $197\mu s\pm 5.3\mu s$ && \\ 
         \hline
-        \multirow{1}{4em}{Misc} & either & 1s & yes & yes \\ 
+        \multirow{2}{4em}{Array} & & & \emph{depth 3} & \emph{freeze, foldl} \\
+        & array & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
         \hline
     \end{tabular}
   \end{center}
 }
-\caption{Table with \dots}
-\end{figure}
-
-
-Synthesis of 
-
-
 
 
 

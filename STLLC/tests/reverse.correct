@@ -1,0 +1,11 @@
+data List a = Nil | Cons (a * List a);
+
+
+reverse :: forall a . (List a -o (List a -o List a));
+reverse b c = case b of
+    Nil -> c
+  | Cons d ->
+      let e*f = d in
+        reverse f (Cons (e, c));
+
+
