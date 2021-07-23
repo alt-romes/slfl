@@ -142,7 +142,7 @@ The \synname\ synthesizer combines linear types with recursion,
 parametric polymorphism, recursive algebraic data types, and
 refinement types. The synthesizer is built on top of a system of proof-search for
 linear logic. Proof search relates to program synthesis via the Curry-Howard
-correspondence~\cite{}, which states that \emph{propositions in a logic} are
+correspondence~\cite{curry:34,howard:80,DBLP:journals/cacm/Wadler15}, which states that \emph{propositions in a logic} are
 \emph{types}, and \emph{proofs} of those propositions are well-typed
 \emph{programs} -- finding a proof of a proposition is finding a program with
 that type.
@@ -329,8 +329,8 @@ use of variables). The syntax of terms $(M,N)$ and types $(\tau, \sigma)$ is giv
 In intuitionistic sequent calculi, each connective has a so-called \emph{left}
 and a \emph{right} rule, which effectively define how to decompose an ambient
 assumption of a given proposition and how to prove a certain proposition is
-true, respectively.  Andreoli's \emph{focusing} for linear logic~\cite{Andreolli
-focusing} is a technique to remove non-essential nondeterminism from
+true, respectively.  Andreoli's \emph{focusing} for linear logic~\cite{10.1093/logcom/2.3.297} 
+is a technique to remove non-essential nondeterminism from
 proof-search by structuring the application of so-called invertible and
 non-invertible inference rules. Andreoli observed that the connectives of linear
 logic can be divided into two categories, dubbed synchronous and asynchronous.
@@ -382,7 +382,7 @@ linear context and $\Delta'$ is the output one.
 
 Putting together linear logic and linear lambda calculus through the Curry-Howard correspondence, resource
 management, and focusing, we get the following core formal system
-(inspired by~\cite{FPnotes...}) -- in which the
+(inspired by~\cite{DBLP:conf/cade/ChaudhuriP05,fpnotes}) -- in which the
 rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
 context $\Delta$, and inversion context $\Omega$, synthesize a program of type $B$ with
@@ -812,7 +812,7 @@ also called a \emph{scheme}.  Synthesis of a scheme comprises of turning it into
 a non-quantified type, and then treating its type variables uniformly.  First,
 type variables are considered \emph{atomic types}, then, we instantiate the
 bound variables of the scheme as described by the Hindley-Milner inference
-method's~\cite{HM-infer} instantiation rule (put simply, generate fresh names
+method's~\cite{DBLP:journals/jcss/Milner78,10.2307/1995158} instantiation rule (put simply, generate fresh names
 for each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha \lolli
 \alpha$ could be instantiated to $\alpha0 \lolli \alpha0$. We add a rule for
 this, where $\forall \overline{\alpha}.\ \tau \sqsubseteq \tau'$ indicates type
@@ -1048,7 +1048,7 @@ pipeline.
 
 The desugaring module converts the frontend AST to a core AST without
 syntatic sugar and using the locally-nameless
-representation~\cite{locally nameless}, in which all bound variables
+representation~\cite{DBLP:journals/jar/Chargueraud12}, in which all bound variables
 are represented with Debruijn indices rather than names (i.e.~using
 the distance to the binding site in terms of the number of traversed
 binders),
@@ -1128,15 +1128,13 @@ For our synthesizer, two calls are equivalent when
 contexts $\Theta, \Rho, \Gamma, \Delta$, $\Omega$, (or alternatively
 the left focus), and the goal, are equivalent. Because comparing all
 of these is slow, our implementation hashes the relevant values via a hashing
-library (\emph{Hashable}~\cite{https://hackage.haskell.org/package/hashable}) and
+library (\emph{Hashable}~\cite{hashable}) and
 uses the result as the key.
 %
 Furthermore, a branch we want to memoize
 might fail, not providing any result -- we also want to record
 synthesis failure, as it happens more often than successful
-results. We capture failure of a LogicT computation using the $\mathit{ifte}$
-function and represent failure or success information with the \texttt{Maybe}
-type. We ran benchmarks to measure the impact of memoization on 
+results. We ran benchmarks to measure the impact of memoization on 
 performance. It's quite noticeable in synthesis with multiple
 functions in the unrestricted context, or more complex
 specifications. For example, if we add a new function \emph{read} to
@@ -1145,25 +1143,30 @@ the unrestricted context in the \emph{array} problem seen in
 around $9s$, while synthesis without memoization doesn't terminate
 after $15m$.
 %
-The implementation could be improved by better combining the
-memoization with the LogicT monad transformer (remembering decisions across
-backtracking branches) and by finetuning key-equality by ignoring context
-components that aren't relevant to the synthesis call, to name some
-examples. We leave such optimizations to future work.
+The implementation could be greatly improved, but we
+% by better combining the
+% memoization with the LogicT monad transformer (remembering decisions across
+% backtracking branches) and by finetuning key-equality by ignoring context
+% components that aren't relevant to the synthesis call, to name some
+% examples. We 
+leave such optimizations to future work.
 
 
 
 \mypara{Debugging} The rules described in the formal
 system (\S~\ref{sec:formal_system}) to handle infinite recursion might seem obvious in
 retrospective, however, when faced with a program that doesn't terminate, what
-went wrong is not so clear. While we were able to figure out a solution for the
-first couple of "infinite examples", the following problems were much harder,
-taking sometimes full days to solve. To make the debugging experience better, we
+went wrong is not so clear.
+% While we were able to figure out a solution for the
+% first couple of "infinite examples", the following problems were much harder,
+% taking sometimes full days to solve.
+To make the debugging experience better, we
 developed a tracing system that prints information whenever a rule is applied,
-alongside the stack of rules applied up until that one. This improved our
-debugging speed considerably, especially when put together with a correct
-derivation done by hand, with which we could match what was happening against
-what was supposed to happen.
+alongside the stack of rules applied so far.
+% This improved our
+% debugging speed considerably, especially when put together with a correct
+% derivation done by hand, with which we could match what was happening against
+% what was supposed to happen.
 
 
 \mypara{Interface} A simple, syntax-highlighted, web interface was developed
@@ -1394,8 +1397,8 @@ more expressive programs.
 
 \section{Evaluation}\label{sec:evaluation}
 
-The benchmarks\footnote{Considering the full pipeline pass; 2017 MBP; 8GB RAM;
-2.3Ghz Intel Core i5; with benchmarking library Criterion} are separated into groups: theorems of linear logic, recursive
+The benchmarks\footnote{ran on an Intel Core i5 machine with 8GB of RAM using the benchmarking library
+Criterion, and considering the full pipeline pass, from parsing to synthesis} are separated into groups: theorems of linear logic, recursive
 ADTs, refinements. The first table displays successful synthesis -- for each
 goal we analyze the mean time and standard deviation, the conditions used to
 guide the output, and the components (other functions) used in the resulting
@@ -1448,10 +1451,27 @@ program.
         \multirow{1}{4em}{Misc} & either & $197\mu s\pm 5.3\mu s$ && \\ 
         \hline
         \multirow{2}{4em}{Array} & & & \emph{depth 3} & \emph{freeze, foldl} \\
-        & array & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
+        & array~\ref{sec:overview} & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
         \hline
     \end{tabular}
   \end{center}
+}
+
+To further showcase the expressiveness of our synthesizer, we present as
+examples the input and output program for \emph{reverse}.
+Note how we can guide the synthesis using the assertion mechanism to 
+supply an example:
+{\small
+\begin{minted}{haskell}
+synth reverse :: List a -o List a -o List a
+  | assert (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil))); 
+\end{minted}
+
+\begin{minted}{haskell}
+reverse b c = case b of
+    Nil -> c
+  | Cons e*f -> reverse f (Cons (e, c));
+\end{minted}
 }
 
 
