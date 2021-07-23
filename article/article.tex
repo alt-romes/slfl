@@ -2135,27 +2135,27 @@ runState c !f = case c of
 bind :: forall a b c . (State c a -o ((a -o State c b) -o State c b));
 bind bs bt = case bs of
     State bu ->
-      State (λbv -> let !bw = bv in
+      State (\bv -> let !bw = bv in
                       let cu*cv = bu (!bw) in
                         let !cw = cv in
                           (let dr*ds = runState (bt cu) (!cw) in
                              let !dt = ds in dr, (!cw)));
 
 return :: forall a b . (a -o State b a);
-return c = State (λd -> let !e = d in
+return c = State (\d -> let !e = d in
                (c, (!e)));
 
 get :: forall a . State a a;
-get = State (λb -> let !c = b in
+get = State (\b -> let !c = b in
                (c, (!c)));
 
 put :: forall a . (!a -o State a 1);
 put b = let !c = b in
-  State (λd -> let !e = d in
+  State (\d -> let !e = d in
                  ((), (!e)));
 
 modify :: forall a . ((!a -o !a) -o State a 1);
-modify b = State (λc -> let !d = c in
+modify b = State (\c -> let !d = c in
                let !f = b (!d) in ((), (!f)));
 
 evalState :: forall a b . (State b a -o (!b -o a));
