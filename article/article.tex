@@ -775,6 +775,7 @@ are then extended as follows, where $\Rho'_C = \Rho_C,T$ if $T$ is
 recursive and $\Rho'_C = \Rho_C$ otherwise ($\Rho'_D$ is dual):
 %
 %TODO: ... we can actually instance ADTs that take no arguments even if they are restricted
+
 \begin{mathpar}
     \infer*[right=(adtR)]
     {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
@@ -1305,10 +1306,9 @@ first-order logic through the Curry-Howard isomorphism). Their approach to
 refinement types consists of a new algorithm that supports decomposition of the
 refinement specification, allowing for separation between the language of
 specification and programs and making the approach amenable to compositional
-synthesis techniques. We also support polymorphism and refinements, however, our
-refinements are somewhat underdeveloped and don't have an important role in our
-process, in contrast to their strong use of refinements to guide their
-synthesizer. Instead, our synthesizer leverages the expressiveness of linear
+synthesis techniques. We also support refinements (and polymorphism),
+but they are not as integrated in the synthesis process as in \cite{DBLP:conf/pldi/PolikarpovaKS16}.
+Instead, our synthesizer leverages the expressiveness of linear
 types and techniques for proof-search in linear logic to guide its process.
 
 \mypara{Resourceful Program Synthesis from Graded Linear Types} The
