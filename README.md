@@ -108,9 +108,29 @@ To pass a program to *SILI*, run `STLLC` (to be changed...) followed by the acti
 
 Future work... :)
 
-## Installing
+## Compiling from source
 
+*SILI* is built using Cabal. First, install the package `cabal-install` from your system's package manager.
+
+Secondly, `git clone` this repository, and `cd` to the directory `STLLC`, and run
+```sh
+cabal install
+```
+to build and install `SILI` (currently named `STLLC`) to your `~/.cabal/bin` directory.
+Make sure that directory is in your path:
+```sh
+export PATH="$HOME/.cabal/bin:$PATH"
+```
 ...
+
+## Web server
+
+After having STLLC installed, to start the web server, `cd` to the directory `web` and run
+```
+node server.js
+```
+
+The web interface should now be live at `https://localhost:25565`
 
 ## Testing
 
