@@ -1,0 +1,82 @@
+html {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    position: relative;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+#main {
+    z-index: 1;
+
+    position: relative;
+
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    padding: 1.2em;
+
+    height: 190px;
+
+    box-shadow: rgba(6, 24, 44, 0.4) 0px 0px 0px 2px, rgba(6, 24, 44, 0.65) 0px 4px 6px -1px, rgba(255, 255, 255, 0.08) 0px 1px 0px inset;
+}
+
+#editor {
+    position: relative;
+    width: 100%;
+    height: calc(100% - 190px);
+}
+
+#editing {
+
+    -webkit-box-shadow: none;
+    -moz-box-shadow: none;
+    box-shadow: none;
+
+    outline: none;
+    padding: 0;
+    resize: none;
+    z-index: 1;
+    color: transparent;
+    background: transparent;
+    caret-color: white;
+}
+
+#highlighting {
+    overflow: auto;
+}
+
+#highlighting, #highlighting-content {
+    z-index: 0;
+}
+
+#editing, #highlighting, #highlighting * {
+    font-size: 16px;
+    font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+    line-height: 1.2;
+}
+
+#editing, #highlighting {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+
+    padding: 2em;
+    border: 0;
+    margin: 0;
+
+    height: 100%;
+    width: 100%;
+
+    position: absolute;
+    top: 0;
+    left: 0;
+}
