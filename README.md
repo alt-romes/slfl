@@ -117,10 +117,8 @@ Secondly, `git clone` this repository, and `cd` to the directory `STLLC`, and ru
 cabal install
 ```
 to build and install `SILI` (currently named `STLLC`) to your `~/.cabal/bin` directory.
-Make sure that directory is in your path:
-```sh
-export PATH="$HOME/.cabal/bin:$PATH"
-```
+To use `SILI` from anywhere on the command line, add the directory to your `PATH`.
+
 ...
 
 ## Web server
