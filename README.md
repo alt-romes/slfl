@@ -86,7 +86,7 @@ synth array :: Int -> List (!(Int * a)) -> Array a | using (foldl) | depth 3;
 
 ### On the web
 
-A live demonstration is on (//...). Try some example programs, or write your own, to see *SILI* in action.
+A live demonstration is on (*comming soon*). Try some example programs, or write your own, to see *SILI* in action.
 The web interface allows you to typecheck, synthesize functions marked with `synth`, and evaluate programs.
 
 ### From your terminal
