@@ -9,8 +9,9 @@ update_code = (text) => {
 
 }
 
-synth = (type) => {
+synth = (type, elem) => {
     let prog = editor.value;
+    elem.disabled = true;
     fetch(type, {
         method: "POST",
         body: prog,
@@ -26,7 +27,8 @@ synth = (type) => {
         else {
             editor.value = data.result
             update_code(data.result)
-        }    
+        }
+        elem.disabled = false;
     })
     //.catch(err => console.log("The error is " + err));
     console.log(prog);
@@ -35,6 +37,10 @@ synth = (type) => {
 displayErr = err => {
 
     let errdom = document.getElementById("error");
+
+    if (err.includes("Parse"))
+        err = "Failed to parse."
+
     errdom.innerHTML = err;
     errdom.hidden = false;
 

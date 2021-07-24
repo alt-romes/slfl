@@ -33,6 +33,8 @@ const server = http.createServer(function (req, res) {
             type = "complete"
         if (req.url == "/type")
             type = "type"
+        if (req.url == "/eval")
+            type = "eval"
 
         res.setHeader("Content-Type", "application/json");
 
@@ -53,7 +55,7 @@ const server = http.createServer(function (req, res) {
             
             var pout;
             try {
-                pout = "" + execSync("/usr/bin/env timeout 3s STLLC " + type + " " + tmpf.name);
+                pout = "" + execSync("/usr/bin/env timeout 0.5s STLLC " + type + " " + tmpf.name);
             }
             catch (err) {
                 
