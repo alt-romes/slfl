@@ -86,7 +86,7 @@ synth array :: Int -> List (!(Int * a)) -> Array a | using (foldl) | depth 3;
 
 ### On the web
 
-A live demonstration is on (*comming soon*). Try some example programs, or write your own, to see *SILI* in action.
+A live demonstration is available from (https://alt-romes.github.io/slfl/). Try some example programs, or write your own, to see *SILI* in action.
 The web interface allows you to typecheck, synthesize functions marked with `synth`, and evaluate programs.
 
 ### From your terminal
@@ -110,7 +110,7 @@ Future work... :)
 
 ## Compiling from source
 
-*SILI* is built using Cabal. First, install the package `cabal-install` from your system's package manager.
+*SILI* is built using [Cabal](https://www.haskell.org/cabal/).
 
 Secondly, `git clone` this repository, and `cd` to the directory `STLLC`, and run
 ```sh
