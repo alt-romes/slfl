@@ -13,15 +13,18 @@
         <div id="main">
             <h2>Synthesis of Linear Functional Programs</h2>
             <p>
-            Use <em>{{ ... }}</em> as a placeholder for a term that should be <em>synthetized</em>.
+            <!--Use <em>{{ ...0}}</em> as a placeholder for a term that should be <em>synthetized</em>.-->
             <span hidden="true" id="error" style="color: red"></span>
             </p>
             
             <br>
+            <button type="back" onclick="back()">undo</button>
             <button type="example" onclick="instructions('')">clear</button>
             <button type="example" onclick="instructions(simple_typing)">basics</button>
-            <button type="example" onclick="instructions(simple_synth)">example</button>
-            <button type="example" onclick="instructions(lambda_synth)">lambda</button>
+            <button type="example" onclick="instructions(maybe)">maybe</button>
+            <button type="example" onclick="instructions(list)">list</button>
+            <button type="example" onclick="instructions(array)">array</button>
+            <button type="example" onclick="instructions(misc)">misc</button>
             <button type="type" onclick="synth('type',this)">type</button>
             <button type="synth" onclick="synth('synth',this)">synth</button>
             <button type="eval" onclick="synth('eval',this)">eval</button>

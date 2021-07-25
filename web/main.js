@@ -9,8 +9,17 @@ update_code = (text) => {
 
 }
 
+this.proghistory = [];
+
+back = () => {
+    let newprog = proghistory.pop();
+    editor.value = newprog
+    update_code(newprog)
+}
+
 synth = (type, elem) => {
     let prog = editor.value;
+    proghistory.push(prog)
     elem.disabled = true;
     fetch(type, {
         method: "POST",
@@ -50,6 +59,9 @@ displayErr = err => {
 
 instructions = (instructions_val) => {
 
+    let prog = editor.value;
+    proghistory.push(prog)
+
     editor.value = instructions_val
     update_code(instructions_val)
 }
@@ -87,7 +99,7 @@ n = 42;
 identity x = x;
 
 # -- lambda
-lambdaId = (\\x -o x);
+lambdaId = (\\x -> x);
 
 # -- function application
 superId x = identity lambdaId x;
@@ -134,34 +146,76 @@ letfour a = let c = 4 in a c;
 # -- marks are used to indicate we want the expression to be synthed from the type
 getId = {{ (a -o a) }};
 
-# -- sum value
-# semaph = union { red : Num; green : Num; yellow Zero; };
+`
 
-# -- case of sum
-# casesem sem = case sum sem of
-#                 red x -> x
-#                 | green y -> y;
+let maybe = `
+data Maybe a = Nothing | Just a;
+
+data List a = Nil | Cons (a * List a);
+
+
+synth return :: a -o Maybe a;
+
+synth empty :: Maybe a;
+
+synth bind :: Maybe a -o (a -o Maybe b) -> Maybe b;
+
+synth maybe :: b -> (a -o b) -> Maybe a -o b;
 
 `
 
-let simple_synth = `data Bool = True | False;
+let list = `
+data List a = Nil | Cons (a * List a);
 
-data Num = Zero | Succ Num;
+data Maybe a = Nothing | Just a;
 
 
-synth predecessor :: (Num -o Num);
+synth singleton :: a -o List a;
 
-synth rec recToZero :: (Num -o Num);
+synth append :: List a -o List a -o List a;
 
-main :: (Num -o (Bool -o Num));
-main num cond = case cond of
-      True -> predecessor num
-    | False -> recToZero num;
+synth map :: (!(a -o b)) -o List a -o List b;
+
+synth foldl :: !(b -o a -o b) -o b -o List a -o b | choose 1;
+
+synth uncons :: List a -o Maybe (a * List a);
+
+synth foldr :: !(a -o b -o b) -o b -o List a -o b;
+
+synth insert :: a -o List a -o List a;
+
+synth concat :: List (List a) -o List a;
 
 `
 
-let lambda_synth = `data Expr = Var Nat | Lambda (Nat * Expr) | App (Expr * Expr);
+let array = `
+
+newMArray :: Int -> (MArray a -o !b) -o b;
+
+write :: MArray a -o (Int * a) -> MArray a;
+
+freeze :: MArray a -o !(Array a);
+
+foldl :: (a -o b -o a) -> a -o (List b) -o a;
+
+#read :: (MArray a -o Int -> (MArray a * !a));
+
+synth array :: Int -> List (!(Int * a)) -> Array a | using (foldl) | depth 3;
+
+`
+
+let misc = `
+data List a = Nil | Cons (a * List a);
+data Bool = False | True;
 
 
-synth value :: (Expr -o Nat);
+synth reverse :: List a -o List a -o List a
+  | assert
+  (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil)));
+
+t = 2;
+
+main = case (4 + 3 + t == t + 7) => 4 < t of
+         True -> False
+        | False -> True;
 `
