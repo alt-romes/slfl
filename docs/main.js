@@ -213,9 +213,7 @@ synth reverse :: List a -o List a -o List a
   | assert
   (reverse (Cons (1, Cons (2, Nil))) Nil) == (Cons (2, Cons (1, Nil)));
 
-t = 2;
-
-main = case (4 + 3 + t == t + 7) => 4 < t of
+main = case (4 + 3 + 2 == 2 + 7) => 4 < 2 of
          True -> False
         | False -> True;
 `
