@@ -21,11 +21,6 @@ maintainer:         rodrigo.m.mesquita@gmail.com
 -- category:
 extra-source-files: CHANGELOG.md
 
-Test-Suite STLLC-testsuite
-    type: detailed-0.9
-    test-module: Tests
-    build-depends: base, Cabal ^>=3.2.1.0
-
 
 executable STLLC
     main-is:          Main.hs
