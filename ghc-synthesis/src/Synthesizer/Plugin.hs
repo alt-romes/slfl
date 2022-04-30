@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Plugin where
+module Synthesizer.Plugin where
 
 import Prelude hiding ((<>))
 

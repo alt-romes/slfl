@@ -1,4 +1,3 @@
-{-# OPTIONS -fplugin=Plugin #-}
 module Main where
 
 t :: [Int] -> Int
