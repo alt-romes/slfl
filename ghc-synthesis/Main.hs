@@ -1,10 +1,11 @@
+{-# LANGUAGE LinearTypes #-}
 module Main where
 
-t :: [Int] -> Int
+t :: Int
 t = _
 
-g :: [Int] -> Int
+g :: Maybe Int
 g = _
 
 main :: IO ()
-main = print $ t [1,2,3]
+main = print $ t 1

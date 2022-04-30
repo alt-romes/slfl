@@ -33,6 +33,6 @@ fp thole hfs =
     Just hole
       | ty <- hole_ty hole
       , synthesized_ty <- synthesize ty
-      -> return $ (RawHoleFit ("" $+$ "Linear synthesis suggestion:" $+$ ppr (synthesized_ty) $+$ ""):hfs)
+      -> return $ (RawHoleFit ("" $+$ "Linear synthesis suggestion:" $+$ (synthesized_ty) $+$ ""):hfs)
     _ -> return hfs
 
