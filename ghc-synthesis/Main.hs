@@ -4,7 +4,7 @@ module Main where
 t :: Int
 t = _
 
-g :: Maybe Int
+g :: Int %1 -> Maybe Int
 g = _
 
 main :: IO ()

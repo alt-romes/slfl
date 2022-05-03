@@ -11,4 +11,5 @@ synthesize = synth . toIfaceType
 
 synth :: IfaceType -> SDoc
 synth (IfaceLitTy s) = ppr s
-synth (IfaceTyConApp a b) = ppr a <+> "and" <+> ppr b
+synth (IfaceTyConApp a b) = ppr a <+> ppr b
+synth e@(IfaceFunTy {}) = ppr e
