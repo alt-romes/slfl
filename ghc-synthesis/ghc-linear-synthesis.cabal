@@ -57,7 +57,9 @@ executable main
 library
     -- Modules exported by the library.
     exposed-modules:  Synthesizer,
-                      Synthesizer.Plugin
+                      Synthesizer.Plugin,
+                      Synthesizer.Ext
+
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -68,6 +70,7 @@ library
     -- Other library packages from which modules are imported.
     build-depends:    base ^>=4.16.1.0,
                       ghc >= 9.2,
+                      containers
 
     -- Directories containing source files.
     hs-source-dirs:   src
