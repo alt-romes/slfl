@@ -52,13 +52,14 @@ executable main
     ghc-options: -fplugin=Synthesizer.Plugin
     default-language: Haskell2010
     build-depends:    base ^>=4.16.1.0,
-                      ghc-linear-synthesis
+                      ghc-linear-synthesis,
+                      ghc
 
 library
     -- Modules exported by the library.
     exposed-modules:  Synthesizer,
                       Synthesizer.Plugin,
-                      Synthesizer.Ext
+                      Synthesizer.Class
 
 
     -- Modules included in this library but not exported.
@@ -70,6 +71,8 @@ library
     -- Other library packages from which modules are imported.
     build-depends:    base ^>=4.16.1.0,
                       ghc >= 9.2,
+                      mtl,
+                      logict,
                       containers
 
     -- Directories containing source files.

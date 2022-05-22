@@ -32,7 +32,7 @@ fp thole hfs =
   case th_hole thole of
     Just hole
       | ty <- hole_ty hole
-      , synthesized_ty <- synthesize ty
-      -> return $ (RawHoleFit ("" $+$ "Attempting to synthesize an expression of type:" $+$ (synthesized_ty) $+$ ""):hfs)
+      , synthesized_exp <- synthesize ty
+      -> return $ (RawHoleFit ("" $+$ "Synthesized solution:" $+$ (synthesized_exp) $+$ ""):hfs)
     _ -> return hfs
 
