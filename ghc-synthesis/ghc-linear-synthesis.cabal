@@ -71,6 +71,7 @@ library
     -- Other library packages from which modules are imported.
     build-depends:    base ^>=4.16.1.0,
                       ghc >= 9.2,
+                      ghc-source-gen >= 0.4,
                       mtl,
                       logict,
                       containers

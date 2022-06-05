@@ -15,6 +15,8 @@ import GHC.Types.Basic (Boxity(Boxed))
 import Control.Applicative
 import GHC.Data.Bag
 
+import GHC.SourceGen hiding (guard)
+
 import Synthesizer.Class
 
 synthesize :: Type -> SDoc
@@ -26,9 +28,9 @@ synth :: Type -> Synth (HsExpr GhcPs)
 ---- -oR
 synth (FunTy _ One a b) = do
     name <- fresh
-    exp <- inOmega (name, a) $ synth b -- todo: this inOmega should append rather than prepend?
+    exp <- inOmega (name, a) $ synth b -- TODO: this inOmega should append rather than prepend?
     guardUsed name
-    pure (lam (VarPat noX (noLocA name)) exp)
+    pure (lambda [bvar name] exp)
 
 -- no more synchronous right propositions, start inverting the ordered context (Ω)
 
@@ -37,20 +39,13 @@ synth t = takeOmega (focus t) $ \case
   (n, TyConApp c l)
 
     ---- *L
-    | consName c == "(,)", [a, b] <- l -> do
-        -- TODO: Generalize for tuples with n elements
-        (n1, n2) <- (,) <$> fresh <*> fresh
+    | isTupleTyCon c -> do
         names <- mapM (\t -> fresh >>= return . (,t)) l
         exp <- foldr inOmega (synth t) names
-        guardUsed n1
-        guardUsed n2
-        return (HsCase noAnn (lvar n)
-                (matchGroup
-                  (TuplePat noAnn
-                      (map (noLocA . VarPat noX . noLocA . fst) names)
-                      Boxed)
-                  exp))
+        forM_ names (guardUsed . fst)
+        return (case' (bvar n) [match [tuple (map (bvar . fst) names)] exp])
 
+---- * Synchronous left propositions to Δ * -------
   p -> do
       pushDelta p
       synth t
@@ -74,19 +69,17 @@ focus goal =
             case din of
               [] -> empty
               _  -> foldr ((<|>) . (\p -> (delDelta p >> focus' (Just p) goal)
-                                           <|> (pushDelta p >> empty {- hack to replace deleted delta in state -}))) empty din
+                                           <|> (pushDelta p >> empty {- hack to reput deleted delta in state -}))) empty din
 
         decideLeftBang _ = empty
 
-        focus' :: Maybe (RdrName, Type) -> Type -> Synth (HsExpr GhcPs)
+        focus' :: Maybe (SName, Type) -> Type -> Synth (HsExpr GhcPs)
 
         focus' Nothing goal = case goal of
           TyConApp c l
-            | consName c == "(,)", [a, b] <- l -> do
-                -- TODO: Generalize for tuples with n elements
-                expa <- focusROption a
-                expb <- focusROption b
-                return $ ExplicitTuple noAnn [Present noAnn (noLocA expa), Present noAnn (noLocA expb)] Boxed
+            | isTupleTyCon c -> do
+                exps <- mapM focusROption l
+                return $ ExplicitTuple noAnn (map (Present noAnn . noLocA) exps) Boxed
           TyVarTy _ -> empty
           _ -> synth goal
 
@@ -94,10 +87,9 @@ focus goal =
         focus' (Just (n, TyVarTy x)) goal =
             case goal of
               (TyVarTy y) ->
-                  if x == y then return (var n)             -- ?a |- ?a succeeds
+                  if x == y then return (bvar n)            -- ?a |- ?a succeeds
                             else empty                      -- ?a |- ?b fails
               _ -> do                                       -- ?a |- t  succeeds with constraint
-                  -- pushDelta (n, TyVarTy x) -- hack to "undo" consume variable
                   empty
                   -- ... Solve constraints and if possible instance with var
                   -- cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) goal

@@ -33,15 +33,19 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Core.Map.Type
+import GHC.Core.TyCon
 import GHC.Hs.Pat
 import GHC
 
+import GHC.SourceGen hiding (guard)
+
 import Control.Monad.Logic
 
+type SName = OccNameStr
 
-type Gamma = [(RdrName, Type)]       -- Unrestricted hypothesis                      (Γ)
-type Delta = [(RdrName, Type)]       -- Linear hypothesis (not left asynchronous)    (Δ)
-type Omega = [(RdrName, Type)]       -- Ordered (linear?) hypothesis                 (Ω)
+type Gamma = [(SName, Type)]       -- Unrestricted hypothesis                      (Γ)
+type Delta = [(SName, Type)]       -- Linear hypothesis (not left asynchronous)    (Δ)
+type Omega = [(SName, Type)]       -- Ordered (linear?) hypothesis                 (Ω)
 
 type Ctxt = (Gamma, Delta, Omega)   -- Delta out is a return value
 type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
@@ -61,68 +65,40 @@ instance Monad Synth where
     (Synth a) >>= f = Synth $ a >>= unSynth . f
 
 
-var :: RdrName -> HsExpr GhcPs
-var n = HsVar noX (noLocA n)
-
-lvar :: RdrName -> LHsExpr GhcPs
-lvar = noLocA . var
-
-lam :: Pat GhcPs -> HsExpr GhcPs -> HsExpr GhcPs
-lam p b = HsLam noExtField (matchGroup p b)
-
-match :: Pat GhcPs -> HsExpr GhcPs -> Match GhcPs (LHsExpr GhcPs)
-match p b = Match noAnn LambdaExpr [noLocA p] (aGRHSs b)
-
-matchGroup :: Pat GhcPs -> HsExpr GhcPs -> MatchGroup GhcPs (LHsExpr GhcPs)
-matchGroup p b = MG noX (noLocA [noLocA (match p b)]) Generated
-
-aGRHSs :: HsExpr GhcPs -> GRHSs GhcPs (LHsExpr GhcPs)
-aGRHSs b = (GRHSs (comments noAnn) [noLoc $ GRHS noAnn [] (noLocA b)] (EmptyLocalBinds noExtField))
-
--- aGRHSs' :: HsExpr GhcPs -> GRHSs GhcPs (LHsExpr GhcPs)
--- aGRHSs' b = trace (show ppr $ aGRHSs b) (aGRHSs b)
-
-noX :: NoExtField
-noX = noExtField
-
-consName :: TyCon -> FastString
-consName = occNameFS . nameOccName . getName
-
-
 -- Synth monad manipulation
 -- ========================
 
 -- Add a proposition to the linear context
-pushDelta :: (RdrName, Type) -> Synth ()
+pushDelta :: (SName, Type) -> Synth ()
 pushDelta = modify . first . (:)
 
-delDelta :: (RdrName, Type) -> Synth ()
+delDelta :: (SName, Type) -> Synth ()
 -- hack for comparing types using debruijn....
-delDelta p = modify (first (\(d :: [(RdrName, Type)]) -> fmap (\(n, D _ t) -> (n, t)) $ delete (second deBruijnize p) (fmap (second deBruijnize) d)))
+delDelta p = modify (first (\(d :: [(SName, Type)]) -> fmap (\(n, D _ t) -> (n, t)) $ delete (second deBruijnize p) (fmap (second deBruijnize) d)))
 
 -- Take a proposition from the omega context:
 --  If one exists, pass it to the 2nd argument (computation using proposition)
 --  If none does, run the 1st argument (computation without proposition from omega, basically focus)
 --
 --  In case a proposition is taken from omega, the computation run won't have it in the omega context anymore
-takeOmega :: Synth a -> ((RdrName, Type) -> Synth a) -> Synth a
+takeOmega :: Synth a -> ((SName, Type) -> Synth a) -> Synth a
 takeOmega c f = asks snd >>= \case
     (h:o) -> local (second (const o)) (f h)
     [] -> c
 
-inOmega :: (RdrName, Type) -> Synth a -> Synth a
+inOmega :: (SName, Type) -> Synth a -> Synth a
 inOmega nt = local (second (<> [nt]))
 
-guardUsed :: RdrName -> Synth ()
+guardUsed :: SName -> Synth ()
 guardUsed name = do
     (d, _) <- get
     guard (name `notElem` map fst d)
 
-fresh :: Synth RdrName
+fresh :: Synth SName
 fresh = do
     (c, n) <- get
     put (c, n + 1)
-    return . mkRdrUnqual . mkVarOcc . getName $ n
+    return . occNameToStr . mkVarOcc . getName $ n
 
     where letters :: [String]
           letters = [1..] >>= flip replicateM ['a'..'z']
