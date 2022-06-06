@@ -16,6 +16,7 @@ module Synthesizer.Class
 
 import Debug.Trace
 import Data.List
+import Data.Either
 import Data.Bifunctor
 import Control.Applicative
 import Control.Monad.Reader
@@ -41,6 +42,8 @@ import GHC.SourceGen hiding (guard)
 
 import Control.Monad.Logic
 
+import Synthesizer.AST
+
 type SName = OccNameStr
 
 type Gamma = [(SName, Type)]       -- Unrestricted hypothesis                      (Γ)
@@ -50,12 +53,19 @@ type Omega = [(SName, Type)]       -- Ordered (linear?) hypothesis              
 type Ctxt = (Gamma, Delta, Omega)   -- Delta out is a return value
 type FocusCtxt = (Gamma, Delta)     -- Gamma, DeltaIn
 
+type Restrictions = [(RestrictTag, Restriction)]
+type Restriction = Either (Type, Type) Type -- Left restriction is on decide left bang proposition, right restriction is on ADT type
+data RestrictTag = ConstructTy | DeconstructTy | DecideLeftBangR deriving (Show, Eq, Ord)
 
-newtype Synth a = Synth { unSynth :: LogicT (ReaderT (Gamma, Omega) (State (Delta, Int))) a }
-    deriving (Functor, MonadState (Delta, Int), MonadReader (Gamma, Omega), Alternative, MonadFail)
+instance Eq Type where
+    -- hack for comparing types using debruijn....
+    a == b = deBruijnize a == deBruijnize b
+
+newtype Synth a = Synth { unSynth :: LogicT (ReaderT (Restrictions, Gamma, Omega) (State (Delta, Int))) a }
+    deriving (Functor, MonadState (Delta, Int), MonadReader (Restrictions, Gamma, Omega), Alternative, MonadFail, MonadLogic)
 
 runSynth :: Int -> Synth a -> [a]
-runSynth i = flip evalState (mempty, 0) . flip runReaderT (mempty, mempty) . observeManyT i . unSynth
+runSynth i = flip evalState (mempty, 0) . flip runReaderT (mempty, mempty, mempty) . observeManyT i . unSynth
 
 instance Applicative Synth where
     pure = Synth . pure
@@ -63,7 +73,6 @@ instance Applicative Synth where
 
 instance Monad Synth where
     (Synth a) >>= f = Synth $ a >>= unSynth . f
-
 
 -- Synth monad manipulation
 -- ========================
@@ -73,26 +82,52 @@ pushDelta :: (SName, Type) -> Synth ()
 pushDelta = modify . first . (:)
 
 delDelta :: (SName, Type) -> Synth ()
--- hack for comparing types using debruijn....
-delDelta p = modify (first (\(d :: [(SName, Type)]) -> fmap (\(n, D _ t) -> (n, t)) $ delete (second deBruijnize p) (fmap (second deBruijnize) d)))
+delDelta p = modify (first (delete p))
+
+getDelta :: Synth Delta
+getDelta = get >>= return . fst
+
+setDelta :: Delta -> Synth ()
+setDelta = modify . first . const
 
 -- Take a proposition from the omega context:
 --  If one exists, pass it to the 2nd argument (computation using proposition)
 --  If none does, run the 1st argument (computation without proposition from omega, basically focus)
 --
 --  In case a proposition is taken from omega, the computation run won't have it in the omega context anymore
-takeOmega :: Synth a -> ((SName, Type) -> Synth a) -> Synth a
-takeOmega c f = asks snd >>= \case
+takeOmegaOr :: Synth a -> ((SName, Type) -> Synth a) -> Synth a
+takeOmegaOr c f = asks (\case (_,_,o) -> o) >>= \case
     (h:o) -> local (second (const o)) (f h)
     [] -> c
 
 inOmega :: (SName, Type) -> Synth a -> Synth a
 inOmega nt = local (second (<> [nt]))
 
+extendOmega :: Omega -> Synth a -> Synth a
+extendOmega o' = local (second (<> o'))
+
+inGamma :: (SName, Type) -> Synth a -> Synth a
+inGamma nt = local (first (<> [nt]))
+
+addRestriction :: RestrictTag -> Type -> Synth a -> Synth a
+addRestriction tag ty = local (\(r,g,o) -> ((tag, Right ty):r, g, o))
+
 guardUsed :: SName -> Synth ()
 guardUsed name = do
     (d, _) <- get
     guard (name `notElem` map fst d)
+
+guardRestricted :: RestrictTag -> Type -> Synth ()
+guardRestricted tag tc = do -- Restrictions only on ADT Construction and Destruction
+    (rs, _, _) <- ask
+    let f = rights . map snd . filter ((== tag) . fst)
+    guard (not $ tc `notElem` f rs)
+
+guardNotRestricted :: RestrictTag -> Type -> Synth ()
+guardNotRestricted tag tc = do -- Restrictions only on ADT Construction and Destruction
+    (rs, _, _) <- ask
+    let f = rights . map snd . filter ((== tag) . fst)
+    guard (tc `notElem` f rs) -- what is this: && (not (isExistentialType ty) || not (any isExistentialType $ filter (\(ADT tyn' _) -> tyn == tyn') reslist))
 
 fresh :: Synth SName
 fresh = do
@@ -106,3 +141,12 @@ fresh = do
           getName :: Int -> String
           getName i = if i < 0 then '-' : letters !! (-i) else letters !! i
 
+forMFairConj :: MonadLogic m => [t] -> (t -> m a) -> m [a]
+forMFairConj [] _ = return [] 
+forMFairConj (x:xs) f =
+  f x >>- \x' -> do
+      xs' <- forMFairConj xs f
+      return $ x':xs'
+
+t4 :: (a,b,c,d) -> d
+t4 (_,_,_,d) = d

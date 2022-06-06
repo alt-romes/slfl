@@ -59,7 +59,8 @@ library
     -- Modules exported by the library.
     exposed-modules:  Synthesizer,
                       Synthesizer.Plugin,
-                      Synthesizer.Class
+                      Synthesizer.Class,
+                      Synthesizer.AST
 
 
     -- Modules included in this library but not exported.
@@ -72,6 +73,7 @@ library
     build-depends:    base ^>=4.16.1.0,
                       ghc >= 9.2,
                       ghc-source-gen >= 0.4,
+                      syb >= 0.7,
                       mtl,
                       logict,
                       containers
