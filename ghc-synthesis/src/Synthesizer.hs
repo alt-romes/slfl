@@ -18,6 +18,7 @@ import GHC.Core.Multiplicity
 import GHC.Types.Basic (Boxity(Boxed))
 import Control.Applicative
 import GHC.Data.Bag
+import GHC.Tc.Types
 
 import GHC.SourceGen hiding (guard)
 
@@ -28,8 +29,8 @@ import Data.Generics.Schemes (everywhere)
 import Synthesizer.AST
 import Synthesizer.Class
 
-synthesize :: Type -> SDoc
-synthesize = ppr . runSynth 3 . synth
+synthesize :: Type -> TcM SDoc
+synthesize t = fmap ppr $ runSynth 3 t $ synth t
 
 synth :: Type -> Synth (HsExpr GhcPs)
 
@@ -68,18 +69,19 @@ synth t = takeOmegaOr (trace "focusing!" $ focus t) $ \case
 
     ---- ADTL
     | isAlgTyCon c -> trace "ADTL1" (do
-        guardNotRestricted DeconstructTy tc
+        guardNotRestricted (DeconstructTy tc)
         dataCons    <- getInstDataCons c l
         commonDelta <- getDelta
         if null dataCons
            -- An ADT that has no constructors might still be used to
            -- instantiate a proposition, but shouldn't leave synchronous mode
            -- (hence the restriction)
-           then addRestriction DeconstructTy tc $ pushDelta (n, tc) >> synth t
+           then addRestriction (DeconstructTy tc) $ pushDelta (n, tc) >> synth t
            else do
+
              -- Construct each branch
              ls <- forMFairConj dataCons $ \(name, ctypes) ->
-               (if isRecursiveType tc then addRestriction DeconstructTy tc else id) do
+               (if isRecursiveType tc then addRestriction (DeconstructTy tc) else id) do
                  -- Generate a name for each bound type
                  boundNs <- mapM (const fresh) ctypes
                  -- Reset delta for this case branch
@@ -92,11 +94,12 @@ synth t = takeOmegaOr (trace "focusing!" $ focus t) $ \case
                  traverse guardUsed boundNs
                  -- Return constructor name, bound names, synthesized expression, resulting delta
                  return (name, boundNs, exp, delta')
+
              -- Guard all resulting contexts are the same
              guard $ and $ zipWith (\x y -> t4 x == t4 y) ls (tail ls)
              return $ case' (bvar n) (map (\(n, boundNs, exp, _) -> match [ conP (unqual n) $ map bvar boundNs ] exp) ls)
         ) <|> trace "ADTL2" (do
-            guardRestricted DeconstructTy tc
+            guardRestricted (DeconstructTy tc)
             pushDelta (n, tc)
             synth t
         )
@@ -122,18 +125,30 @@ focus goal =
             if isAtomic goal                            -- to decide right, goal cannot be atomic
                 then empty
                 else do
-                    -- TODO: is possible? to decide right, goal cannot be an ADT that has no constructors
+                    -- TODO: is the commented even possible?
+                    -- to decide right, goal cannot be an ADT that has no constructors
                     -- assertADTHasCons goal >>= guard 
                     focus' Nothing goal
 
-        decideLeft goal = do
-            (din, _) <- get
-            case din of
-              [] -> empty
-              _  -> foldr ((<|>) . (\p -> (delDelta p >> focus' (Just p) goal)
-                                           <|> (pushDelta p >> empty {- hack to reput deleted delta in state -}))) empty din
+        decideLeft goal = getDelta >>=
 
-        decideLeftBang _ = empty
+            foldr ((<|>) . handleDecision) empty
+
+            where
+              handleDecision p =  (delDelta  p >> focus' (Just p) goal)
+                              <|> (pushDelta p >> empty)                -- hack to reset deleted proposition in delta
+
+        decideLeftBang goal = getGamma >>=
+
+            foldr ((<|>) . handleDecision) empty
+
+            where
+              handleDecision (n, x)  = trace ("decide left bang >< " <> show (n,ppr x))  $ do
+                  guardNotRestricted (DecideLeftBangR x goal)
+                  -- (if allowrec then id else disallowrecursion) $
+                  addRestriction (DecideLeftBangR x goal) $
+                      focus' (Just (n, x)) goal
+
 
         -- | While focused proposition, synthesize a type
         focus' :: Maybe (SName, Type) -> Type -> Synth (HsExpr GhcPs)
@@ -163,7 +178,7 @@ focus goal =
                       -- If the constructor takes no argumments, the restrictions don't matter (the creation of the ADT is trivial).
                       -- Using this constructor might still fail later e.g. if an hypothesis isn't consumed from delta when it should have
                       unless (null args) $
-                          guardNotRestricted ConstructTy tc
+                          guardNotRestricted (ConstructTy tc)
 
                       -- TODO: If the constructor for an ADT takes just itself as a parameter, focus right should fail and instead focus left.
                       -- if [tc] == args -- TODO: args might not be type instanced yet?
@@ -171,7 +186,7 @@ focus goal =
                       --    else do
 
                       -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
-                      exps <- addRestriction ConstructTy tc $ mapM focusROption args
+                      exps <- addRestriction (ConstructTy tc) $ mapM focusROption args
                       return (foldl (@@) (var (unqual tag)) exps)
 
                     )) empty dataCons
@@ -183,6 +198,24 @@ focus goal =
 
 
         ---- * Left synchronous rules * -------------------
+
+        ---- VL ROMES:TODO
+        -- focusSch (n, ForAllTy ns t) goal = do
+        --     -- can only try scheme if current constraints are still safe
+        --     -- before trying to synth Unit to use as the instanciation of an existential ?x, make sure this new constraint doesn't violate previous constraints,
+        --     -- or else we might try to synth Unit assuming ?x again, which will fail solving the constraints, which in turn will make the Unit try to be synthed again using the other choice which is to assume ?x again...
+        --     (et, etvars)  <- existencialInstantiate ns t                    -- tipo com existenciais
+        --     (se, d', cs') <- focus' (Just (n, et)) goal                     -- fail ou success c restrições -- sempre que é adicionada uma constraint é feita a unificação
+        --                                                                     -- resolve ou falha -- por conflito ou falta informação
+        --                                                                     -- por conflicto durante o processo
+        --     guard (Set.disjoint (Set.fromList etvars) (ftv $ apply cs' et)) -- por falta de informação (não pode haver variáveis existenciais bound que fiquem por instanciar, i.e. não pode haver bound vars nas ftvs do tipo substituido)
+        --                                                                     -- after making sure no instantiated variables escaped, the constraints added to the substitution can be forgotten so that it doesn't complicate further scheme computations
+        --     return se                                                       -- if constraints are "total" and satisfiable, the synth using a polymorphic type was successful
+        --         where
+        --             existencialInstantiate ns t = do
+        --                 netvs <- mapM (const $ do {i <- freshIndex; return (ExistentialTypeVar i, -i)}) ns
+        --                 return (apply (Map.fromList $ zip ns $ map fst netvs) t, map snd netvs)
+
 
         ---- -oL
         focus' (Just (n, FunTy _ One a b)) goal = trace "-oL" $ do
@@ -219,15 +252,14 @@ focus goal =
           TyConApp c' ts'
             | isAlgTyCon c' && c == c'
             -> do
-              error "llol"
-              -- cs' <- addconstraint cs $ Constraint (ADT tyn tps) (ADT tyn' tps')
-              -- return (Var n, d, cs')
+              solveConstraintsWithEq (TyConApp c ts) goal
+              return (bvar n)
           _ -> do
               dataCons <- getInstDataCons c ts 
               -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
               guard $ not $ null dataCons
               -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
-              guardNotRestricted DeconstructTy (TyConApp c ts)
+              guardNotRestricted (DeconstructTy (TyConApp c ts))
               inOmega nh $ synth goal
 
         ---- left focus is either atomic or not.

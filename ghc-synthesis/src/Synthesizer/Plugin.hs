@@ -31,8 +31,9 @@ fp :: FitPlugin
 fp thole hfs =
   case th_hole thole of
     Just hole
-      | ty <- hole_ty hole
-      , synthesized_exp <- synthesize ty
-      -> return $ (RawHoleFit ("" $+$ "Synthesized solution:" $+$ (synthesized_exp) $+$ ""):hfs)
+      | ty <- hole_ty hole 
+      -> do
+        synthesized_exp <- synthesize ty
+        return $ (RawHoleFit ("" $+$ "Synthesized solution:" $+$ (synthesized_exp) $+$ ""):hfs)
     _ -> return hfs
 

@@ -37,3 +37,4 @@ dummyName = mkSystemName (mkUniqueGrimily 0) . mkVarOcc
 
 dummyTyCon :: String -> TyCon
 dummyTyCon x = mkAlgTyCon (dummyName x) [] liftedTypeKind [] Nothing [] AbstractTyCon (VanillaAlgTyCon $ dummyName x) False
+

@@ -1,35 +1,27 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LinearTypes #-}
 module Main where
 
--- x :: Bool
--- x = _
+data Ur a where
+    Ur :: a -> Ur a
 
--- unit :: a -> ()
--- unit = _
-
--- l :: (a, c, b) %1 -> (c, b, a)
--- l = _
-
--- f :: (a -> b) -> a -> b
+-- f :: (a %1 -> b) %1 -> a %1 -> b
 -- f = _
-
-map' :: (a -> b) -> [a] -> [b]
-map' = _
-
-
-data Test a = Test a
-
-t :: Test a %1 -> a
-t = _
-
--- return :: a %1 -> [a]
--- return = _
 
 -- return :: a %1 -> Maybe a
 -- return = _
 
--- fromMaybe :: a %1 -> Maybe a %1 -> a
--- fromMaybe = _
+-- empty :: Maybe a
+-- empty = _
+
+-- map' :: (a %1 -> b) -> [a] %1 -> [b]
+-- map' = _
+
+map' :: Ur (Int %1 -> Char) %1 -> [Int] %1 -> [Char]
+map' = _
+
+-- bind :: Maybe a %1 -> (a %1 -> Maybe b) -> Maybe b
+-- bind = _
 
 main :: IO ()
 main = print $ 1
