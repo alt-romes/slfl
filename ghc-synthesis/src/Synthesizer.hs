@@ -29,13 +29,13 @@ import Synthesizer.AST
 import Synthesizer.Class
 
 synthesize :: Type -> SDoc
-synthesize = ppr . runSynth 1 . synth
+synthesize = ppr . runSynth 3 . synth
 
 synth :: Type -> Synth (HsExpr GhcPs)
 
 ---- * Right asynchronous rules * -----------------
 ---- -oR
-synth (FunTy _ One a b) = do
+synth (FunTy _ One a b) = trace "-oR" $ do
     name <- fresh
     exp <- inOmega (name, a) $ synth b
     guardUsed name
@@ -47,18 +47,19 @@ synth (FunTy x Many a b) = synth (FunTy x One (TyConApp (dummyTyCon "Ur") [a]) b
 -- no more synchronous right propositions, start inverting the ordered context (Ω)
 
 ---- * Left asynchronous rules * ------------------
-synth t = takeOmegaOr (focus t) $ \case
+
+synth t = takeOmegaOr (trace "focusing!" $ focus t) $ \case
   (n, tc@(TyConApp c l))
 
     ---- *L
-    | isTupleTyCon c -> do
+    | isTupleTyCon c -> trace "*L" $ do
         names <- mapM (\t -> fresh >>= return . (,t)) l
         exp <- foldr inOmega (synth t) names
         forM_ names (guardUsed . fst)
         return (case' (bvar n) [match [tuple (map (bvar . fst) names)] exp])
 
     ---- !L
-    | consName c == "Ur" -> do
+    | consName c == "Ur" -> trace "!L" $ do
         let [a] = l
         name <- fresh
         exp <- inGamma (name, a) $ synth t
@@ -66,7 +67,7 @@ synth t = takeOmegaOr (focus t) $ \case
         return (case' (bvar n) [match [conP "Ur" [bvar name]] exp])
 
     ---- ADTL
-    | isAlgTyCon c -> (do
+    | isAlgTyCon c -> trace "ADTL1" (do
         guardNotRestricted DeconstructTy tc
         dataCons    <- getInstDataCons c l
         commonDelta <- getDelta
@@ -94,7 +95,7 @@ synth t = takeOmegaOr (focus t) $ \case
              -- Guard all resulting contexts are the same
              guard $ and $ zipWith (\x y -> t4 x == t4 y) ls (tail ls)
              return $ case' (bvar n) (map (\(n, boundNs, exp, _) -> match [ conP (unqual n) $ map bvar boundNs ] exp) ls)
-        ) <|> (do
+        ) <|> trace "ADTL2" (do
             guardRestricted DeconstructTy tc
             pushDelta (n, tc)
             synth t
@@ -104,7 +105,7 @@ synth t = takeOmegaOr (focus t) $ \case
 --         error (show (consName c))
 
 ---- * Synchronous left propositions to Δ * -------
-  p -> do
+  p -> trace "move to delta" $ do
       pushDelta p
       synth t
 
@@ -121,7 +122,8 @@ focus goal =
             if isAtomic goal                            -- to decide right, goal cannot be atomic
                 then empty
                 else do
-                    -- assertADTHasCons goal >>= guard     -- to decide right, goal cannot be an ADT that has no constructors
+                    -- TODO: is possible? to decide right, goal cannot be an ADT that has no constructors
+                    -- assertADTHasCons goal >>= guard 
                     focus' Nothing goal
 
         decideLeft goal = do
@@ -140,12 +142,12 @@ focus goal =
         focus' Nothing tc@(TyConApp c l)
 
         ---- *R
-            | isTupleTyCon c = do
+            | isTupleTyCon c = trace "*R" $ do
                 exps <- mapM focusROption l
                 return $ ExplicitTuple noAnn (map (Present noAnn . noLocA) exps) Boxed
 
         ---- !R
-            | consName c == "Ur" = do
+            | consName c == "Ur" = trace "!R" $ do
                 let [a] = l
                 d   <- getDelta
                 exp <- synth a
@@ -153,17 +155,25 @@ focus goal =
                 guard (d == d')
                 return (var "Ur" @@ exp)
 
-            | isAlgTyCon c = do
+        ---- ADTR
+            | isAlgTyCon c = trace "ADTR" $ do
                 dataCons <- getInstDataCons c l
-                foldr ((<|>) . (\(tag, args) -> do
-                    guardRestricted ConstructTy tc
-                    -- If the constructor for an ADT takes itself as a parameter, focus right should fail and instead focus left.
-                    if tc `elem` args -- TODO: args might not be type instanced yet?
-                       then empty
-                       else do
-                           -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
-                           exps <- addRestriction ConstructTy tc $ mapM focusROption args
-                           return (foldl (@@) (var (unqual . nameToStr . getName $ c)) exps)
+                foldr ((<|>) . (\(tag, args) -> trace ("Constructor " <> show tag) $ do
+
+                      -- If the constructor takes no argumments, the restrictions don't matter (the creation of the ADT is trivial).
+                      -- Using this constructor might still fail later e.g. if an hypothesis isn't consumed from delta when it should have
+                      unless (null args) $
+                          guardNotRestricted ConstructTy tc
+
+                      -- TODO: If the constructor for an ADT takes just itself as a parameter, focus right should fail and instead focus left.
+                      -- if [tc] == args -- TODO: args might not be type instanced yet?
+                      --    then trace ("tc in args " <> show (ppr tc)) empty
+                      --    else do
+
+                      -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
+                      exps <- addRestriction ConstructTy tc $ mapM focusROption args
+                      return (foldl (@@) (var (unqual tag)) exps)
+
                     )) empty dataCons
                 -- When we're right focused, we might continue right focused as we construct the proof (e.g. RightTensor),
                 -- However, where other propositions would loop back to asynch mode, and back again to the decision point,
@@ -175,14 +185,14 @@ focus goal =
         ---- * Left synchronous rules * -------------------
 
         ---- -oL
-        focus' (Just (n, FunTy _ One a b)) goal = do
+        focus' (Just (n, FunTy _ One a b)) goal = trace "-oL" $ do
             name <- fresh
             expb <- focus' (Just (name, b)) goal
             expa <- synth a
             return (substitute name (bvar n @@ expa) expb)
 
         ---- ∃L (?)
-        focus' (Just (n, TyVarTy x)) goal =
+        focus' (Just (n, TyVarTy x)) goal = trace "?L" $
             case goal of
               (TyVarTy y) ->
                   if x == y then return (bvar n)            -- ?a |- ?a succeeds
@@ -203,9 +213,9 @@ focus goal =
             -- TODO: cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) h -- goal is an existential proposition generate a constraint and succeed
             -- return (bvar n)
 
-        ---- adtLFocus
+        ---- ADTLFocus
         ---- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
-        focus' (Just nh@(n, TyConApp c ts)) goal = case goal of
+        focus' (Just nh@(n, TyConApp c ts)) goal = trace "ADTLFocus" $ case goal of
           TyConApp c' ts'
             | isAlgTyCon c' && c == c'
             -> do
@@ -231,7 +241,8 @@ focus goal =
           | otherwise
           = inOmega nh $ synth goal  -- left focus is not atomic and not left synchronous, unfocus
 
-        focus' Nothing (TyVarTy x) = empty -- can't instance type variable when not focused?
+        -- can't instance type variable when not focused?
+        focus' Nothing (TyVarTy x) = empty
 
         ---- right focus is not synchronous, unfocus.
         focus' Nothing goal = synth goal
@@ -244,7 +255,7 @@ focus goal =
             if case goal of
                 TyVarTy _ -> True
                 TyConApp c _
-                  | isAlgTyCon c -> True
+                  | isAlgTyCon c && consName c /= "Ur" -> True
                 _ -> False
             then
                 focus goal
@@ -257,7 +268,10 @@ isAtomic t =
     case t of
        LitTy _              -> True
        TyVarTy _            -> True
-       _                    -> False
+       TyConApp c l
+         | isAlgTyCon c     -> False -- ADTs aren't atomic
+         | otherwise        -> True  -- TyCons not ADTs are atomic
+       _                    -> error ("is atom? " <> show (ppr t))
 
 
 -- | Subsitute var SName with ExpA in ExpB
