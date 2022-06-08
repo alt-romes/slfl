@@ -76,7 +76,8 @@ library
                       syb >= 0.7,
                       mtl,
                       logict,
-                      containers
+                      containers,
+                      transformers
 
     -- Directories containing source files.
     hs-source-dirs:   src

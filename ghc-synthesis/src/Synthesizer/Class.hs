@@ -1,4 +1,7 @@
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -15,18 +18,24 @@ module Synthesizer.Class
     ) where
 
 import Debug.Trace
+import Data.Tree
 import Data.List
 import Data.Either
 import Data.Bifunctor
 import Control.Applicative
+import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.RWS.Lazy hiding (ask, asks, local, get, put, modify, writer, tell, listen)
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Writer.Class
+import Control.Monad.RWS.Class
 import Data.Foldable (toList)
 
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Extension
-import GHC.Utils.Outputable hiding ((<>), empty)
+import GHC.Utils.Outputable hiding ((<>), empty, Depth(..))
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Types.Basic
@@ -62,28 +71,89 @@ newtype Gamma = Gamma { gamma :: [Prop] } -- Unrestricted hypothesis           
 newtype Delta = Delta { delta :: [Prop] } -- Linear hypothesis (not left asynchronous)    (Δ)
 newtype Omega = Omega { omega :: [Prop] } -- Ordered (linear?) hypothesis                 (Ω)
 
-data RestrictTag = ConstructTy Type | DeconstructTy Type | DecideLeftBangR Type Type deriving (Eq)
+deriving instance Eq Gamma
+deriving instance Eq Delta
+deriving instance Eq Omega
+
+data RestrictTag = ConstructTy Type | DeconstructTy Type | DecideLeftBangR Type Type deriving Eq
                    -- Restrictions on construct and deconstruct ADTs, and on deciding left bang on a type to synthesize another type (hence the two type fields)
+
+instance {-# OVERLAPPING #-} Show Prop where
+    show (n, t) = occNameStrToString n <> ": " <> show t
+
+instance Show Gamma where
+    show (Gamma l) = "Gamma: " <> show l
+
+instance Show Delta where
+    show (Delta l) = "Delta: " <> show l <> "\n"
+
+instance Show Omega where
+    show (Omega l) = "Omega: " <> show l
+
+instance Show RestrictTag where
+    show (ConstructTy l) = "PC: " <> show l
+    show (DeconstructTy l) = "PD: " <> show l
+    show (DecideLeftBangR l r) = "PL!: " <> show l <> " :=> " <> show r
+
+instance {-# OVERLAPPING #-} Show ([RestrictTag], Gamma, Omega) where
+    show (a,b,c) = "Restrictions: " <> show a <> "\n\n" <> show b <> "\n\n" <> show c <> "\n\n"
+
+instance Show Type where
+    -- hack for showing types
+    show = show . ppr
 
 instance Eq Type where
     -- hack for comparing types using debruijn....
     a == b = deBruijnize a == deBruijnize b
 
-newtype Synth a = Synth { unSynth :: LogicT (ReaderT ([RestrictTag], Gamma, Omega) (StateT (Int, Delta, [Ct]) TcM)) a }
-    deriving (Functor, MonadState (Int, Delta, [Ct]), MonadReader ([RestrictTag], Gamma, Omega), Alternative, MonadFail, MonadLogic)
+data Past = Past Delta [RestrictTag] Gamma Omega
+          | NoPast
+          deriving (Eq)
+
+type Depth = Int
+
+newtype Synth a = Synth { unSynth :: LogicT (RWST (Depth, [RestrictTag], Gamma, Omega) () (Past, Int, Delta, [Ct]) TcM) a }
+    deriving (Functor, Alternative, MonadFail, MonadLogic, MonadIO)
+
+instance MonadReader (Depth, [RestrictTag], Gamma, Omega) Synth where
+    ask = Synth (lift ask)
+    local f (Synth (LogicT m)) = Synth $ LogicT $ \sk fk -> do
+        env <- ask
+        local f $ m ((local (const env) .) . sk) (local (const env) fk)
+
+instance MonadState (Past, Int, Delta, [Ct]) Synth where
+    get = Synth $ lift get
+    put = Synth . lift . put
 
 runSynth :: Int -> Type -> Synth a -> TcM [a]
-runSynth i t = flip evalStateT (0, Delta mempty, mempty) . flip runReaderT (mempty, Gamma [("rec", trace (show $ ppr t) t)], Omega mempty) . observeManyT i . unSynth
+runSynth i t sy = do
+    (exps, _) <- evalRWST (observeManyT i $ unSynth sy) (0, mempty, Gamma [("rec", trace (show $ ppr t) t)], Omega mempty) (NoPast, 0, Delta mempty, mempty)
+    return exps
 
 instance Applicative Synth where
     pure = Synth . pure
     (Synth f) <*> (Synth v) = Synth (f <*> v)
 
 instance Monad Synth where
-    (Synth a) >>= f = Synth $ a >>= unSynth . f
+    (Synth a) >>= f = Synth $ do
+        (p, i, d, ct) <- get
+        (_, rs, g, o) <- ask
+        when (p /= Past d rs g o) $ do
+            -- liftIO $ print d >> print (rs, g, o)
+            put (Past d rs g o, i, d, ct)
+        a >>= unSynth . f
+
+
+type Rule = String
+
+rule :: Rule -> Synth a -> Synth a
+rule s act = do
+    (d, _, _, _) <- ask
+    liftIO $ putStrLn (take (d*2) (repeat ' ') <> s)
+    local (\(d,a,b,c) -> (d+1,a,b,c)) act
 
 liftTcM :: TcM a -> Synth a
-liftTcM = Synth . lift . lift . lift
+liftTcM = Synth . lift . lift
 
 -- Synth monad manipulation
 -- ========================
@@ -97,7 +167,7 @@ delDelta p = modify (first (Delta . delete p . delta))
 
 getDelta :: Synth [Prop]
 getDelta = do
-    (_, d, _) <- get
+    (_, _, d, _) <- get
     return $ delta d
 
 setDelta :: [Prop] -> Synth ()
@@ -109,7 +179,7 @@ setDelta = modify . first . const . Delta
 --
 --  In case a proposition is taken from omega, the computation run won't have it in the omega context anymore
 takeOmegaOr :: Synth a -> (Prop -> Synth a) -> Synth a
-takeOmegaOr c f = asks (\case (_,_,Omega o) -> o) >>= \case
+takeOmegaOr c f = asks (\case (_,_,_,Omega o) -> o) >>= \case
     (h:o) -> local (second (const (Omega o))) (f h)
     [] -> c
 
@@ -124,19 +194,19 @@ inGamma nt = local (first (Gamma . (<> [nt]) . gamma))
 
 getGamma :: Synth [Prop]
 getGamma = do
-    (_, g, _) <- ask
+    (_, _, g, _) <- ask
     return $ gamma g
 
 getConstraints :: Synth [Ct]
 getConstraints = do
-    (_, _, cts) <- get
+    (_, _, _, cts) <- get
     return cts
 
 setConstraints :: [Ct] -> Synth ()
 setConstraints = modify . second . const
 
 addRestriction :: RestrictTag -> Synth a -> Synth a
-addRestriction tag = local (\(r,g,o) -> (tag:r, g, o))
+addRestriction tag = local (\(d,r,g,o) -> (d, tag:r, g, o))
 
 guardUsed :: SName -> Synth ()
 guardUsed name = do
@@ -146,7 +216,7 @@ guardUsed name = do
 guardRestricted :: RestrictTag -> Synth ()
 -- guardRestricted (DecideLeftBangR _ _) = undefined
 guardRestricted tag = do
-    (rs, _, _) <- ask
+    (_, rs, _, _) <- ask
     guard (tag `elem` rs)
 
 guardNotRestricted :: RestrictTag -> Synth ()
@@ -158,7 +228,7 @@ guardNotRestricted :: RestrictTag -> Synth ()
 --         -- isExistential => Poly-Exist pairs are less than the existential depth
 --         (not (isExistentialType $ snd typair) || existentialdepth > count True (map (\x -> isExistentialType (snd x) && isLeft (fst x)) reslist)) -- no repeated use of unr functions or use of unr func when one was used focused on an existential
 guardNotRestricted tag = do
-    (rs, _, _) <- ask
+    (_, rs, _, _) <- ask
     guard (tag `notElem` rs)
 
 
@@ -181,8 +251,8 @@ solveConstraintsWithEq t1 t2 = do
 
 fresh :: Synth SName
 fresh = do
-    (n, d, cts) <- get
-    put (n + 1, d, cts)
+    (p, n, d, cts) <- get
+    put (p, n + 1, d, cts)
     return . occNameToStr . mkVarOcc . getName $ n
 
     where letters :: [String]

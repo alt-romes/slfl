@@ -36,31 +36,31 @@ synth :: Type -> Synth (HsExpr GhcPs)
 
 ---- * Right asynchronous rules * -----------------
 ---- -oR
-synth (FunTy _ One a b) = trace "-oR" $ do
+synth (FunTy _ One a b) = rule "-oR" $ do
     name <- fresh
     exp <- inOmega (name, a) $ synth b
     guardUsed name
     pure (lambda [bvar name] exp)
 
 ---- ->R
-synth (FunTy x Many a b) = synth (FunTy x One (TyConApp (dummyTyCon "Ur") [a]) b)
+synth (FunTy x Many a b) = rule "->R" $ synth (FunTy x One (TyConApp (dummyTyCon "Ur") [a]) b)
 
 -- no more synchronous right propositions, start inverting the ordered context (Ω)
 
 ---- * Left asynchronous rules * ------------------
 
-synth t = takeOmegaOr (trace "focusing!" $ focus t) $ \case
+synth t = takeOmegaOr (focus t) $ \case
   (n, tc@(TyConApp c l))
 
     ---- *L
-    | isTupleTyCon c -> trace "*L" $ do
+    | isTupleTyCon c -> rule "*L" $ do
         names <- mapM (\t -> fresh >>= return . (,t)) l
         exp <- foldr inOmega (synth t) names
         forM_ names (guardUsed . fst)
         return (case' (bvar n) [match [tuple (map (bvar . fst) names)] exp])
 
     ---- !L
-    | consName c == "Ur" -> trace "!L" $ do
+    | consName c == "Ur" -> rule "!L" $ do
         let [a] = l
         name <- fresh
         exp <- inGamma (name, a) $ synth t
@@ -68,7 +68,7 @@ synth t = takeOmegaOr (trace "focusing!" $ focus t) $ \case
         return (case' (bvar n) [match [conP "Ur" [bvar name]] exp])
 
     ---- ADTL
-    | isAlgTyCon c -> trace "ADTL1" (do
+    | isAlgTyCon c -> rule "ADTL-1" (do
         guardNotRestricted (DeconstructTy tc)
         dataCons    <- getInstDataCons c l
         commonDelta <- getDelta
@@ -98,17 +98,15 @@ synth t = takeOmegaOr (trace "focusing!" $ focus t) $ \case
              -- Guard all resulting contexts are the same
              guard $ and $ zipWith (\x y -> t4 x == t4 y) ls (tail ls)
              return $ case' (bvar n) (map (\(n, boundNs, exp, _) -> match [ conP (unqual n) $ map bvar boundNs ] exp) ls)
-        ) <|> trace "ADTL2" (do
+        ) <|> rule "ADTL-2" (do
+            -- Only push proposition to delta if the above failure was due to deconstruction restriction
             guardRestricted (DeconstructTy tc)
             pushDelta (n, tc)
             synth t
         )
 
---     | otherwise -> do
---         error (show (consName c))
-
 ---- * Synchronous left propositions to Δ * -------
-  p -> trace "move to delta" $ do
+  p -> rule "Move to Δ" $ do
       pushDelta p
       synth t
 
@@ -121,29 +119,28 @@ focus goal =
     where
         decideRight, decideLeft, decideLeftBang :: Type -> Synth (HsExpr GhcPs)
 
-        decideRight goal =
-            if isAtomic goal                            -- to decide right, goal cannot be atomic
-                then empty
-                else do
-                    -- TODO: is the commented even possible?
-                    -- to decide right, goal cannot be an ADT that has no constructors
-                    -- assertADTHasCons goal >>= guard 
-                    focus' Nothing goal
+        decideRight goal = rule "Decide-Right" $ do
+            -- To decide right, goal cannot be atomic
+            guard (not $ isAtomic goal)
+            -- TODO: is the commented even possible?
+            -- to decide right, goal cannot be an ADT that has no constructors
+            -- assertADTHasCons goal >>= guard 
+            focus' Nothing goal
 
         decideLeft goal = getDelta >>=
 
-            foldr ((<|>) . handleDecision) empty
+            foldr ((<|>) . rule "Decide-Left" . handleDecision) empty
 
             where
               handleDecision p =  (delDelta  p >> focus' (Just p) goal)
-                              <|> (pushDelta p >> empty)                -- hack to reset deleted proposition in delta
+                              <|> (pushDelta p >> empty) -- hack to reset deleted proposition in delta
 
         decideLeftBang goal = getGamma >>=
 
-            foldr ((<|>) . handleDecision) empty
+            foldr ((<|>) . rule "Decide-Left!" . handleDecision) empty
 
             where
-              handleDecision (n, x)  = trace ("decide left bang >< " <> show (n,ppr x))  $ do
+              handleDecision (n, x)  = do
                   guardNotRestricted (DecideLeftBangR x goal)
                   -- (if allowrec then id else disallowrecursion) $
                   addRestriction (DecideLeftBangR x goal) $
@@ -157,12 +154,12 @@ focus goal =
         focus' Nothing tc@(TyConApp c l)
 
         ---- *R
-            | isTupleTyCon c = trace "*R" $ do
+            | isTupleTyCon c = rule "*R" $ do
                 exps <- mapM focusROption l
                 return $ ExplicitTuple noAnn (map (Present noAnn . noLocA) exps) Boxed
 
         ---- !R
-            | consName c == "Ur" = trace "!R" $ do
+            | consName c == "Ur" = rule "!R" $ do
                 let [a] = l
                 d   <- getDelta
                 exp <- synth a
@@ -171,9 +168,9 @@ focus goal =
                 return (var "Ur" @@ exp)
 
         ---- ADTR
-            | isAlgTyCon c = trace "ADTR" $ do
+            | isAlgTyCon c = rule "ADTR" $ do
                 dataCons <- getInstDataCons c l
-                foldr ((<|>) . (\(tag, args) -> trace ("Constructor " <> show tag) $ do
+                foldr ((<|>) . (\(tag, args) -> do
 
                       -- If the constructor takes no argumments, the restrictions don't matter (the creation of the ADT is trivial).
                       -- Using this constructor might still fail later e.g. if an hypothesis isn't consumed from delta when it should have
@@ -218,37 +215,38 @@ focus goal =
 
 
         ---- -oL
-        focus' (Just (n, FunTy _ One a b)) goal = trace "-oL" $ do
+        focus' (Just (n, FunTy _ One a b)) goal = rule "-oL" $ do
             name <- fresh
             expb <- focus' (Just (name, b)) goal
             expa <- synth a
             return (substitute name (bvar n @@ expa) expb)
 
         ---- ∃L (?)
-        focus' (Just (n, TyVarTy x)) goal = trace "?L" $
+        focus' (Just (n, TyVarTy x)) goal = rule "?L" $
             case goal of
-              (TyVarTy y) ->
-                  if x == y then return (bvar n)            -- ?a |- ?a succeeds
-                            else empty                      -- ?a |- ?b fails
-              _ -> do                                       -- ?a |- t  succeeds with constraint
-                  empty
+              (TyVarTy y) -> do
+                  guard (x == y)  -- ?a |- ?b fails
+                  return (bvar n) -- ?a |- ?a succeeds
+              _ -> do             -- ?a |- t  succeeds with constraint
+                  solveConstraintsWithEq (TyVarTy x) goal
+                  return (bvar n)
 
 
         ---- * Proposition no longer synchronous * --------
 
         ---- skip bangs steps
         focus' (Just (n, TyConApp c [t])) (TyConApp goalC [goal])
-            | consName c == "Ur" && consName goalC == "Ur" =
+          | consName c == "Ur" && consName goalC == "Ur" = rule "Skip Bangs" $
                 focus' (Just (n, t)) goal
 
         -- -- preemptively instance existential tv goals
-        -- focus' (Just nh@(n, h)) (TyVarTy x) = do
-            -- TODO: cs' <- addconstraint cs $ Constraint (ExistentialTypeVar x) h -- goal is an existential proposition generate a constraint and succeed
-            -- return (bvar n)
+        focus' (Just nh@(n, h)) (TyVarTy x) = do
+            solveConstraintsWithEq (TyVarTy x) h -- goal is an existential proposition generate a constraint and succeed
+            return (bvar n)
 
         ---- ADTLFocus
         ---- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
-        focus' (Just nh@(n, TyConApp c ts)) goal = trace "ADTLFocus" $ case goal of
+        focus' (Just nh@(n, TyConApp c ts)) goal = rule "ADTL-Focus" $ case goal of
           TyConApp c' ts'
             | isAlgTyCon c' && c == c'
             -> do
@@ -277,7 +275,7 @@ focus goal =
         focus' Nothing (TyVarTy x) = empty
 
         ---- right focus is not synchronous, unfocus.
-        focus' Nothing goal = synth goal
+        focus' Nothing goal = rule "Unfocus" $ synth goal
 
         ---- if focus object is synchronous and needs to consider the contexts to be satisfied, focus on a proposition, instead of solely focusing right
         focusROption goal =

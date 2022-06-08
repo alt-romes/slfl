@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE LinearTypes #-}
 module Main where
 
@@ -17,7 +18,7 @@ data Ur a where
 -- map' :: (a %1 -> b) -> [a] %1 -> [b]
 -- map' = _
 
-map' :: Ur (Int %1 -> Char) %1 -> [Int] %1 -> [Char]
+map' :: Ur (a %1 -> b) %1 -> [a] %1 -> [b]
 map' = _
 
 -- bind :: Maybe a %1 -> (a %1 -> Maybe b) -> Maybe b
