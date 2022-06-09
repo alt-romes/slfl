@@ -35,6 +35,9 @@ dummyDataCon na = mkDataCon (dummyName na) False (dummyName na) [] [] [] []Â []Â
 dummyName :: String -> Name
 dummyName = mkSystemName (mkUniqueGrimily 0) . mkVarOcc
 
+unrestrictedTyCon :: TyCon
+unrestrictedTyCon = mkAlgTyCon (dummyName "Ur") [] liftedTypeKind [] Nothing [] (DataTyCon [dummyDataCon "Ur"] 1 False) (VanillaAlgTyCon $ dummyName "Ur") False
+
 dummyTyCon :: String -> TyCon
 dummyTyCon x = mkAlgTyCon (dummyName x) [] liftedTypeKind [] Nothing [] AbstractTyCon (VanillaAlgTyCon $ dummyName x) False
 

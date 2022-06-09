@@ -125,9 +125,9 @@ newtype Synth a = Synth { unSynth :: LogicT (RWST (Depth, [RestrictTag], Gamma, 
 instance Alternative Synth where
     (<|>) (Synth a) (Synth b) = Synth (a <|> b)
     empty = do
-        liftIO $ putStrLn "[X] Fail"
+        (d, _, _, _) <- ask
+        liftIO $ putStrLn (take (d*2) (repeat ' ') <> "[X] Fail")
         Synth empty
-
 
 instance MonadReader (Depth, [RestrictTag], Gamma, Omega) Synth where
     ask = Synth (lift ask)
@@ -163,11 +163,18 @@ type Rule = String
 rule :: Rule -> Type -> Synth a -> Synth a
 rule s t act = do
     (d, _, _, _) <- ask
-    liftIO $ putStrLn (take (d*2) (repeat ' ') <> s <> ": " <> show t)
+    liftIO $ putStrLn (take (d*2) (repeat ' ') <> "[" <> s <> "] " <> show t)
     local (\(d,a,b,c) -> (d+1,a,b,c)) act
 
 liftTcM :: TcM a -> Synth a
 liftTcM = Synth . lift . lift
+
+guardWith :: String -> Bool -> Synth ()
+guardWith s b = do
+    unless b $ do
+        (d, _, _, _) <- ask
+        liftIO $ putStrLn (take (d*2) (repeat ' ') <> "[X] " <> s)
+        empty
 
 -- Synth monad manipulation
 -- ========================
@@ -225,13 +232,13 @@ addRestriction tag = local (\(d,r,g,o) -> (d, tag:r, g, o))
 guardUsed :: SName -> Synth ()
 guardUsed name = do
     d <- getDelta
-    guard (name `notElem` map fst d)
+    guardWith "Not used" (name `notElem` map fst d)
 
 guardRestricted :: RestrictTag -> Synth ()
 -- guardRestricted (DecideLeftBangR _ _) = undefined
 guardRestricted tag = do
     (_, rs, _, _) <- ask
-    guard (tag `elem` rs)
+    guardWith "Expected restricted" (tag `elem` rs)
 
 guardNotRestricted :: RestrictTag -> Synth ()
 -- ROMES:TODO
@@ -243,7 +250,7 @@ guardNotRestricted :: RestrictTag -> Synth ()
 --         (not (isExistentialType $ snd typair) || existentialdepth > count True (map (\x -> isExistentialType (snd x) && isLeft (fst x)) reslist)) -- no repeated use of unr functions or use of unr func when one was used focused on an existential
 guardNotRestricted tag = do
     (_, rs, _, _) <- ask
-    guard (tag `notElem` rs)
+    guardWith "Restricted" (tag `notElem` rs)
 
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
 newWantedWithLoc loc pty
@@ -274,7 +281,7 @@ solveConstraintsWithEq t1 t2 = do
         evBinds <- evBindMapBinds . snd <$> runTcS (solveSimpleWanteds (listToBag $ ct:cts))
         liftIO $ putStrLn ("Result: " <> show (ppr evBinds))
         return (ct, not (null $ toList evBinds) && (t1 /= t2)) -- when t1 == t2, evBinds = [] ?
-    guard False -- TODO: The above doesn't work, always fail for now
+    guardWith "Unification failure (ALWAYS FALSE)" False -- TODO: The above doesn't work, always fail for now
     guard solved
     setConstraints (ct:cts)
 
