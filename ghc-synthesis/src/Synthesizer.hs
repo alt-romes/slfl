@@ -18,7 +18,11 @@ import GHC.Core.Multiplicity
 import GHC.Types.Basic (Boxity(Boxed))
 import Control.Applicative
 import GHC.Data.Bag
+import Data.String (fromString)
+import GHC.Utils.Outputable (renderWithContext, defaultSDocContext)
 import GHC.Tc.Types
+import GHC.Hs.Dump
+import Control.Monad.IO.Class
 
 import GHC.SourceGen hiding (guard)
 
@@ -30,20 +34,31 @@ import Synthesizer.AST
 import Synthesizer.Class
 
 synthesize :: Type -> TcM SDoc
-synthesize t = fmap ppr $ runSynth 3 t $ synth t
+synthesize t = fmap (fromString . renderWithContext defaultSDocContext . ppr) $ runSynth 1 t $ synth t
+
+-- synth' :: Type -> Synth (HsExpr GhcPs)
+-- synth' t = do
+--     liftIO $ putStrLn " adding constraint "
+--     solveConstraintsWithEq t t
+--     liftIO $ putStrLn " is equal to itself "
+--     solveConstraintsWithEq t (LitTy $ NumTyLit 5)
+--     liftIO $ putStrLn " is equal to litTy 5 "
+--     f <- fresh
+--     return (bvar f)
+
 
 synth :: Type -> Synth (HsExpr GhcPs)
 
 ---- * Right asynchronous rules * -----------------
 ---- -oR
-synth (FunTy _ One a b) = rule "-oR" $ do
+synth f@(FunTy _ One a b) = rule "-oR" f $ do
     name <- fresh
     exp <- inOmega (name, a) $ synth b
     guardUsed name
     pure (lambda [bvar name] exp)
 
 ---- ->R
-synth (FunTy x Many a b) = rule "->R" $ synth (FunTy x One (TyConApp (dummyTyCon "Ur") [a]) b)
+synth f@(FunTy x Many a b) = rule "->R" f $ synth (FunTy x One (TyConApp (dummyTyCon "Ur") [a]) b)
 
 -- no more synchronous right propositions, start inverting the ordered context (Ω)
 
@@ -53,14 +68,14 @@ synth t = takeOmegaOr (focus t) $ \case
   (n, tc@(TyConApp c l))
 
     ---- *L
-    | isTupleTyCon c -> rule "*L" $ do
+    | isTupleTyCon c -> rule "*L" tc $ do
         names <- mapM (\t -> fresh >>= return . (,t)) l
         exp <- foldr inOmega (synth t) names
         forM_ names (guardUsed . fst)
         return (case' (bvar n) [match [tuple (map (bvar . fst) names)] exp])
 
     ---- !L
-    | consName c == "Ur" -> rule "!L" $ do
+    | consName c == "Ur" -> rule "!L" tc $ do
         let [a] = l
         name <- fresh
         exp <- inGamma (name, a) $ synth t
@@ -68,9 +83,9 @@ synth t = takeOmegaOr (focus t) $ \case
         return (case' (bvar n) [match [conP "Ur" [bvar name]] exp])
 
     ---- ADTL
-    | isAlgTyCon c -> rule "ADTL-1" (do
+    | isAlgTyCon c -> rule "ADTL-1" tc (do
         guardNotRestricted (DeconstructTy tc)
-        dataCons    <- getInstDataCons c l
+        let dataCons = getInstDataCons c l
         commonDelta <- getDelta
         if null dataCons
            -- An ADT that has no constructors might still be used to
@@ -81,12 +96,13 @@ synth t = takeOmegaOr (focus t) $ \case
 
              -- Construct each branch
              ls <- forMFairConj dataCons $ \(name, ctypes) ->
+               -- For recursive types, restrict deconstruction of this type in further computations
                (if isRecursiveType tc then addRestriction (DeconstructTy tc) else id) do
                  -- Generate a name for each bound type
                  boundNs <- mapM (const fresh) ctypes
                  -- Reset delta for this case branch
                  setDelta commonDelta
-                 -- Synth
+                 -- Synth with bound variables; TODO: If type is recursive, allow recursive call?
                  exp <- extendOmega (zip boundNs ctypes) $ synth t
                  -- All resulting deltas must be equal, save it for later
                  delta'  <- getDelta
@@ -98,15 +114,17 @@ synth t = takeOmegaOr (focus t) $ \case
              -- Guard all resulting contexts are the same
              guard $ and $ zipWith (\x y -> t4 x == t4 y) ls (tail ls)
              return $ case' (bvar n) (map (\(n, boundNs, exp, _) -> match [ conP (unqual n) $ map bvar boundNs ] exp) ls)
-        ) <|> rule "ADTL-2" (do
-            -- Only push proposition to delta if the above failure was due to deconstruction restriction
+        ) <|> rule "ADTL-2" tc (do
+            -- Only push proposition to delta if the above failure was due to
+            -- deconstruction restriction. This allows this proposition to be
+            -- used in ways other than deconstruction during focusing
             guardRestricted (DeconstructTy tc)
             pushDelta (n, tc)
             synth t
         )
 
 ---- * Synchronous left propositions to Δ * -------
-  p -> rule "Move to Δ" $ do
+  p -> rule "Move to Δ" (snd p) $ do
       pushDelta p
       synth t
 
@@ -119,28 +137,37 @@ focus goal =
     where
         decideRight, decideLeft, decideLeftBang :: Type -> Synth (HsExpr GhcPs)
 
-        decideRight goal = rule "Decide-Right" $ do
-            -- To decide right, goal cannot be atomic
-            guard (not $ isAtomic goal)
-            -- TODO: is the commented even possible?
-            -- to decide right, goal cannot be an ADT that has no constructors
-            -- assertADTHasCons goal >>= guard 
-            focus' Nothing goal
-
-        decideLeft goal = getDelta >>=
-
-            foldr ((<|>) . rule "Decide-Left" . handleDecision) empty
+        decideRight goal = do
+            restoreS <- get
+            handleDecision <|> ( put restoreS >> empty ) -- hack to restore state
 
             where
-              handleDecision p =  (delDelta  p >> focus' (Just p) goal)
-                              <|> (pushDelta p >> empty) -- hack to reset deleted proposition in delta
+              handleDecision = rule "Decide-Right" goal $ do
+                -- To decide right, goal cannot be atomic
+                guard (not $ isAtomic goal)
+                -- TODO: is the below even possible?
+                -- to decide right, goal cannot be an ADT that has no constructors
+                guardADTHasCons goal
+                focus' Nothing goal
 
-        decideLeftBang goal = getGamma >>=
 
-            foldr ((<|>) . rule "Decide-Left!" . handleDecision) empty
+        decideLeft goal = do
+            restoreS <- get
+            getDelta >>=
+                foldr ((<|>) . (<|> (put restoreS >> empty)) . handleDecision) empty
 
             where
-              handleDecision (n, x)  = do
+              handleDecision p =
+                rule "Decide-Left" (snd p =>> goal) $
+                    delDelta p >> focus' (Just p) goal 
+
+        decideLeftBang goal = do
+            restoreS <- get
+            getGamma >>=
+                foldr ((<|>) . (<|> (put restoreS >> empty)) . handleDecision) empty
+
+            where
+              handleDecision p@(n, x) = rule "Decide-Left!" (snd p =>> goal) $ do
                   guardNotRestricted (DecideLeftBangR x goal)
                   -- (if allowrec then id else disallowrecursion) $
                   addRestriction (DecideLeftBangR x goal) $
@@ -154,12 +181,12 @@ focus goal =
         focus' Nothing tc@(TyConApp c l)
 
         ---- *R
-            | isTupleTyCon c = rule "*R" $ do
+            | isTupleTyCon c = rule "*R" tc $ do
                 exps <- mapM focusROption l
                 return $ ExplicitTuple noAnn (map (Present noAnn . noLocA) exps) Boxed
 
         ---- !R
-            | consName c == "Ur" = rule "!R" $ do
+            | consName c == "Ur" = rule "!R" tc $ do
                 let [a] = l
                 d   <- getDelta
                 exp <- synth a
@@ -168,8 +195,8 @@ focus goal =
                 return (var "Ur" @@ exp)
 
         ---- ADTR
-            | isAlgTyCon c = rule "ADTR" $ do
-                dataCons <- getInstDataCons c l
+            | isAlgTyCon c = rule "ADTR" tc $ do
+                let dataCons = getInstDataCons c l
                 foldr ((<|>) . (\(tag, args) -> do
 
                       -- If the constructor takes no argumments, the restrictions don't matter (the creation of the ADT is trivial).
@@ -215,14 +242,17 @@ focus goal =
 
 
         ---- -oL
-        focus' (Just (n, FunTy _ One a b)) goal = rule "-oL" $ do
+        focus' (Just (n, f@(FunTy _ One a b))) goal = rule "-oL" (f =>> goal) $ do
             name <- fresh
             expb <- focus' (Just (name, b)) goal
             expa <- synth a
             return (substitute name (bvar n @@ expa) expb)
 
+        ---- ->L
+        focus' (Just (n, f@(FunTy x Many a b))) goal = rule "->L" (f =>> goal) $ focus' (Just (n, FunTy x One (TyConApp (dummyTyCon "Ur") [a]) b)) goal
+
         ---- ∃L (?)
-        focus' (Just (n, TyVarTy x)) goal = rule "?L" $
+        focus' (Just (n, TyVarTy x)) goal = rule "?L" (TyVarTy x) $
             case goal of
               (TyVarTy y) -> do
                   guard (x == y)  -- ?a |- ?b fails
@@ -236,7 +266,7 @@ focus goal =
 
         ---- skip bangs steps
         focus' (Just (n, TyConApp c [t])) (TyConApp goalC [goal])
-          | consName c == "Ur" && consName goalC == "Ur" = rule "Skip Bangs" $
+          | consName c == "Ur" && consName goalC == "Ur" = rule "Skip Bangs" (TyConApp c [t] =>> TyConApp goalC [goal]) $
                 focus' (Just (n, t)) goal
 
         -- -- preemptively instance existential tv goals
@@ -246,17 +276,18 @@ focus goal =
 
         ---- ADTLFocus
         ---- if we're focusing left on an ADT X while trying to synth ADT X, instead of decomposing the ADT as we do when inverting rules, we'll instance the var right away -- to tame recursive types
-        focus' (Just nh@(n, TyConApp c ts)) goal = rule "ADTL-Focus" $ case goal of
+        focus' (Just nh@(n, tc@(TyConApp c ts))) goal = rule "ADTL-Focus" (tc =>> goal) $ case goal of
           TyConApp c' ts'
-            | isAlgTyCon c' && c == c'
+            | consName c == consName c'
             -> do
-              solveConstraintsWithEq (TyConApp c ts) goal
+              -- TODO: solveConstraintsWithEq (TyConApp c ts) goal
               return (bvar n)
           _ -> do
-              dataCons <- getInstDataCons c ts 
+              let dataCons = getInstDataCons c ts
               -- If the type can't be desconstructed fail here, trying it asynchronously will force another focus/decision of goal -- which under certain circumstances causes an infinite loop
               guard $ not $ null dataCons
-              -- Assert ADT to move to omega can be deconstructed. ADTs that can't would loop back here if they were to be placed in omega
+              -- Assert ADT to move to omega can be deconstructed. ADTs that
+              -- can't would loop back here if they were to be placed in omega
               guardNotRestricted (DeconstructTy (TyConApp c ts))
               inOmega nh $ synth goal
 
@@ -275,7 +306,7 @@ focus goal =
         focus' Nothing (TyVarTy x) = empty
 
         ---- right focus is not synchronous, unfocus.
-        focus' Nothing goal = rule "Unfocus" $ synth goal
+        focus' Nothing goal = synth goal
 
         ---- if focus object is synchronous and needs to consider the contexts to be satisfied, focus on a proposition, instead of solely focusing right
         focusROption goal =
@@ -301,7 +332,7 @@ isAtomic t =
        TyConApp c l
          | isAlgTyCon c     -> False -- ADTs aren't atomic
          | otherwise        -> True  -- TyCons not ADTs are atomic
-       _                    -> error ("is atom? " <> show (ppr t))
+       _                    -> False
 
 
 -- | Subsitute var SName with ExpA in ExpB
@@ -316,10 +347,10 @@ substitute n exp = everywhere (mkT subs)
 -- | Get the data constructors names and the types of their arguments
 --
 -- Todo: Infix operators already have parenthesis
-getInstDataCons :: TyCon -> [Type] -> Synth [(SName, [Type])]
+getInstDataCons :: TyCon -> [Type] -> [(SName, [Type])]
 getInstDataCons tc l = do
     -- Handles substitution of polimorfic types with actual type in constructors
-    return $ map (\dc -> ((nameToStr . dataConName) dc, (\(_, _, args) -> args) $ dataConInstSig dc l)) $ tyConDataCons tc
+    map (\dc -> ((nameToStr . dataConName) dc, (\(_, _, args) -> args) $ dataConInstSig dc l)) $ tyConDataCons tc
 
 
 isRecursiveType :: Type -> Bool
@@ -327,6 +358,12 @@ isRecursiveType (TyConApp c l) =
     let possibleArgs = concatMap (\dc -> (\(_, _, args) -> args) $ dataConInstSig dc l) $ tyConDataCons c
      in (TyConApp c l) `elem` possibleArgs
 isRecursiveType _ = False
+
+
+guardADTHasCons :: Type -> Synth ()
+guardADTHasCons (TyConApp tc l) =
+    guard $ not $ null $ map (\dc -> ((nameToStr . dataConName) dc, (\(_, _, args) -> args) $ dataConInstSig dc l)) $ tyConDataCons tc
+guardADTHasCons _ = return ()
 
 
 -- type Subst = M.Map Int Type

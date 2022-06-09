@@ -12,7 +12,7 @@ module Synthesizer.Class
     ( module Language.Haskell.Syntax.Expr
     , module Language.Haskell.Syntax.Pat
     , module GHC
-    , runState, runReaderT, observeT, observeManyT, asks, get
+    , runState, runReaderT, observeT, observeManyT, asks, get, put
     , SDoc, ppr
     , module Synthesizer.Class
     ) where
@@ -35,11 +35,18 @@ import Data.Foldable (toList)
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Extension
+import GHC.Core.Predicate
 import GHC.Utils.Outputable hiding ((<>), empty, Depth(..))
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Types.Basic
+import GHC.Tc.Utils.TcMType (newCoercionHole, newEvVar)
+import GHC.Tc.Solver
 import GHC.Parser.Annotation
+import GHC.Core.Multiplicity
+import GHC.Types.Var
+import GHC.Core.TyCo.Rep
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -51,7 +58,7 @@ import GHC.Hs.Pat
 import GHC.Tc.Types
 import GHC.Core.Coercion
 import GHC.Tc.Solver.Interact
-import GHC.Tc.Solver.Monad
+import GHC.Tc.Solver.Monad (runTcS)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Types.Id
@@ -113,7 +120,14 @@ data Past = Past Delta [RestrictTag] Gamma Omega
 type Depth = Int
 
 newtype Synth a = Synth { unSynth :: LogicT (RWST (Depth, [RestrictTag], Gamma, Omega) () (Past, Int, Delta, [Ct]) TcM) a }
-    deriving (Functor, Alternative, MonadFail, MonadLogic, MonadIO)
+    deriving (Functor, MonadFail, MonadLogic, MonadIO)
+
+instance Alternative Synth where
+    (<|>) (Synth a) (Synth b) = Synth (a <|> b)
+    empty = do
+        liftIO $ putStrLn "[X] Fail"
+        Synth empty
+
 
 instance MonadReader (Depth, [RestrictTag], Gamma, Omega) Synth where
     ask = Synth (lift ask)
@@ -146,10 +160,10 @@ instance Monad Synth where
 
 type Rule = String
 
-rule :: Rule -> Synth a -> Synth a
-rule s act = do
+rule :: Rule -> Type -> Synth a -> Synth a
+rule s t act = do
     (d, _, _, _) <- ask
-    liftIO $ putStrLn (take (d*2) (repeat ' ') <> s)
+    liftIO $ putStrLn (take (d*2) (repeat ' ') <> s <> ": " <> show t)
     local (\(d,a,b,c) -> (d+1,a,b,c)) act
 
 liftTcM :: TcM a -> Synth a
@@ -231,6 +245,17 @@ guardNotRestricted tag = do
     (_, rs, _, _) <- ask
     guard (tag `notElem` rs)
 
+newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
+newWantedWithLoc loc pty
+  = do dst <- case classifyPredType pty of
+                EqPred {} -> HoleDest  <$> newCoercionHole pty
+                _         -> EvVarDest <$> newEvVar pty
+       return $ CtWanted { ctev_dest      = dst
+                         , ctev_pred      = pty
+                         , ctev_loc       = loc
+                         , ctev_nosh      = WOnly }
+
+(=>>) a b = FunTy InvisArg Many a b
 
 -- | Add a constraint to the list of constraints and solve it
 -- Failing if the constraints can't be solved with this addition
@@ -240,12 +265,16 @@ solveConstraintsWithEq t1 t2 = do
     -- Solve the existing constraints with the added equality, failing when unsolvable
     (ct, solved) <- liftTcM $ do
         let predTy = mkPrimEqPred t1 t2
-        name <- newName (mkEqPredCoOcc (mkVarOcc "magic"))
-        let var = mkVanillaGlobal name predTy
+        liftIO $ putStrLn ("Predicate: " <> show predTy)
+        -- name <- newName (mkEqPredCoOcc (mkVarOcc "magic"))
+        -- let var = mkVanillaGlobal name predTy
         loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
-        let ct = mkNonCanonical $ CtGiven predTy var loc
-        ((), EvBindMap evBinds) <- runTcS $ solveSimpleGivens (ct:cts)
-        return (ct, not $ null $ toList evBinds)
+        -- let ct = mkNonCanonical $ CtGiven predTy var loc
+        ct <- mkNonCanonical <$> newWantedWithLoc loc predTy
+        evBinds <- evBindMapBinds . snd <$> runTcS (solveSimpleWanteds (listToBag $ ct:cts))
+        liftIO $ putStrLn ("Result: " <> show (ppr evBinds))
+        return (ct, not (null $ toList evBinds) && (t1 /= t2)) -- when t1 == t2, evBinds = [] ?
+    guard False -- TODO: The above doesn't work, always fail for now
     guard solved
     setConstraints (ct:cts)
 

@@ -18,8 +18,11 @@ data Ur a where
 -- map' :: (a %1 -> b) -> [a] %1 -> [b]
 -- map' = _
 
-map' :: Ur (a %1 -> b) %1 -> [a] %1 -> [b]
+map' :: (Int %1 -> Char) -> [Int] %1 -> [Char]
 map' = _
+
+-- m :: a
+-- m = _
 
 -- bind :: Maybe a %1 -> (a %1 -> Maybe b) -> Maybe b
 -- bind = _
