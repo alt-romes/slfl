@@ -95,7 +95,7 @@ synth t = takeOmegaOr (focus t) $ \case
            else do
 
              -- Construct each branch
-             ls <- forMFairConj dataCons $ \(name, ctypes) ->
+             ls <- forMFairConj dataCons $ \(name, ctypes) -> rule ("Deconstruct branch " <> occStr name) tc do
                -- For recursive types, restrict deconstruction of this type in further computations
                (if isRecursiveType tc then addRestriction (DeconstructTy tc) else id) do
                  -- Generate a name for each bound type
@@ -197,7 +197,7 @@ focus goal =
         ---- ADTR
             | isAlgTyCon c = rule "ADTR" tc $ do
                 let dataCons = getInstDataCons c l
-                foldr ((<|>) . (\(tag, args) -> do
+                foldr ((<|>) . (\(tag, args) -> rule ("Construct branch " <> (occStr tag)) tc do
 
                       -- If the constructor takes no argumments, the restrictions don't matter (the creation of the ADT is trivial).
                       -- Using this constructor might still fail later e.g. if an hypothesis isn't consumed from delta when it should have
@@ -210,7 +210,7 @@ focus goal =
                       --    else do
 
                       -- Cannot construct ADT t as means to construct ADT t -- might cause an infinite loop
-                      exps <- addRestriction (ConstructTy tc) $ mapM focusROption args
+                      exps <- addRestriction (ConstructTy tc) $ mapM (\t -> rule "Parameter of constructor: " t $ focusROption t) args
                       return (foldl (@@) (var (unqual tag)) exps)
 
                     )) empty dataCons
@@ -280,6 +280,7 @@ focus goal =
           TyConApp c' ts'
             | consName c == consName c'
             -> do
+              guard (ts == ts')
               -- TODO: solveConstraintsWithEq (TyConApp c ts) goal
               return (bvar n)
           _ -> do
