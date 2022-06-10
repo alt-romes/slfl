@@ -43,7 +43,7 @@ type FocusCtxt = (Subst, Restrictions, Gamma, Delta)     -- Gamma, DeltaIn
 -- Synth "Monad"
 -------------------------------------------------------------------------------
 
-type Synth a = LogicT (StateT SynthState (ReaderT SynthReaderState IO)) a 
+type Synth a = LogicT (StateT SynthState (ReaderT SynthReaderState IO)) a
 
 
 type SynthState = (MemoTable, Int)  -- (list of constraints added by the process to solve when instantiating a scheme, next index to instance a variable)

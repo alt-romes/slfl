@@ -32,16 +32,16 @@ executable STLLC
     -- other-extensions:
     build-depends:
         base,
-        mtl ^>=2.2.2,
-        containers ^>=0.6.2.1,
-        hashable ^>=1.3.1.0,
-        parsec ^>=3.1.14.0,
-        logict ^>=0.7.1.0,
-        sbv ^>=8.15,
-        criterion ^>=1.5.9.0,
-        deepseq ^>=1.4.4.0,
-        pretty ^>= 1.1.3.6,
-        async ^>=2.2.3
+        mtl,
+        containers,
+        hashable,
+        parsec,
+        logict,
+        sbv,
+        criterion,
+        deepseq,
+        pretty,
+        async
     
     ghc-options:
         -Wunused-packages -threaded

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+        <title>romes</title>
+        
+    </head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism-tomorrow.min.css" integrity="sha512-vswe+cgvic/XBoF1OcM/TeJ2FW0OofqAVdCZiEYkd6dwGXthvkSFWOoGGJgS2CW70VK5dQM5Oh+7ne47s74VTg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="style.css" />
+    <body>
+
+        <div id="main">
+            <h2>Synthesis of Linear Functional Programs</h2>
+            <p>
+            <!--Use <em>{{ ...0}}</em> as a placeholder for a term that should be <em>synthetized</em>.-->
+            <span hidden="true" id="error" style="color: red"></span>
+            </p>
+            
+            <br>
+            <button type="back" onclick="back()">undo</button>
+            <button type="example" onclick="instructions('')">clear</button>
+            <button type="example" onclick="instructions(simple_typing)">basics</button>
+            <button type="example" onclick="instructions(maybe)">maybe</button>
+            <button type="example" onclick="instructions(list)">list</button>
+            <button type="example" onclick="instructions(array)">array</button>
+            <button type="example" onclick="instructions(misc)">misc</button>
+            <button type="type" onclick="synth('type',this)">type</button>
+            <button type="synth" onclick="synth('synth',this)">synth</button>
+            <button type="eval" onclick="synth('eval',this)">eval</button>
+            <!-- <p hidden="true" id="error" style="color: red"></p> -->
+        </div>
+
+        <div id="editor">
+            <textarea onkeydown="check_tab(this, event);" onscroll="sync_scroll(this)" spellcheck="false" name="editing" id="editing" oninput="update_code(this.value); sync_scroll(this)"></textarea>
+            <pre id="highlighting" aria-hidden="true"><code class="language-haskell" id="highlighting-content"></code></pre>
+        </div>
+
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/prism.min.js" integrity="sha512-YBk7HhgDZvBxmtOfUdvX0z8IH2d10Hp3aEygaMNhtF8fSOvBZ16D/1bXZTJV6ndk/L/DlXxYStP8jrF77v2MIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/components/prism-haskell.min.js" integrity="sha512-08jf4ViPRlP9+OEtEilh+yWPpiomRBozFEuHeq03qgRSP41lcHzY+YnqZ4TS8TCkjF8abbZD4m7SQMBUyP4reQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="main.js"></script>
+    </body>
+</html>
