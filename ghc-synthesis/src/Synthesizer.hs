@@ -31,7 +31,7 @@ import Data.Generics.Aliases (mkT)
 import Data.Generics.Schemes (everywhere)
 
 import Synthesizer.AST
-import Synthesizer.Class
+import Synthesizer.Monad
 
 synthesize :: Type -> TcM SDoc
 synthesize t = fmap (fromString . renderWithContext defaultSDocContext . ppr) $ runSynth 1 t $ synth t

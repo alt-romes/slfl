@@ -59,8 +59,8 @@ library
     -- Modules exported by the library.
     exposed-modules:  Synthesizer,
                       Synthesizer.Plugin,
-                      Synthesizer.Class,
-                      Synthesizer.AST
+                      Synthesizer.AST,
+                      Synthesizer.Monad
 
 
     -- Modules included in this library but not exported.
