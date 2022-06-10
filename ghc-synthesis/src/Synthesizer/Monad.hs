@@ -105,8 +105,9 @@ type Rule = String
 -- This is used to track the depth of the proof, and for logging
 rule :: Rule -> Type -> Synth a -> Synth a
 rule s t act = do
-    (d, _, _, _) <- ask
-    liftIO $ putStrLn (take (d*2) (repeat ' ') <> "[" <> s <> "] " <> show t)
+    (d, _, _g, o) <- ask
+    (_, dl, _) <- get
+    liftIO $ putStrLn (take (d*2) (repeat ' ') <> "[" <> s <> "] " <> show dl <> " ; " <> show o <> " |- " <> show t)
     local (\(depth,a,b,c) -> (depth+1,a,b,c)) act
 
 -- | From two types (a,b) create a new type (a => b) for usage with 'rule'
@@ -185,11 +186,11 @@ takeOmegaOr c f = asks (\case (_,_,_,Omega o) -> o) >>= \case
 
 -- | Run a computation with an additional proposition in omega
 inOmega :: Prop -> Synth a -> Synth a
-inOmega nt = local (second (Omega . (<> [nt]) . omega))
+inOmega nt = local (second (Omega . (nt:) . omega))
 
 -- | Extend a computation with additional propositions in omega
 extendOmega :: [Prop] -> Synth a -> Synth a
-extendOmega o' = local (second (Omega . (<> o') . omega))
+extendOmega o' = local (second (Omega . (o' <>) . omega))
 
 
 -----------------------------------------
@@ -295,11 +296,12 @@ fresh = do
     return . occNameToStr . mkVarOcc . genName $ n
 
     where letters :: [String]
-          letters = [1..] >>= flip replicateM ['a'..'z']
+          letters = someWords <> ([1..] >>= flip replicateM ['a'..'z'])
 
           genName :: Int -> String
           genName i = if i < 0 then '-' : letters !! (-i) else letters !! i
 
+          someWords = ["moon", "earth", "water", "fire", "air"]
 
 -----------------------------------------
 -- * Utilities
@@ -316,12 +318,12 @@ guardWith s b = do
 -- | 'forM' but instead of '(>>=)' use '(>>-)' for fair conjunction
 --
 -- See '(>>-)' in 'LogicT'
-forMFairConj :: MonadLogic m => [t] -> (t -> m a) -> m [a]
-forMFairConj [] _ = return [] 
-forMFairConj (x:xs) f =
-  f x >>- \x' -> do
-      xs' <- forMFairConj xs f
-      return $ x':xs'
+-- forMFairConj :: MonadLogic m => [t] -> (t -> m a) -> m [a]
+-- forMFairConj [] _ = return [] 
+-- forMFairConj (x:xs) f =
+--   f x >>- \x' -> do
+--       xs' <- forMFairConj xs f
+--       return $ x':xs'
 
 -- | Lift a 'TcM' computation into a 'Synth' one
 liftTcM :: TcM a -> Synth a
@@ -337,24 +339,24 @@ t4 (_,_,_,d) = d
 -----------------------------------------
 
 instance {-# OVERLAPPING #-} Show Prop where
-    show (n, t) = occNameStrToString n <> ": " <> show t
+    show (n, t) = occNameStrToString n <> ":" <> show t
 
 instance Show Gamma where
-    show (Gamma l) = "Gamma: " <> show l
+    show (Gamma []) = "{}"
+    show (Gamma l) = concat $ intersperse "," $ map show l
 
 instance Show Delta where
-    show (Delta l) = "Delta: " <> show l <> "\n"
+    show (Delta []) = "{}"
+    show (Delta l) = concat $ intersperse "," $ map show l
 
 instance Show Omega where
-    show (Omega l) = "Omega: " <> show l
+    show (Omega []) = "{}"
+    show (Omega l) = concat $ intersperse "," $ map show l
 
 instance Show RestrictTag where
-    show (ConstructTy l) = "PC: " <> show l
-    show (DeconstructTy l) = "PD: " <> show l
-    show (DecideLeftBangR l r) = "PL!: " <> show l <> " :=> " <> show r
-
-instance {-# OVERLAPPING #-} Show ([RestrictTag], Gamma, Omega) where
-    show (a,b,c) = "Restrictions: " <> show a <> "\n\n" <> show b <> "\n\n" <> show c <> "\n\n"
+    show (ConstructTy l) = "PC(" <> show l <> ")"
+    show (DeconstructTy l) = "PD(" <> show l <> ")"
+    show (DecideLeftBangR l r) = "PL!(" <> show l <> " :=> " <> show r <> ")"
 
 instance Show Type where
     -- hack for showing types

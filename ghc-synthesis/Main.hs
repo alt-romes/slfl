@@ -47,20 +47,28 @@ data State b a = State (Ur b %1 -> (a, Ur b))
 -- runState = _
 
 
-fromMaybe :: A -> Maybe A %1 -> A
-fromMaybe = _
+-- fromMaybe :: A -> Maybe A %1 -> A
+-- fromMaybe = _
 
 
 -- bind :: State C A %1 -> (A %1 -> State C B) %1 -> State C B
--- bind = _
--- bind = \ a -> \ b -> case a of
---  (State c)
---    -> State
---         (\ d
---            -> case d of
---                 (Ur e)
---                   -> case b (case c (Ur e) of (j, k) -> case k of (Ur l) -> j) of
---                        (State g) -> g (Ur e))
+-- bind = \ moon -> \ earth
+--         -> case moon of
+--              (State water)
+--                -> State
+--                     (\ fire
+--                        -> case fire of
+--                             (Ur air)
+--                               -> case
+--                                      earth (case water (Ur air) of (e, f) -> case f of (Ur g) -> e)
+--                                  of
+--                                    (State b) -> b (Ur air))
+
+
+concat :: [[A]] %1 -> [A]
+concat = _
+
+
 
 main :: IO ()
 main = print $ 1

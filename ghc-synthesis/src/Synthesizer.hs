@@ -10,6 +10,7 @@ import Prelude hiding (exp)
 
 import Control.Monad
 import Control.Monad.State
+import Control.Monad.Reader
 
 import GHC.Core.DataCon
 import GHC.Core.TyCo.Rep
@@ -100,17 +101,22 @@ synth t = takeOmegaOr (focus t) $ \case
                -- An ADT that has no constructors might still be used to
                -- instantiate a proposition, but shouldn't leave synchronous mode
                -- (hence the restriction)
-               then addRestriction (DeconstructTy tc) $ pushDelta (n, tc) >> synth t
+               then rule "ADTL No Constructors" (tc =>> t) $
+                   addRestriction (DeconstructTy tc) $ pushDelta (n, tc) >> synth t
                else do
 
                  -- Construct each branch
-                 ls <- forMFairConj dataCons $ \(name, ctypes) -> rule ("Deconstruct branch " <> occStr name) (tc =>> t) do
+                 ls <- forM dataCons $ \(name, ctypes) -> rule ("Deconstruct branch " <> occStr name) (tc =>> t) do
                    -- For recursive types, restrict deconstruction of this type in further computations
                    (if isRecursiveType tc then addRestriction (DeconstructTy tc) else id) do
                      -- Generate a name for each bound type
                      boundNs <- mapM (const fresh) ctypes
-                     -- Reset delta for this case branch
+                     -- Reset delta for this case branch (Note: we don't reset
+                     -- constraints because we want to keep constraints across
+                     -- branches)
                      setDelta commonDelta
+                     -- (_,_,_,o) <- ask
+                     -- liftIO $ print o
                      -- Synth with bound variables; TODO: If type is recursive, allow recursive call?
                      exp <- extendOmega (zip boundNs ctypes) $ synth t
                      -- All resulting deltas must be equal, save it for later
@@ -352,13 +358,10 @@ substitute n exp = everywhere (mkT subs)
 
 
 -- | Get the data constructors names and the types of their arguments
---
--- Todo: Infix operators already have parenthesis
 getInstDataCons :: TyCon -> [Type] -> [(SName, [Type])]
 getInstDataCons tc l = do
     -- Handles substitution of polimorfic types with actual type in constructors
     map (\dc -> ((nameToStr . dataConName) dc, (\(_, _, args) -> args) $ dataConInstSig dc l)) $ tyConDataCons tc
-
 
 isRecursiveType :: Type -> Bool
 isRecursiveType (TyConApp c l) =
@@ -368,5 +371,4 @@ isRecursiveType _ = False
 
 -- | Restore the state then fail the computation with `empty`
 restoreState :: SynthState -> Synth a
--- hack to restore state
 restoreState s = put s >> empty 
