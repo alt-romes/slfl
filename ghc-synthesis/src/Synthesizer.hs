@@ -4,50 +4,55 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Synthesizer (synthesize) where
+module Synthesizer (synthesize, synth) where
 
-import qualified Data.Map as M
+import Prelude hiding (exp)
+
 import Control.Monad
+import Control.Monad.State
 
-import Debug.Trace
-import Data.Bifunctor
 import GHC.Core.DataCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 import GHC.Types.Basic (Boxity(Boxed))
 import Control.Applicative
-import GHC.Data.Bag
 import Data.String (fromString)
-import GHC.Utils.Outputable (renderWithContext, defaultSDocContext)
+import GHC.Utils.Outputable (renderWithContext, defaultSDocContext, SDoc, ppr)
 import GHC.Tc.Types
-import GHC.Hs.Dump
-import Control.Monad.IO.Class
+-- import GHC.Hs.Dump
 
 import GHC.SourceGen hiding (guard)
 
-import Data.Data hiding (TyCon(..))
+-- import Data.Data hiding (TyCon)
 import Data.Generics.Aliases (mkT)
 import Data.Generics.Schemes (everywhere)
+
+import GHC
 
 import Synthesizer.AST
 import Synthesizer.Monad
 
+-- | Run the synthesis from a type and render the resulting expression
+--
+-- The result is in `TcM` because Type Hole Plugins use this monad and can
+-- `SDoc` can be directly used in a raw hole fit
 synthesize :: Type -> TcM SDoc
 synthesize t = fmap (fromString . renderWithContext defaultSDocContext . ppr) $ runSynth 1 t $ synth t
 
-synth' :: Type -> Synth (HsExpr GhcPs)
-synth' (TyConApp tc l) = do
+-- synth' :: Type -> Synth (HsExpr GhcPs)
+-- synth' (TyConApp tc l) = do
     -- liftIO $ print (showAstData NoBlankSrcSpan NoBlankEpAnnotations tc)
     -- liftIO $ putStrLn " adding constraint "
     -- solveConstraintsWithEq t t
     -- liftIO $ putStrLn " is equal to itself "
     -- solveConstraintsWithEq t (LitTy $ NumTyLit 5)
     -- liftIO $ putStrLn " is equal to litTy 5 "
-    f <- fresh
-    return (bvar f)
+    -- f <- fresh
+    -- return (bvar f)
 
 
+-- | Synthesize an expression from a type
 synth :: Type -> Synth (HsExpr GhcPs)
 
 ---- * Right asynchronous rules * -----------------
@@ -70,14 +75,13 @@ synth t = takeOmegaOr (focus t) $ \case
 
     ---- *L
     | isTupleTyCon c -> rule "*L" (tc =>> t) $ do
-        names <- mapM (\t -> fresh >>= return . (,t)) l
+        names <- mapM (\tt -> fresh >>= return . (,tt)) l
         exp <- foldr inOmega (synth t) names
         forM_ names (guardUsed . fst)
         return (case' (bvar n) [match [tuple (map (bvar . fst) names)] exp])
 
     ---- !L
-    | consName c == "Ur" -> rule "!L" (tc =>> t) $ do
-        let [a] = l
+    | consName c == "Ur", [a] <- l -> rule "!L" (tc =>> t) $ do
         name <- fresh
         exp <- inGamma (name, a) $ synth t
         guardUsed name
@@ -108,13 +112,13 @@ synth t = takeOmegaOr (focus t) $ \case
                  -- All resulting deltas must be equal, save it for later
                  delta'  <- getDelta
                  -- Names can't escape bound scope
-                 traverse guardUsed boundNs
+                 mapM_ guardUsed boundNs
                  -- Return constructor name, bound names, synthesized expression, resulting delta
                  return (name, boundNs, exp, delta')
 
              -- Guard all resulting contexts are the same
              guard $ and $ zipWith (\x y -> t4 x == t4 y) ls (tail ls)
-             return $ case' (bvar n) (map (\(n, boundNs, exp, _) -> match [ conP (unqual n) $ map bvar boundNs ] exp) ls)
+             return $ case' (bvar n) (map (\(nn, boundNs, exp, _) -> match [ conP (unqual nn) $ map bvar boundNs ] exp) ls)
         ) <|> rule "ADTL-Roundtrip" (tc =>> t) (do
             -- Only push proposition to delta if the above failure was due to
             -- deconstruction restriction. This allows this proposition to be
@@ -132,8 +136,8 @@ synth t = takeOmegaOr (focus t) $ \case
 
 
 focus :: Type -> Synth (HsExpr GhcPs)
-focus goal =
-    decideLeft goal <|> decideRight goal <|> decideLeftBang goal -- deciding left before right will be correct more often than not (at least based on recent attempts...) -- !TODO: Deciding Right before Left can lead to infinite loops!! (Ex: Expr = Var Nat | Lam Expr)
+focus fgoal =
+    decideLeft fgoal <|> decideRight fgoal <|> decideLeftBang fgoal -- deciding left before right will be correct more often than not (at least based on recent attempts...) -- !TODO: Deciding Right before Left can lead to infinite loops!! (Ex: Expr = Var Nat | Lam Expr)
 
     where
         decideRight, decideLeft, decideLeftBang :: Type -> Synth (HsExpr GhcPs)
@@ -187,8 +191,7 @@ focus goal =
                 return $ ExplicitTuple noAnn (map (Present noAnn . noLocA) exps) Boxed
 
         ---- !R
-            | consName c == "Ur" = rule "!R" tc $ do
-                let [a] = l
+            | consName c == "Ur", [a] <- l = rule "!R" tc $ do
                 d   <- getDelta
                 exp <- synth a
                 d'  <- getDelta
@@ -271,7 +274,7 @@ focus goal =
                 focus' (Just (n, t)) goal
 
         -- -- preemptively instance existential tv goals
-        focus' (Just nh@(n, h)) (TyVarTy x) = do
+        focus' (Just (n, h)) (TyVarTy x) = do
             solveConstraintsWithEq (TyVarTy x) h -- goal is an existential proposition generate a constraint and succeed
             return (bvar n)
 
@@ -305,7 +308,7 @@ focus goal =
           = inOmega nh $ synth goal  -- left focus is not atomic and not left synchronous, unfocus
 
         -- can't instance type variable when not focused?
-        focus' Nothing (TyVarTy x) = empty
+        focus' Nothing (TyVarTy _) = empty
 
         ---- right focus is not synchronous, unfocus.
         focus' Nothing goal = synth goal
@@ -331,7 +334,7 @@ isAtomic t =
     case t of
        LitTy _              -> True
        TyVarTy _            -> True
-       TyConApp c l
+       TyConApp c _
          | isAlgTyCon c     -> False -- ADTs aren't atomic
          | otherwise        -> True  -- TyCons not ADTs are atomic
        _                    -> False
@@ -341,8 +344,8 @@ isAtomic t =
 substitute :: SName -> HsExpr GhcPs -> HsExpr GhcPs -> HsExpr GhcPs
 substitute n exp = everywhere (mkT subs)
     where
-        subs (HsVar _ id)
-          | (rdrNameToStr . unLoc) id == occStr n = exp
+        subs (HsVar _ i)
+          | (rdrNameToStr . unLoc) i == occStr n = exp
         subs e = e
 
 
@@ -364,7 +367,6 @@ isRecursiveType _ = False
 
 guardADTHasCons :: Type -> Synth ()
 guardADTHasCons (TyConApp tc l) = do
-    liftIO $ print $ map (nameToStr . dataConName) $ tyConDataCons tc
     guardWith "ADT Has No Constructors" $ not $ null $ map (\dc -> ((nameToStr . dataConName) dc, (\(_, _, args) -> args) $ dataConInstSig dc l)) $ tyConDataCons tc
 guardADTHasCons _ = return ()
 

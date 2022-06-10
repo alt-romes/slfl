@@ -1,21 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 module Synthesizer.AST where
 
-import GHC.Utils.Outputable hiding ((<>), empty)
-import GHC.Types.Basic
-import GHC.Parser.Annotation
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Types.Name
-import GHC.Types.Basic
-import GHC.Data.FastString
-import GHC.Core.Map.Type
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Types.Unique
-import GHC.Hs.Pat
-import GHC
 
 import GHC.SourceGen
 

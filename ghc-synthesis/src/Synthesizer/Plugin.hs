@@ -4,9 +4,6 @@ module Synthesizer.Plugin where
 import Prelude hiding ((<>))
 
 import GHC.Plugins hiding ((<>))
-import GHC.Utils.Outputable ((<>))
-import GHC.Tc.Errors.Hole
-import GHC.Tc.Errors.Hole.FitTypes
 import GHC.Tc.Types.Constraint
 import Data.IORef (newIORef)
 
@@ -22,7 +19,7 @@ plugin :: Plugin
 plugin = defaultPlugin { holeFitPlugin = hfp }
 
 hfp :: [CommandLineOption] -> Maybe HoleFitPluginR
-hfp opts = Just (fromPureHFPlugin $ HoleFitPlugin cp fp)
+hfp _ = Just (fromPureHFPlugin $ HoleFitPlugin cp fp)
 
 cp :: CandPlugin
 cp _ cands = return cands

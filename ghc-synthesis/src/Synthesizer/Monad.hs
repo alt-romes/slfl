@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-} -- Show Prop, Show Type, Eq Type
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -8,19 +9,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Synthesizer.Monad
-    ( module Language.Haskell.Syntax.Expr
-    , module Language.Haskell.Syntax.Pat
-    , module GHC
-    , runState, runReaderT, observeT, observeManyT, asks, get, put
-    , SDoc, ppr
-    , module Synthesizer.Monad
-    ) where
+module Synthesizer.Monad where
 
-import Debug.Trace
-import Data.Tree
 import Data.List
-import Data.Either
 import Data.Bifunctor
 import Control.Applicative
 import Control.Monad
@@ -28,48 +19,30 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.RWS.Lazy hiding (ask, asks, local, get, put, modify, writer, tell, listen)
 import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Writer.Class
-import Control.Monad.RWS.Class
 import Data.Foldable (toList)
 
-import Language.Haskell.Syntax.Pat
-import Language.Haskell.Syntax.Expr
-import Language.Haskell.Syntax.Extension
 import GHC.Core.Predicate
 import GHC.Utils.Outputable hiding ((<>), empty, Depth(..))
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
-import GHC.Types.Basic
 import GHC.Tc.Utils.TcMType (newCoercionHole, newEvVar)
-import GHC.Tc.Solver
-import GHC.Parser.Annotation
+-- import GHC.Tc.Solver
 import GHC.Core.Multiplicity
 import GHC.Types.Var
 import GHC.Core.TyCo.Rep
 import GHC.Types.Name.Occurrence
-import GHC.Types.Name.Reader
-import GHC.Types.Name
-import GHC.Types.Basic
-import GHC.Data.FastString
 import GHC.Core.Map.Type
-import GHC.Core.TyCon
-import GHC.Hs.Pat
-import GHC.Tc.Types
-import GHC.Core.Coercion
+-- import GHC.Core.Coercion
 import GHC.Tc.Solver.Interact
 import GHC.Tc.Solver.Monad (runTcS)
-import GHC.Tc.Utils.Monad
+-- import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
-import GHC.Types.Id
 import GHC.Data.Bag
-import GHC
 
 import GHC.SourceGen hiding (guard)
 
 import Control.Monad.Logic
-
-import Synthesizer.AST
 
 -----------------------------------------
 -- * Synth
@@ -79,7 +52,7 @@ import Synthesizer.AST
 --
 -- Handles threading of state, propagation of reading state, backtracking,
 -- constraint solving, and friends
-newtype Synth a = Synth { unSynth :: LogicT (RWST (Depth, [RestrictTag], Gamma, Omega) () (Past, Int, Delta, [Ct]) TcM) a }
+newtype Synth a = Synth { unSynth :: LogicT (RWST (Depth, [RestrictTag], Gamma, Omega) () (Int, Delta, [Ct]) TcM) a }
     deriving ( Functor
              , MonadFail
              , MonadLogic
@@ -97,13 +70,7 @@ instance Alternative Synth where
         Synth empty
 
 instance Monad Synth where
-    (Synth a) >>= f = Synth $ do
-        (p, i, d, ct) <- get
-        (_, rs, g, o) <- ask
-        when (p /= Past d rs g o) $ do
-            -- liftIO $ print d >> print (rs, g, o)
-            put (Past d rs g o, i, d, ct)
-        a >>= unSynth . f
+    (Synth a) >>= f = Synth $ a >>= unSynth . f
 
 instance MonadReader (Depth, [RestrictTag], Gamma, Omega) Synth where
     ask = Synth (lift ask)
@@ -111,7 +78,7 @@ instance MonadReader (Depth, [RestrictTag], Gamma, Omega) Synth where
         env <- ask
         local f $ m ((local (const env) .) . sk) (local (const env) fk)
 
-instance MonadState (Past, Int, Delta, [Ct]) Synth where
+instance MonadState (Int, Delta, [Ct]) Synth where
     get = Synth $ lift get
     put = Synth . lift . put
 
@@ -122,7 +89,7 @@ instance MonadState (Past, Int, Delta, [Ct]) Synth where
 -- and the synthesis computation
 runSynth :: Int -> Type -> Synth a -> TcM [a]
 runSynth i t sy = do
-    (exps, _) <- evalRWST (observeManyT i $ unSynth sy) (0, mempty, Gamma [("rec", trace (show $ ppr t) t)], Omega mempty) (NoPast, 0, Delta mempty, mempty)
+    (exps, _) <- evalRWST (observeManyT i $ unSynth sy) (0, mempty, Gamma [("rec", t)], Omega mempty) (0, Delta mempty, mempty)
     return exps
 
 
@@ -130,7 +97,7 @@ runSynth i t sy = do
 -- * Rules
 -----------------------------------------
 
--- | A Rule is a string e.g. "-oR", but could also be a custom datatype
+-- | A Rule is a string e.g. "-oR", but could also eventually be a custom datatype
 type Rule = String
 
 -- | Run computation where the current rule is being applied to the given type
@@ -140,7 +107,7 @@ rule :: Rule -> Type -> Synth a -> Synth a
 rule s t act = do
     (d, _, _, _) <- ask
     liftIO $ putStrLn (take (d*2) (repeat ' ') <> "[" <> s <> "] " <> show t)
-    local (\(d,a,b,c) -> (d+1,a,b,c)) act
+    local (\(depth,a,b,c) -> (depth+1,a,b,c)) act
 
 -- | From two types (a,b) create a new type (a => b) for usage with 'rule'
 -- 
@@ -185,7 +152,7 @@ delDelta p = modify (first (Delta . delete p . delta))
 -- | Get the linear context
 getDelta :: Synth [Prop]
 getDelta = do
-    (_, _, d, _) <- get
+    (_, d, _) <- get
     return $ delta d
 
 -- | Set the linear context
@@ -274,7 +241,7 @@ guardNotRestricted tag = do
 
 getConstraints :: Synth [Ct]
 getConstraints = do
-    (_, _, _, cts) <- get
+    (_, _, cts) <- get
     return cts
 
 setConstraints :: [Ct] -> Synth ()
@@ -323,15 +290,15 @@ solveConstraintsWithEq t1 t2 = do
 --      return (var a)
 fresh :: Synth SName
 fresh = do
-    (p, n, d, cts) <- get
-    put (p, n + 1, d, cts)
-    return . occNameToStr . mkVarOcc . getName $ n
+    (n, d, cts) <- get
+    put (n + 1, d, cts)
+    return . occNameToStr . mkVarOcc . genName $ n
 
     where letters :: [String]
           letters = [1..] >>= flip replicateM ['a'..'z']
 
-          getName :: Int -> String
-          getName i = if i < 0 then '-' : letters !! (-i) else letters !! i
+          genName :: Int -> String
+          genName i = if i < 0 then '-' : letters !! (-i) else letters !! i
 
 
 -----------------------------------------
@@ -366,7 +333,7 @@ t4 (_,_,_,d) = d
 
 
 -----------------------------------------
--- * Pretty Printing
+-- Pretty Printing
 -----------------------------------------
 
 instance {-# OVERLAPPING #-} Show Prop where
@@ -409,8 +376,4 @@ type Prop = (SName, Type)
 deriving instance Eq Gamma
 deriving instance Eq Delta
 deriving instance Eq Omega
-
-data Past = Past Delta [RestrictTag] Gamma Omega
-          | NoPast
-          deriving (Eq)
 
