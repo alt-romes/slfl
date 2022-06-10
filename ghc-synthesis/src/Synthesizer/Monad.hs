@@ -72,13 +72,13 @@ instance Alternative Synth where
 instance Monad Synth where
     (Synth a) >>= f = Synth $ a >>= unSynth . f
 
-instance MonadReader (Depth, [RestrictTag], Gamma, Omega) Synth where
+instance MonadReader SynthReader Synth where
     ask = Synth (lift ask)
     local f (Synth (LogicT m)) = Synth $ LogicT $ \sk fk -> do
         env <- ask
         local f $ m ((local (const env) .) . sk) (local (const env) fk)
 
-instance MonadState (Int, Delta, [Ct]) Synth where
+instance MonadState SynthState Synth where
     get = Synth $ lift get
     put = Synth . lift . put
 
@@ -377,3 +377,5 @@ deriving instance Eq Gamma
 deriving instance Eq Delta
 deriving instance Eq Omega
 
+type SynthReader = (Depth, [RestrictTag], Gamma, Omega)
+type SynthState  = (Int, Delta, [Ct])

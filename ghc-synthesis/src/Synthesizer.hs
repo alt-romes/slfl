@@ -88,45 +88,49 @@ synth t = takeOmegaOr (focus t) $ \case
         return (case' (bvar n) [match [conP "Ur" [bvar name]] exp])
 
     ---- ADTL
-    | isAlgTyCon c -> rule "ADTL" (tc =>> t) (do
-        guardNotRestricted (DeconstructTy tc)
-        let dataCons = getInstDataCons c l
-        commonDelta <- getDelta
-        if null dataCons
-           -- An ADT that has no constructors might still be used to
-           -- instantiate a proposition, but shouldn't leave synchronous mode
-           -- (hence the restriction)
-           then addRestriction (DeconstructTy tc) $ pushDelta (n, tc) >> synth t
-           else do
+    | isAlgTyCon c -> do
+        s <- get
+        ruleADTL <|> restoreState s <|> ruleADTLRoundtrip
+        where
+          ruleADTL = rule "ADTL" (tc =>> t) do
+            guardNotRestricted (DeconstructTy tc)
+            let dataCons = getInstDataCons c l
+            commonDelta <- getDelta
+            if null dataCons
+               -- An ADT that has no constructors might still be used to
+               -- instantiate a proposition, but shouldn't leave synchronous mode
+               -- (hence the restriction)
+               then addRestriction (DeconstructTy tc) $ pushDelta (n, tc) >> synth t
+               else do
 
-             -- Construct each branch
-             ls <- forMFairConj dataCons $ \(name, ctypes) -> rule ("Deconstruct branch " <> occStr name) (tc =>> t) do
-               -- For recursive types, restrict deconstruction of this type in further computations
-               (if isRecursiveType tc then addRestriction (DeconstructTy tc) else id) do
-                 -- Generate a name for each bound type
-                 boundNs <- mapM (const fresh) ctypes
-                 -- Reset delta for this case branch
-                 setDelta commonDelta
-                 -- Synth with bound variables; TODO: If type is recursive, allow recursive call?
-                 exp <- extendOmega (zip boundNs ctypes) $ synth t
-                 -- All resulting deltas must be equal, save it for later
-                 delta'  <- getDelta
-                 -- Names can't escape bound scope
-                 mapM_ guardUsed boundNs
-                 -- Return constructor name, bound names, synthesized expression, resulting delta
-                 return (name, boundNs, exp, delta')
+                 -- Construct each branch
+                 ls <- forMFairConj dataCons $ \(name, ctypes) -> rule ("Deconstruct branch " <> occStr name) (tc =>> t) do
+                   -- For recursive types, restrict deconstruction of this type in further computations
+                   (if isRecursiveType tc then addRestriction (DeconstructTy tc) else id) do
+                     -- Generate a name for each bound type
+                     boundNs <- mapM (const fresh) ctypes
+                     -- Reset delta for this case branch
+                     setDelta commonDelta
+                     -- Synth with bound variables; TODO: If type is recursive, allow recursive call?
+                     exp <- extendOmega (zip boundNs ctypes) $ synth t
+                     -- All resulting deltas must be equal, save it for later
+                     delta'  <- getDelta
+                     -- Names can't escape bound scope
+                     mapM_ guardUsed boundNs
+                     -- Return constructor name, bound names, synthesized expression, resulting delta
+                     return (name, boundNs, exp, delta')
 
-             -- Guard all resulting contexts are the same
-             guard $ and $ zipWith (\x y -> t4 x == t4 y) ls (tail ls)
-             return $ case' (bvar n) (map (\(nn, boundNs, exp, _) -> match [ conP (unqual nn) $ map bvar boundNs ] exp) ls)
-        ) <|> rule "ADTL-Roundtrip" (tc =>> t) (do
+                 -- Guard all resulting contexts are the same
+                 guard $ and $ zipWith (\x y -> t4 x == t4 y) ls (tail ls)
+                 return $ case' (bvar n) (map (\(nn, boundNs, exp, _) -> match [ conP (unqual nn) $ map bvar boundNs ] exp) ls)
+
+          ruleADTLRoundtrip = rule "ADTL-Roundtrip" (tc =>> t) do
             -- Only push proposition to delta if the above failure was due to
             -- deconstruction restriction. This allows this proposition to be
             -- used in ways other than deconstruction during focusing
             guardRestricted (DeconstructTy tc)
             pushDelta (n, tc)
             synth t
-        )
 
 ---- * Synchronous left propositions to Δ * -------
   p -> rule "Move to Δ" (snd p) $ do
@@ -143,23 +147,20 @@ focus fgoal =
         decideRight, decideLeft, decideLeftBang :: Type -> Synth (HsExpr GhcPs)
 
         decideRight goal = do
-            restoreS <- get
-            handleDecision <|> ( put restoreS >> empty ) -- hack to restore state
+            s <- get
+            handleDecision <|> restoreState s
 
             where
               handleDecision = rule "Decide-Right" goal $ do
                 -- To decide right, goal cannot be atomic
-                guard (not $ isAtomic goal)
-                -- TODO: is the below really needed?
-                -- to decide right, goal cannot be an ADT that has no constructors
-                guardADTHasCons goal
+                guardWith "Is Atomic" (not $ isAtomic goal)
                 focus' Nothing goal
 
 
         decideLeft goal = do
-            restoreS <- get
+            s <- get
             getDelta >>=
-                foldr ((<|>) . (<|> (put restoreS >> empty)) . handleDecision) empty
+                foldr ((<|>) . (<|> restoreState s) . handleDecision) empty
 
             where
               handleDecision p =
@@ -167,9 +168,9 @@ focus fgoal =
                     delDelta p >> focus' (Just p) goal 
 
         decideLeftBang goal = do
-            restoreS <- get
+            s <- get
             getGamma >>=
-                foldr ((<|>) . (<|> (put restoreS >> empty)) . handleDecision) empty
+                foldr ((<|>) . (<|> restoreState s) . handleDecision) empty
 
             where
               handleDecision p@(n, x) = rule "Decide-Left!" (snd p =>> goal) $ do
@@ -200,8 +201,9 @@ focus fgoal =
 
         ---- ADTR
             | isAlgTyCon c = rule "ADTR" tc $ do
+                s <- get
                 let dataCons = getInstDataCons c l
-                foldr ((<|>) . (\(tag, args) -> rule ("Construct branch " <> (occStr tag)) tc do
+                foldr ((<|>) . (<|> restoreState s) . (\(tag, args) -> rule ("Construct branch " <> (occStr tag)) tc do
 
                       -- If the constructor takes no argumments, the restrictions don't matter (the creation of the ADT is trivial).
                       -- Using this constructor might still fail later e.g. if an hypothesis isn't consumed from delta when it should have
@@ -364,11 +366,7 @@ isRecursiveType (TyConApp c l) =
      in (TyConApp c l) `elem` possibleArgs
 isRecursiveType _ = False
 
-
-guardADTHasCons :: Type -> Synth ()
-guardADTHasCons (TyConApp tc l) = do
-    guardWith "ADT Has No Constructors" $ not $ null $ map (\dc -> ((nameToStr . dataConName) dc, (\(_, _, args) -> args) $ dataConInstSig dc l)) $ tyConDataCons tc
-guardADTHasCons _ = return ()
-
-
--- type Subst = M.Map Int Type
+-- | Restore the state then fail the computation with `empty`
+restoreState :: SynthState -> Synth a
+-- hack to restore state
+restoreState s = put s >> empty 
