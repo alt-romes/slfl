@@ -174,8 +174,8 @@ makeSVar (n, TyLit TyInt) = Right <$> sInteger n
 makeSVar (n, t) = error ("[Refinement] Can't make symbolic variable " ++ show n ++ " of type " ++ show t)
 
 makeUnivSVar :: (Name, Type) -> Symbolic (Either SBool SInteger)
-makeUnivSVar (n, ADT _ _) = Left <$> forall n
-makeUnivSVar (n, TyLit TyInt) = Right <$> forall n
+makeUnivSVar (n, ADT _ _) = Left <$> SBV.sbvForall n
+makeUnivSVar (n, TyLit TyInt) = Right <$> SBV.sbvForall n
 makeUnivSVar (n, t) = error ("[Refinement] Can't make universal symbolic variable " ++ show n ++ " of type " ++ show t)
 
 getSVals :: [(Name, Either SBool SInteger)] -> Predicate -> Predicate -> Symbolic (Either SBool SInteger, Either SBool SInteger)
