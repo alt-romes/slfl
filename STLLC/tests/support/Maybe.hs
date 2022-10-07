@@ -11,4 +11,4 @@ synth bind :: Maybe a -o (a -o Maybe b) -> Maybe b;
 
 synth maybe :: b -> (a -o b) -> Maybe a -o b;
 
-#synth listToMaybe :: (List a -o Maybe a);
+synth listToMaybe :: (List a -o Maybe a);

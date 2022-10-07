@@ -1,0 +1,3 @@
+[submodule "ghc-linear-synthesis-plugin"]
+	path = ghc-linear-synthesis-plugin
+	url = https://github.com/alt-romes/ghc-linear-synthesis-plugin
