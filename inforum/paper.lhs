@@ -13,10 +13,15 @@
 
 \begin{abstract}
 Type-driven program synthesis concerns itself with generating programs that
-satisfy a given type-based specification. In synthesis, the main challenges are
-understanding user intent and finding candidate solutions satisfying the
-specification in the vast space of valid programs in a reasonable amount of
-time.
+satisfy a given type-based specification.
+One of the key challenges of program synthesis lies in finding candidate
+solutions that adhere to both the specification and the user's intent in an
+actionable amount of time.
+
+% In synthesis, the main challenges are
+% understanding user intent and finding candidate solutions satisfying the
+% specification in the vast space of valid programs in a reasonable amount of
+% time.
 
 In this work, we explore how linear types allow for precise specifications
 suitable for synthesis, and present a framework for synthesis with linear types
