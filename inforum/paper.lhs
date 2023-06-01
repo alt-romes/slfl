@@ -140,9 +140,9 @@ map f ls = case ls of
 \end{code}
 
 With linear types, the correct handling of resources can be enforced
-statically, allowing us to, e.g., ensure a file handle is released exactly, or
+statically, allowing us to, e.g., ensure a file handle is released exactly once, or
 provide a safe interface to manipulate mutable arrays. This last example is
-used in the Linear Haskell~\cite{} work, specifically, they provide an
+used in Linear Haskell~\cite{} -- they provide an
 implementation of |array :: Int -> [(Int,a)] -> Array a| using the following API:
 \begin{code}
 newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
@@ -151,8 +151,8 @@ read :: MArray a ⊸ Int -> (MArray a, Ur b)
 freeze :: MArray a ⊸ Ur (Array a)
 \end{code}
 This doubles as the flagship example of our synthesis framework: we're able to
-synthesize the exact implementation given in Linear Haskell, from the above API plus |foldl|
-and the |array| type, generating (in a small fraction of a second):
+synthesize the exact implementation given in Linear Haskell from the above API plus |foldl|
+and the |array| type specification, generating the program (\emph{in 0.1s}):
 \begin{code}
 array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
 \end{code}
@@ -165,8 +165,8 @@ array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
 % (e.g.~Rust's ownership types), safely updating-in-place mutable
 % structures~\cite{Bernardy_2018}, enforcing protocols for external \textsc{api}s~\cite{Bernardy_2018}, to name a few.
 
-
-\mypara{Contributions} Despite their long-known potential
+%\mypara{Contributions}
+Despite their long-known potential
 \cite{Wadler90lineartypes,DBLP:journals/mscs/CairesPT16,Bernardy_2018} and
 strong proof-theoretic foundations
 \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00},
