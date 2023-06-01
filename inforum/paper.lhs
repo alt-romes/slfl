@@ -173,7 +173,13 @@ Despite their long-known potential
 strong proof-theoretic foundations
 \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00},
 synthesis with linear types combined with other advanced typing features has
-generally been overlooked in the literature. Our contributions are:
+generally been overlooked in the literature. Furthermore, their preciseness
+also affects the search space: all programs where a linear resource is used
+non-linearly %(i.e. not exactly once)
+are ill-typed. With linearity built into the synthesis process, usage of a
+linear proposition more than once is not considered, and unused propositions
+are identified during synthesis, constraining the space of valid programs.
+Our contributions build on these ideas:
 \begin{itemize}
 
 \item We introduce linear types as specifications suitable for synthesis both
@@ -230,17 +236,17 @@ linearity.
 % that type.
 
 % TODO: No... Como abrir esta secção?
-Linear types make for more precise specifications than simple types
-because information on which resources must necessarily be used is
-encoded in the type. For instance the type $\mathsf{Int} \lolli
-\mathsf{Int} \lolli \mathsf{Int}$ denotes a function that \emph{must}
-use its two integer arguments to produce an integer.
-Their preciseness also affects the search space:
-all programs where a linear resource is used non-linearly (i.e. not
-\emph{exactly once}) are ill-typed. With linearity built into the
-synthesis process, usage of a linear proposition more than once is not
-considered, and unused propositions are identified during synthesis,
-constraining the space of valid programs.
+% Linear types make for more precise specifications than simple types
+% because information on which resources must necessarily be used is
+% encoded in the type. For instance the type $\mathsf{Int} \lolli
+% \mathsf{Int} \lolli \mathsf{Int}$ denotes a function that \emph{must}
+% use its two integer arguments to produce an integer.
+% Their preciseness also affects the search space:
+% all programs where a linear resource is used non-linearly (i.e. not
+% \emph{exactly once}) are ill-typed. With linearity built into the
+% synthesis process, usage of a linear proposition more than once is not
+% considered, and unused propositions are identified during synthesis,
+% constraining the space of valid programs.
 
 % Moreover, we can leverage the modularity
 % of the proof-search based approach along two axes: first, since proof
@@ -268,9 +274,7 @@ theory-driven implementation.
 %
 We note that a \emph{sound} set of rules guarantees we cannot synthesize
 incorrect programs; and that the valid programs derivable through them
-reflect the subjective trade-offs we committed to. Different
-choices and approaches outside the core might lead to completely
-distinct synths and spaces of valid programs.
+reflect the subjective trade-offs we committed to.
 
 \mypara{Core Rules} The system comprises of proof search in
 (intuitionistic) linear logic sequent calculus, based on a system of
