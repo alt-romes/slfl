@@ -1,4 +1,7 @@
-paper.pdf: paper.tex
+paper.pdf: paper.tex references.bib
+	pdflatex $< -o $@
+	pdflatex $< -o $@
+	bibtex paper
 	pdflatex $< -o $@
 
 paper.tex: paper.lhs

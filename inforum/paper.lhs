@@ -11,6 +11,7 @@
 \usepackage{hyperref}
 \usepackage{multirow}
 \usepackage{verbatim}
+\usepackage{wrapfig}
 \newenvironment{code}{\footnotesize\verbatim}{\endverbatim\normalsize}
 
 \newcommand{\lolli}{\multimap}
@@ -44,7 +45,7 @@
 
 
 \begin{document}
-\title{Synthesis of Linear Functional Programs}
+\title{Functional Program Synthesis from Linear Types}
 
 \author{Rodrigo Mesquita \and Bernardo Toninho}
 
@@ -56,10 +57,9 @@
 
 \begin{abstract}
 Type-driven program synthesis concerns itself with generating programs that
-satisfy a given type-based specification.
-One of the key challenges of program synthesis lies in finding candidate
-solutions that adhere to both the specification and the user's intent in an
-actionable amount of time.
+satisfy a given type-based specification. One of the key challenges of program
+synthesis lies in finding candidate solutions that adhere to both the
+specification and the user's intent in an actionable amount of time.
 %
 % In synthesis, the main challenges are
 % understanding user intent and finding candidate solutions satisfying the
@@ -111,55 +111,42 @@ searching over the space of valid programs, and interpreting user intent.
 expressive and prune the valid programs search space, while maintaining a
 ``familiar'' specification interface (types) for the user.
 %
-Richer type systems allow for more precise types, which can statically eliminate
-various kinds of logical errors by making certain invalid program states
-ill-typed (e.g.,~a ``null aware'' type system will ensure at compile-time that
-you cannot dereference a null-pointer).
+% Richer type systems allow for more precise types, which can statically
+% eliminate various kinds of logical errors by making certain invalid program
+% states ill-typed, e.g.,~a ``null aware'' type system will ensure at
+% compile-time that you cannot dereference a null-pointer.
 %
 For instance, the type $\mathsf{Int} \rightarrow \mathsf{Int} \rightarrow
-\mathsf{Int}$, viewed as a specification, is extremely imprecise (there are an
-infinite number of functions that instance this type/satisfy this
-specification).  However, the richer type $(x{:}\mathsf{Int}) \rightarrow
-(y{:}\mathsf{Int}) \rightarrow \{z{:}\mathsf{Int} \mid z = x+y\}$ precisely
-specifies a function that adds its two arguments. 
+\mathsf{Int}$ can be viewed as a specification, but there are an infinite
+number of functions that instance this type/satisfy this specification -- it is
+extremely imprecise. On the other hand, the richer type $(x{:}\mathsf{Int})
+\rightarrow (y{:}\mathsf{Int}) \rightarrow \{z{:}\mathsf{Int} \mid z = x+y\}$
+precisely specifies a function that adds its two arguments.
 
-The focus of our work is type-driven synthesis where specifications take the
-form of \emph{linear types}.
+% The focus of our work is type-driven synthesis where specifications take the
+% form of \emph{linear types}.
 %
-Linear types constrain resource usage in programs by \emph{statically} limiting
-the number of times certain resources can be used during their lifetime; in
-particular, linear resources must be used \emph{exactly once}. Linearity allows us
-to concisely describe interesting functions, since we can easily specify which
-arguments must be used linearly in the body of a function. For example, given the
-type of the linear map function, |map :: (a ⊸ b) -> [a] ⊸ [b]|,
-since the list of $a$s must be used exactly once to produce a list of $b$s,
-which can only be done by applying the function to each element, the synthesis
-framework will generate code implementing map as expected:
+Linear types are a form of richer types that constrains resource usage in
+programs by \emph{statically} limiting the number of times certain resources
+can be used during their lifetime; in particular, linear resources must be used
+\emph{exactly once}. Linearity allows us to concisely describe interesting
+functions, since we can easily specify which arguments must be used linearly in
+the body of a function. For example, the type of the linear map function,
+|map :: (a ⊸ b) -> [a] ⊸ [b]|, specifies a function that must consume the list of $a$s exactly once
+to produce a list of $b$s, which can only be done by applying the function to
+each element.
+% 
+A linear type aware type-driven synthesizer might take the |map| type as a specification to unambiguously produce
+%
 \begin{code}
 map f ls = case ls of
   [] -> []
   x:xs -> f x:map f xs
 \end{code}
-
-With linear types, the correct handling of resources can be enforced
-statically, allowing us to, e.g., ensure a file handle is released exactly once, or
-provide a safe interface to manipulate mutable arrays. This last example is
-used in Linear Haskell~\cite{} -- they provide an
-implementation of |array :: Int -> [(Int,a)] -> Array a| using the following API:
-\begin{code}
-newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
-write :: MArray a ⊸ (Int,a) -> MArray a
-read :: MArray a ⊸ Int -> (MArray a, Ur b)
-freeze :: MArray a ⊸ Ur (Array a)
-\end{code}
-This doubles as the flagship example of our synthesis framework: we're able to
-synthesize the exact implementation given in Linear Haskell from the above API plus |foldl|
-and the |array| type specification, generating the program (\emph{in 0.1s}):
-\begin{code}
-array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
-\end{code}
-
 %
+
+It isn't clear, however, how such a synthesizer should operate. Iterating over all possible programs, for instance, ???
+However, how can it do so, while being efficient? How to write?
 % TODO: Bad
 % They can be applied to resource-aware programming such as concurrent programming
 % (e.g. session types for message passing
@@ -168,18 +155,13 @@ array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
 % structures~\cite{Bernardy_2018}, enforcing protocols for external \textsc{api}s~\cite{Bernardy_2018}, to name a few.
 
 %\mypara{Contributions}
-Despite their long-known potential
+Synthesis with linear types combined with other advanced typing features has
+generally been overlooked in the literature, despite their long-known potential
 \cite{Wadler90lineartypes,DBLP:journals/mscs/CairesPT16,Bernardy_2018} and
 strong proof-theoretic foundations
 \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00},
-synthesis with linear types combined with other advanced typing features has
-generally been overlooked in the literature. Furthermore, their preciseness
-also affects the search space: all programs where a linear resource is used
-non-linearly %(i.e. not exactly once)
-are ill-typed. With linearity built into the synthesis process, usage of a
-linear proposition more than once is not considered, and unused propositions
-are identified during synthesis, constraining the space of valid programs.
-Our contributions build on these ideas:
+%
+In this work we aim to bridge this gap -- our contributions are:
 \begin{itemize}
 
 \item We introduce linear types as specifications suitable for synthesis both
@@ -220,7 +202,15 @@ linearity.
 % Appendix~\ref{sec:final_system} presents the final set of inference rules.
 % Appendix~\ref{sec:examples} lists concrete examples of synthesis with \synname.
 
-\section{The Linear Synthesis Framework}\label{sec:overview}
+
+\section{Synthesis is Proof Search}\label{sec:overview}
+
+ Furthermore, their preciseness
+also affects the search space: all programs where a linear resource is used
+non-linearly %(i.e. not exactly once)
+are ill-typed. With linearity built into the synthesis process, usage of a
+linear proposition more than once is not considered, and unused propositions
+are identified during synthesis, constraining the space of valid programs.
 
 % TODO: Better to separate completely the implementation talk from the
 % synthesis framework talk.
@@ -1005,6 +995,31 @@ $\bang$-ed proposition, and the goal is $\bang$-ed:
     {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
 \end{mathpar}
 
+\section{Results}
+
+In practice, linear types can enforce the correct handling of resources,
+allowing us to, e.g., ensure a file handle is released exactly once, or provide
+a safe interface to manipulate mutable arrays. This last example is used in
+Linear Haskell~\cite{} -- they provide an implementation of |array :: Int ->
+[(Int,a)] -> Array a| using mutable arrays through the functions:
+%
+\begin{code}
+newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
+write :: MArray a ⊸ (Int,a) -> MArray a
+read :: MArray a ⊸ Int -> (MArray a, Ur b)
+freeze :: MArray a ⊸ Ur (Array a)
+\end{code}
+%
+This doubles as the flagship example of our synthesis framework and illustrates
+the preciseness of linear types -- we're able to synthesize the exact
+implementation given in Linear Haskell from the above function signatures and
+the |array| type goal in a hundred miliseconds:
+\begin{code}
+array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
+\end{code}
+
+\bibliographystyle{splncs04}
+\bibliography{references}
 
 \end{document}
 
