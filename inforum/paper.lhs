@@ -136,7 +136,8 @@ the body of a function. For example, the type of the linear map function,
 to produce a list of $b$s, which can only be done by applying the function to
 each element.
 % 
-A linear type aware type-driven synthesizer might take the |map| type as a specification to unambiguously produce
+A linear type aware type-driven synthesizer might take the |map| type
+as a specification to unambiguously produce the correct output:
 %
 \begin{code}
 map f ls = case ls of
@@ -145,8 +146,15 @@ map f ls = case ls of
 \end{code}
 %
 
-It isn't clear, however, how such a synthesizer should operate. Iterating over all possible programs, for instance, ???
-However, how can it do so, while being efficient? How to write?
+However, it is not at all obvious how to automate such a synthesis
+procedure in a general setting where functions can make use of
+recursion, algebraic data types and pattern matching. 
+%
+For instance, any naive approach that simply iterates over all
+possible programs (of which there are infinitely many) and checks them against the given specification
+(i.e.,~type-checking) would be very unlikely to find a function that
+matches the user intent in a reasonable time frame. 
+
 % TODO: Bad
 % They can be applied to resource-aware programming such as concurrent programming
 % (e.g. session types for message passing
@@ -161,21 +169,29 @@ generally been overlooked in the literature, despite their long-known potential
 strong proof-theoretic foundations
 \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00}.
 %
-Furthermore, their preciseness
+Their preciseness
 also affects the search space: all programs where a linear resource is used
 non-linearly %(i.e. not exactly once)
 are ill-typed. With linearity built into the synthesis process, usage of a
-linear proposition more than once is not considered, and unused propositions
+linear variable more than once is not considered, and unused variables
 are identified during synthesis, constraining the space of valid programs.
 %
-In this work we aim to bridge this gap -- our contributions are as follows:
+
+In this work we explore the problem of type-based synthesis of
+functional programs using linear types under the lens of the
+Curry-Howard isomorphism. Specifically, in this
+work we employ techniques from linear logic \emph{proof search} as a
+mechanism for program synthesis, leveraging the connection between linearly
+typed functional programs and linear logic proofs. 
+%
+Our contributions are as follows:
 \begin{itemize}
 
 \item We introduce linear types as specifications suitable for synthesis both
 in their expressiveness and conciseness, by example.
 
 \item We present a framework for synthesis of linear types
-(\S~\ref{sec:formal_system}) from specifications based on classical linear
+(\S~\ref{sec:formal_system}) from specifications based on linear
 types extended with recursive algebraic data types, parametric polymorphism and
 refinements, leveraging established proof-search techniques for linear logic
 through the Curry-Howard isomorphism. Specifically, the core of the synthesis
@@ -210,24 +226,32 @@ linearity.
 % Appendix~\ref{sec:examples} lists concrete examples of synthesis with \synname.
 
 
-\section{Synthesis is Proof Search}\label{sec:overview}
+\section{Synthesis as Proof Search}\label{sec:overview}
 
 The Curry-Howard isomorphism~\cite{} describes the fundamental correspondence
 between logic and programming languages: propositions are types, and proofs are
-programs. Under these lens, we can further see proof-search as synthesis --
+programs. Under this lens, we can further see proof-search as synthesis --
 finding a proof \emph{is} generating a program.
 
-A set of typing rules, derivation rules, somehow lead up to focusing set of
-rules...
-
-We can simultaneoulsy specify a typing system and a \emph{bottom-up}
-proof-search algorithm through a set of derivation rules, by ...
-
-However type systems are usually declarative in the sense that at any step of
-the typing derivation multiple rules could be applied, especially considering
-the variables available in the contexts.
-
-However, not all systems are amenable for proof...
+\begin{itemize}
+\item Curry-Howard tens uma correspondencia um para um entre regras
+  logicas e regras tipos.
+\item Neste sentido, um programa pode ser visto como uma representacao
+  compacta de uma prova de uma proposicao logica.
+\item Portanto encontrar programas e o mesmo que encontrar provas.
+\item Tipicamente, a correspondencia CH desenvolve-se entre sistemas
+  logicos ditos de deducao natural ou calculo de sequentes e linguagens funcionais (calculo
+  lambda)
+\item bottom up!
+\item Contudo, um sistema de deducao natural nao descreve por si so um
+  algoritmo para proof search. Exemplo de porque e que e dificil em
+  geral.
+\item Calculos de sequentes sao um passo nessa direccao (subformula
+  property), mas mesmo assim ha muito nao determinismo.
+\item Literatura de ``proof search'' neste contexto passa por
+  focusing, que e uma reformulacao das regras logicas do calculo de
+  sequencia de forma a isolar o nao determinismo.
+\end{itemize}
 
 Our key idea is that linear type systems are not only suitable synthesis
 specifications in their preciseness and expressiveness, but are also and in its
