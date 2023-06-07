@@ -159,9 +159,16 @@ Synthesis with linear types combined with other advanced typing features has
 generally been overlooked in the literature, despite their long-known potential
 \cite{Wadler90lineartypes,DBLP:journals/mscs/CairesPT16,Bernardy_2018} and
 strong proof-theoretic foundations
-\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00},
+\cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00}.
 %
-In this work we aim to bridge this gap -- our contributions are:
+Furthermore, their preciseness
+also affects the search space: all programs where a linear resource is used
+non-linearly %(i.e. not exactly once)
+are ill-typed. With linearity built into the synthesis process, usage of a
+linear proposition more than once is not considered, and unused propositions
+are identified during synthesis, constraining the space of valid programs.
+%
+In this work we aim to bridge this gap -- our contributions are as follows:
 \begin{itemize}
 
 \item We introduce linear types as specifications suitable for synthesis both
@@ -205,12 +212,37 @@ linearity.
 
 \section{Synthesis is Proof Search}\label{sec:overview}
 
- Furthermore, their preciseness
-also affects the search space: all programs where a linear resource is used
-non-linearly %(i.e. not exactly once)
-are ill-typed. With linearity built into the synthesis process, usage of a
-linear proposition more than once is not considered, and unused propositions
-are identified during synthesis, constraining the space of valid programs.
+The Curry-Howard isomorphism~\cite{} describes the fundamental correspondence
+between logic and programming languages: propositions are types, and proofs are
+programs. Under these lens, we can further see proof-search as synthesis --
+finding a proof \emph{is} generating a program.
+
+A set of typing rules, derivation rules, somehow lead up to focusing set of
+rules...
+
+We can simultaneoulsy specify a typing system and a \emph{bottom-up}
+proof-search algorithm through a set of derivation rules, by ...
+
+However type systems are usually declarative in the sense that at any step of
+the typing derivation multiple rules could be applied, especially considering
+the variables available in the contexts.
+
+However, not all systems are amenable for proof...
+
+Our key idea is that linear type systems are not only suitable synthesis
+specifications in their preciseness and expressiveness, but are also and in its
+correspondence with \emph{linear logic}. Due to the stricter discipline
+managing propositions in the typing contexts (linear propositions must be used exactly once), 
+... lead to focusing...
+
+The system comprises of proof search in (intuitionistic) linear logic sequent
+calculus, based on a system of resource
+management~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
+and focusing.
+
+In this section, we present the key idea for synthesizing programs from a
+linear-type-based based specification....
+
 
 % TODO: Better to separate completely the implementation talk from the
 % synthesis framework talk.
@@ -266,18 +298,13 @@ We note that a \emph{sound} set of rules guarantees we cannot synthesize
 incorrect programs; and that the valid programs derivable through them
 reflect the subjective trade-offs we committed to.
 
-\mypara{Core Rules} The system comprises of proof search in
-(intuitionistic) linear logic sequent calculus, based on a system of
-resource management~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
-and focusing.
-
-The core language is a simply-typed linear $\lambda$-calculus with linear
-functions ($\lolli$), additive ($\with$) and multiplicative
-($\tensor$) pairs
-(denoting alternative \emph{vs} simultaneous occurrence of resources),
-multiplicative unit (\textbf{1}), additive sums ($\oplus$)
-and the exponential modality ($\bang$) (to internalize unrestricted
-use of variables). The syntax of terms $(M,N)$ and types $(\tau, \sigma)$ is given below:
+\mypara{Core Rules} The core language for synthesis terms and specifications is
+a simply-typed linear $\lambda$-calculus with linear functions ($\lolli$),
+additive ($\with$) and multiplicative ($\tensor$) pairs (denoting alternative
+\emph{vs} simultaneous occurrence of resources), multiplicative unit
+(\textbf{1}), additive sums ($\oplus$) and the exponential modality ($\bang$),
+to internalize unrestricted use of variables. The syntax of terms $(M,N)$ and
+types $(\tau, \sigma)$ is given below:
 \[
   \begin{array}{lclcc}
     M,N & ::= & u, v & \quad & \\
@@ -317,7 +344,7 @@ the inversion phase ($\Uparrow$), in which we apply \emph{all}
 invertible rules eagerly, and the focusing phase ($\Downarrow$), in
 which we decide a proposition to focus on, and then apply
 non-invertible rules, staying \emph{in focus} until we reach an
-asynchronous (i.e. invertible proposition), the proof is complete, or
+asynchronous/invertible proposition, the proof is complete, or
 no rules are applicable, in which case the proof must \emph{backtrack}
 to the state at which the focusing phase began.  As such, with
 focusing, the linear sequent calculus judgment 
@@ -534,6 +561,14 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
 The rules written above together make the core of our synthesizer. Next, we'll
 present new rules that align and build on top of these to synthesize recursive
 programs from more expressive (richer) types.
+
+\section{Extending Synthesis with Recursion and Polymorphism}
+
+By itself, the core synthesis process can only generate simple non-recursive programs....
+In this section, we extend the synthesis with recursion and polymorphism,
+leaving the realm of completeness of proof search??, and show how we can tame
+non-terminating proof serach??
+Extending the core synthesis process into 
 
 \mypara{Algebraic Data Types} In its simplest form, an algebraic data type (ADT)
 is a tagged sum of any type, i.e. a named type that can be instantiated by one of many
@@ -994,6 +1029,8 @@ $\bang$-ed proposition, and the goal is $\bang$-ed:
     { \Theta/\Theta';\Rho;\Gamma;\Delta; x{:}A\Downarrow\ \vdash M : C}
     {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
 \end{mathpar}
+
+
 
 \section{Results}
 
