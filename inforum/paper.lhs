@@ -2,6 +2,7 @@
 
 \usepackage[dvipsnames]{xcolor}
 \usepackage{xcolor}
+\usepackage{todonotes}
 \usepackage{xargs}
 \usepackage{fancyvrb}
 \usepackage{cmll}
@@ -88,6 +89,13 @@ faster than existing alternatives.
 % resource management policies at the type level
 \end{abstract}
 
+\keywords{
+program synthesis,
+linear logic,
+propositions-as-types,
+proof theory
+}
+
 \section{Introduction}
 
 Program synthesis is the automated or semi-automated process of deriving a
@@ -144,7 +152,6 @@ map f ls = case ls of
   [] -> []
   x:xs -> f x:map f xs
 \end{code}
-%
 
 However, it is not at all obvious how to automate such a synthesis
 procedure in a general setting where functions can make use of
@@ -230,34 +237,87 @@ linearity.
 
 The Curry-Howard isomorphism~\cite{} describes the fundamental correspondence
 between logic and programming languages: propositions are types, and proofs are
-programs. Under this lens, we can further see proof-search as synthesis --
-finding a proof \emph{is} generating a program.
+programs. Under this lens, we can view \emph{bottom-up proof-search as
+synthesis} -- starting from the goal, finding a proof \emph{is} generating a
+program, which is also a compact representation of the proof.
 
-\begin{itemize}
-\item Curry-Howard tens uma correspondencia um para um entre regras
-  logicas e regras tipos.
-\item Neste sentido, um programa pode ser visto como uma representacao
-  compacta de uma prova de uma proposicao logica.
-\item Portanto encontrar programas e o mesmo que encontrar provas.
-\item Tipicamente, a correspondencia CH desenvolve-se entre sistemas
-  logicos ditos de deducao natural ou calculo de sequentes e linguagens funcionais (calculo
-  lambda)
-\item bottom up!
-\item Contudo, um sistema de deducao natural nao descreve por si so um
-  algoritmo para proof search. Exemplo de porque e que e dificil em
-  geral.
-\item Calculos de sequentes sao um passo nessa direccao (subformula
-  property), mas mesmo assim ha muito nao determinismo.
-\item Literatura de ``proof search'' neste contexto passa por
-  focusing, que e uma reformulacao das regras logicas do calculo de
-  sequencia de forma a isolar o nao determinismo.
-\end{itemize}
+Typically, the Curry-Howard correspondence is developed between the so called
+natural deduction logical systems and functional programming languages such as
+the $\lambda$-calculus, where logical rules have a one-to-one mapping to typing rules.
+%
+However, even though a proof in a system of natural deduction can be
+interpreted as a program, by itself, a natural deduction system does not
+describe an algorithm for proof search.
+%
+An example that highlights this is the \emph{modus ponens} rule from
+intuitionistic logic and its analagous \emph{function application} typing rule
+from the simply-typed $\lambda$-calculus:
+%
+\begin{mathpar}
+\infer*[right=]
+{\Gamma \vdash \alpha \rightarrow \beta \and \Gamma \vdash \alpha}
+{\Gamma \vdash \beta}
+\and
+\infer*[right=($\rightarrow$ E)]
+{\Gamma \vdash M : \alpha \rightarrow \beta \and \Gamma \vdash N : \alpha}
+{\Gamma \vdash M~N : \beta}
+\end{mathpar}
+%
+Through the lens of \emph{bottom-up} proof search, one can read ``to find a
+proof of $\beta$ with assumptions $\Gamma$, find a proof of $\alpha \rightarrow
+\beta$ and a proof of $\alpha$ with the same assumptions''. However, an
+algorithm based on these rules would have to come up with an instantiation of
+$\alpha$ for which the proof is complete, which is considerably hard. In
+essence, inference rules in natural deduction are ill-suited for bottom-up
+proof-search since elimination rules work top-down, despite introduction rules working
+bottom-up.
+%
+A more suitable candidate for bottom-up proof search than natural deduction is
+the equivalent \emph{sequent calculus} system in which all inference rules can
+be understood naturally in a bottom-up manner. The \emph{function application}
+rule is instead:
+%
+\begin{mathpar}
+  \infer*[right=($\rightarrow L$)]
+  {\Gamma, f{:}\alpha\rightarrow\beta, x{:}\beta \vdash M : \tau \and \Gamma, f{:}\alpha\rightarrow\beta \vdash N : \alpha}
+  {\Gamma, f{:}\alpha\rightarrow\beta \vdash M[f~N/x] : \tau}
+\end{mathpar}
+%
+which can naturally be read \emph{bottom-up}, through the lens of synthesis
+this time, as ``to synthesize an expression of type $\tau$ when
+$f{:}\alpha\rightarrow\beta$ is in the context, synthesize an argument
+$N{:}\alpha$, and an expression $M{:}\tau$ assuming $x{:}\beta$ in the context -- then
+replace occurrences of $x$ by $f~N$ in $M$''.
+%
+Nevertheless, sequent calculus rules naively considered for proof search still
+deal with excessive non-determinism (e.g.~multiple rules may be applicable, or
+there might be multiple functions in the context, which should we attempt to
+use?).
 
-Our key idea is that linear type systems are not only suitable synthesis
-specifications in their preciseness and expressiveness, but are also and in its
-correspondence with \emph{linear logic}. Due to the stricter discipline
-managing propositions in the typing contexts (linear propositions must be used exactly once), 
-... lead to focusing...
+Andreoli's focusing~\cite{} % for linear logic
+emerges from the literature as a
+technique to discipline proof-search by reformulating the logical rules from
+sequent calculus. Focusing greatly prunes the search space of valid proofs --
+focusing eliminates all of the “don’t care” non-determinism from proof search,
+since the order in which certain rules are applied does not affect the outcome
+of the search, leaving only the non-determinism that pertains to unknowns (or
+“don’t know” non-determinism), identifying precisely the points at which
+backtracking search is necessary.
+
+% TODO: Falamos de linear types antes ou depois? Parece estranho falar de linear types sem ter falado nada deles ainda
+% TODO não falamos de resource management, aparece aqui?
+Our key idea is that linear types, in their correspondence with linear logic,
+form an system well we can consolidate bottom-up proof-search in
+linear logic these concepts into a uniform system of rules that describes
+synthesis of functional programs from linear-type-based specifications, which
+besides being amenable to prof systems
+
+, besides being suitable synthesis specifications
+in their preciseness and expressiveness.
+
+Our key idea is then that putting together 
+
+but are also and in its correspondence with \emph{linear logic}.
 
 The system comprises of proof search in (intuitionistic) linear logic sequent
 calculus, based on a system of resource
@@ -267,6 +327,57 @@ and focusing.
 In this section, we present the key idea for synthesizing programs from a
 linear-type-based based specification....
 
+
+% TODO: Acho que talvez faça mais sentido falar disto noutro sítio, está out-of-place
+% Não estou a imaginar como começar a falar de linear types/logic
+Linear logic~\cite{} can be seen as a resource-aware logic, where propositions
+are interpreted as resources that are consumed during the inference process.
+Where in standard propositional logic we are able to use an assumption as many
+times as we want, in linear logic every resource (i.e., every assumption) must
+be used \emph{exactly once}, or \emph{linearly}.
+%
+% TODO Não gosto deste paragrafo em geral
+Linear types are analogous to linear logic connectives, through the
+Curry-Howard isomorphism. As an example, consider the typing rules for the
+linear function ($\lolli$), the linear counterpart to the common function type,
+and the linear tensor product ($\tensor$), similar to the common product type:
+\begin{mathpar}
+\infer*[right=($\lolli$ R)]
+{\Gamma; \Delta, x{:}\alpha \vdash M : \beta}
+{\Gamma; \Delta \vdash \lambda x. M : \alpha\lolli\beta}
+\and
+\infer*[right=($\tensor$ R)]
+{\Gamma; \Delta_1 \vdash M : \alpha \and \Gamma; \Delta_2 \vdash N : \beta}
+{\Gamma; \Delta_1, \Delta_2 \vdash (M,N) : \alpha\tensor\beta}
+\end{mathpar}
+%
+Note how we have a new context $\Delta$ threading the linear resources...
+
+% \begin{itemize}
+% \item Curry-Howard tens uma correspondencia um para um entre regras
+%   logicas e regras tipos.
+% \item Neste sentido, um programa pode ser visto como uma representacao
+%   compacta de uma prova de uma proposicao logica.
+% \item Portanto encontrar programas e o mesmo que encontrar provas.
+% \item Tipicamente, a correspondencia CH desenvolve-se entre sistemas
+%   logicos ditos de deducao natural ou calculo de sequentes e linguagens funcionais (calculo
+%   lambda)
+% \item bottom up!
+% \item Contudo, um sistema de deducao natural nao descreve por si so um
+%   algoritmo para proof search. Exemplo de porque e que e dificil em
+%   geral.
+% \item Calculos de sequentes sao um passo nessa direccao (subformula
+%   property), mas mesmo assim ha muito nao determinismo.
+% \item Literatura de ``proof search'' neste contexto passa por
+%   focusing, que e uma reformulacao das regras logicas do calculo de
+%   sequencia de forma a isolar o nao determinismo.
+% \end{itemize}
+
+Antes do Core calculus, apresentar linear types (linear function e tensor)
+
+Não é qq sistema de linear logic que serve para síntese
+
+\todo{god}
 
 % TODO: Better to separate completely the implementation talk from the
 % synthesis framework talk.
@@ -321,6 +432,8 @@ theory-driven implementation.
 We note that a \emph{sound} set of rules guarantees we cannot synthesize
 incorrect programs; and that the valid programs derivable through them
 reflect the subjective trade-offs we committed to.
+
+\subsection{Core Language}
 
 \mypara{Core Rules} The core language for synthesis terms and specifications is
 a simply-typed linear $\lambda$-calculus with linear functions ($\lolli$),
@@ -402,17 +515,15 @@ linear context and $\Delta'$ is the output one.
 
 
 Putting together linear logic and linear lambda calculus through the Curry-Howard correspondence, resource
-management, and focusing, we get the following core formal system
+management, and focusing, we get the following core formal system\footnote{For
+the sake of brevity, we've ommitted some rules such as those for the additive
+pair and disjunction. The complete system can be found in the appendice.}
 (inspired by~\cite{DBLP:conf/cade/ChaudhuriP05,fpnotes}) -- in which the
 rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
-context $\Delta$, and inversion context $\Omega$, synthesize a program of type $B$ with
-an additional hypothesis of type $A$ named $x$ in the $\Omega$ context,
-resulting in the program $M$ and output linear
-context $\Delta'$ that cannot contain the added hypothesis $x{:}A$. Finally, the
-resulting program is $\lambda x . M$ and the output linear context is
-$\Delta'$.
-
+context $\Delta$, and inversion context $\Omega$, assume $x{:}A$ in $\Omega$ to
+synthesize a program $M$ of type $B$, and return $\lambda x. M$.
+%
 We start with right invertible rules, which decompose the goal proposition until it's synchronous.
 %
 \begin{mathpar}
@@ -434,7 +545,7 @@ We start with right invertible rules, which decompose the goal proposition until
     \with B \Uparrow}
 
 \end{mathpar}
-
+%
 When we reach a non-invertible proposition on the right, we start inverting the
 $\Omega$ context. The rule to transition to inversion on the left is:
 %
@@ -444,9 +555,10 @@ $\Omega$ context. The rule to transition to inversion on the left is:
     right asynchronous}}
     {\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
 \end{mathpar}
-
+%
 We follow with left invertible rules for asynchronous connectives, which
 decompose asynchronous propositions in $\Omega$.
+%
 \[
   \begin{array}{c}
 
@@ -455,31 +567,31 @@ decompose asynchronous propositions in $\Omega$.
     \and y,z \notin \Delta'}
     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \tensor B \Uparrow\ \vdash\
     \textrm{let}\ y \tensor z = x\ \textrm{in}\ M : C}\\[0.5em]
-    \infer*[right=($1 L$)]
-    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
-    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}1 \Uparrow\ \vdash\ \textrm{let}\
-    \star =
-    x\ \textrm{in}\ M : C}\\[0.5em]
-    \mprset{flushleft}
-    \infer*[right=($\oplus L$)]
-    {
-    \Gamma ; \Delta/ \Delta' ; \Omega, y{:}A \Uparrow\ \vdash M : C \and
-    y \notin \Delta' \\
-    \Gamma ; \Delta/ \Delta'' ; \Omega, z{:}B \Uparrow\ \vdash N : C \\
-    z \notin \Delta'' \\
-    \Delta' = \Delta''
-    }
-    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \oplus B \Uparrow\ \vdash\
-    \textrm{case}\ x\ \textrm{of}\ \textrm{inl}\ y \rightarrow M\ \mid\
-    \textrm{inr}\ z \rightarrow N : C}
-    \\[0.5em]
+    %\infer*[right=($1 L$)]
+    %{\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
+    %{\Gamma ; \Delta/\Delta' ; \Omega, x{:}1 \Uparrow\ \vdash\ \textrm{let}\
+    %\star =
+    %x\ \textrm{in}\ M : C}\\[0.5em]
+    %\mprset{flushleft}
+    %\infer*[right=($\oplus L$)]
+    %{
+    %\Gamma ; \Delta/ \Delta' ; \Omega, y{:}A \Uparrow\ \vdash M : C \and
+    %y \notin \Delta' \\
+    %\Gamma ; \Delta/ \Delta'' ; \Omega, z{:}B \Uparrow\ \vdash N : C \\
+    %z \notin \Delta'' \\
+    %\Delta' = \Delta''
+    %}
+    %{\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \oplus B \Uparrow\ \vdash\
+    %\textrm{case}\ x\ \textrm{of}\ \textrm{inl}\ y \rightarrow M\ \mid\
+    %\textrm{inr}\ z \rightarrow N : C}
+    %\\[0.5em]
     \infer*[right=($\bang L$)]
     {\Gamma, y{:}A ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}\bang A \Uparrow\ \vdash\
     \textrm{let}\ \bang y = x\ \textrm{in}\ M : C}
 \end{array}
 \]
-
+%
 When we find a synchronous (i.e. non-invertible) proposition in $\Omega$,
 we simply move it to the linear context $\Delta$, and keep inverting on the left:
 \begin{mathpar}
@@ -488,7 +600,7 @@ we simply move it to the linear context $\Delta$, and keep inverting on the left
     \textrm{not left asynchronous}}
     {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
 \end{mathpar}
-
+%
 After inverting all the asynchronous propositions in $\Omega$ we'll reach a state
 where there are no more propositions to invert ($\Gamma'; \Delta'; \cdot
 \Uparrow\ \vdash C$). At this point, we want to \emph{focus} on a proposition.
@@ -496,6 +608,7 @@ The focus object will be: the proposition on the right (the
 goal), a proposition from the linear $\Delta$ context, or a proposition from the
 unrestricted $\Gamma$ context. For these options we have three \emph{decision}
 rules:
+%
 \[
   \begin{array}{c}
     \infer*[right=(decideR)]
@@ -510,7 +623,7 @@ rules:
     {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
   \end{array}
   \]
-
+%
 The decision rules are followed by either left or right focus rules.
 To illustrate, consider the $\lolli$L left focus rule. The rule
 states that to produce a program of type $C$ while left focused on
@@ -529,16 +642,16 @@ albeit the goal and sub-goals are under focus (except for $\bang R$).
     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C \and \Gamma;
     \Delta'/\Delta''; \cdot \vdash N : A \Uparrow}
     {\Gamma; \Delta/\Delta''; x{:}A \lolli B \Downarrow\ \vdash M\{(x\,N)/y\} : C}
+%\and
+%    \infer*[right=($\with L_1$)]
+%    {\Gamma; \Delta/\Delta'; y{:}A \Downarrow\ \vdash M : C}
+%    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{fst}\ x)/y\} : C}
+%\and
+%    \infer*[right=($\with L_2$)]
+%    {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C}
+%    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash
+%      M\{(\textrm{snd}\ x)/y\} : C}
 \and
-    \infer*[right=($\with L_1$)]
-    {\Gamma; \Delta/\Delta'; y{:}A \Downarrow\ \vdash M : C}
-    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{fst}\ x)/y\} : C}
-\and
-    \infer*[right=($\with L_2$)]
-    {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C}
-    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash
-      M\{(\textrm{snd}\ x)/y\} : C}
-    \and
     \infer*[right=($\tensor R$)]
     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
     : B \Downarrow}
@@ -547,18 +660,18 @@ albeit the goal and sub-goals are under focus (except for $\bang R$).
     \infer*[right=($1 R$)]
     { }
     {\Gamma; \Delta/\Delta \vdash \star : \textbf{1} \Downarrow}
-\and
-    \infer*[right=($\oplus R_1$)]
-    {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow}
-    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inl}\ M : A \oplus B \Downarrow}
-\and
-    \infer*[right=($\oplus R_2$)]
-    {\Gamma; \Delta/\Delta' \vdash M : B \Downarrow}
-    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inr}\ M : A \oplus B \Downarrow}
-\and
-    \infer*[right=($\bang R$)]
-    {\Gamma; \Delta/\Delta'; \cdot \vdash M : A \Uparrow \and \Delta = \Delta'}
-    {\Gamma; \Delta/\Delta \vdash \bang M : \bang A \Downarrow}
+%\and
+%    \infer*[right=($\oplus R_1$)]
+%    {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow}
+%    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inl}\ M : A \oplus B \Downarrow}
+%\and
+%    \infer*[right=($\oplus R_2$)]
+%    {\Gamma; \Delta/\Delta' \vdash M : B \Downarrow}
+%    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inr}\ M : A \oplus B \Downarrow}
+%\and
+%    \infer*[right=($\bang R$)]
+%    {\Gamma; \Delta/\Delta'; \cdot \vdash M : A \Uparrow \and \Delta = \Delta'}
+%    {\Gamma; \Delta/\Delta \vdash \bang M : \bang A \Downarrow}
 \end{mathpar}
 %
 Eventually, the focus proposition will no longer be synchronous, i.e. it's
@@ -582,28 +695,35 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
 
 \end{array}
 \]
+%
 The rules written above together make the core of our synthesizer. Next, we'll
 present new rules that align and build on top of these to synthesize recursive
 programs from more expressive (richer) types.
 
-\section{Extending Synthesis with Recursion and Polymorphism}
+\section{Beyond Propositional Logic}
 
-By itself, the core synthesis process can only generate simple non-recursive programs....
+By itself, the core synthesis process can only generate simple non-recursive
+programs.
 In this section, we extend the synthesis with recursion and polymorphism,
 leaving the realm of completeness of proof search??, and show how we can tame
 non-terminating proof serach??
 Extending the core synthesis process into 
+\todo{intro to section, mention algebraic data types and recursion as a whole
+(text that follows it assumes both have been announced), and polymorphism}
 
-\mypara{Algebraic Data Types} In its simplest form, an algebraic data type (ADT)
-is a tagged sum of any type, i.e. a named type that can be instantiated by one of many
-tags (or constructors) that take some value of  a fixed type, which might
-be, e.g., a product type ($A \tensor B$), or unit ($1$), in practice allowing
-for constructors with an arbitrary number of parameters. In the \synname\
-language, the programmer can define custom ADTs; as an example, we show the
-definition of an ADT which holds zero, one, or two
-values of type $A$, using the syntax: |data Container
-= None 1 mid One A mid Two (A * A)|. The grammar is extended as (where $C$ is an ADT
-constructor and $T$ is an ADT):
+In its simplest form, an algebraic data type (ADT) is a tagged sum of any type,
+i.e. a named type that can be instantiated by one of many tags (or
+constructors) that take some value of  a fixed type, which might be, e.g., a
+product type ($A \tensor B$), or unit ($1$), in practice allowing for
+constructors with an arbitrary number of parameters.
+%
+%In the \synname\
+%language, the programmer can define custom ADTs; as an example, we show the
+%definition of an ADT which holds zero, one, or two
+%values of type $A$, using the syntax: |data Container = None 1 mid One A mid Two (A * A)|.
+%
+The grammar of our core calculus is extended as (where $C_n$ constructs values of some type $T$):
+%
 \[
 \begin{array}{lclc}
     M,N & ::= & \dots\ \vert\ \emph{C}_n\ M\ \vert\ (\mathsf{case}\ M\ \mathsf{of}\ \dots\ \vert\ \emph{C}_n\ u \Rightarrow N) \\
@@ -612,17 +732,25 @@ constructor and $T$ is an ADT):
 % $\vert$\ $\dots$\ $\vert$\ $\emph{Cons}_n\ \tau$) \\
 \end{array}
 \]
-
-The semantics of ADTs relate to those of the plus ($\oplus$) type -- both are
-additive disjunctions.  To construct a value of an ADT we must use one of its
-constructors, similar to the way $\oplus$ requires only proof of either the left
-or right type it consists of. Analogously, we can deconstruct a value of an ADT
-via pattern matching on its constructors, where all branches of the pattern
-match must have the same type -- akin to the left rule for the $\oplus$
-connective. In effect, the inference rules for a simple ADT are a generalized
-form of the $\oplus$ rules.  Therefore, there's one left rule for ADTs, and an
-arbitrary number of right rules, one for each constructor, where ADT $T$ and
-its constructors stand for any ADT defined as |data T = C1 X1 mid C2 X2 mid ... mid Cn Xn|:
+%
+Algebraic data types are closely related to the ($\oplus$) type -- both are
+additive disjunctions. There is a right rule for each constructor of the data
+type, each requiring only that a term is synthesized for the argument of the
+constructor; and there is one left rule to deconstruct an ADT term in the
+context by pattern matching on it, requiring a term of the same type to be
+synthesized for each possible branch -- akin to the left rule for the $\oplus$
+connective. Naively, one might consider the rules:
+%
+%The semantics of ADTs relate to those of the plus ($\oplus$) type -- both are
+%additive disjunctions.  To construct a value of an ADT we must use one of its
+%constructors, similar to the way $\oplus$ requires only proof of either the left
+%or right type it consists of. Analogously, we can deconstruct a value of an ADT
+%via pattern matching on its constructors, where all branches of the pattern
+%match must have the same type -- akin to the left rule for the $\oplus$
+%connective. In effect, the inference rules for a simple ADT are a generalized
+%form of the $\oplus$ rules.  Therefore, there's one left rule for ADTs, and an
+%arbitrary number of right rules, one for each constructor, where ADT $T$ and
+%its constructors stand for any ADT defined as |data T = C1 X1 mid C2 X2 mid ... mid Cn Xn|:
 %
 \begin{mathpar}
     \infer*[right=(adtR)]
@@ -632,19 +760,19 @@ its constructors stand for any ADT defined as |data T = C1 X1 mid C2 X2 mid ... 
     \mprset{flushleft}
     \infer*[right=(adtL)]
     {
-        \Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
-        \and
-        y_1 \notin \Delta'_1
+        %\Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
+        %\and
+        %y_1 \notin \Delta'_1
+        %\\
+        %\Gamma ; \Delta/ \Delta'_2 ; \Omega, y_2{:}X_2 \Uparrow\ \vdash M_2 : C
+        %\\
+        %y_2 \notin \Delta'_2
+        %\\\\
+        %\\ \dots
+        %\\
+        \overline{\Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C}
         \\
-        \Gamma ; \Delta/ \Delta'_2 ; \Omega, y_2{:}X_2 \Uparrow\ \vdash M_2 : C
-        \\
-        y_2 \notin \Delta'_2
-        \\\\
-        \\ \dots
-        \\
-        \Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
-        \\
-        y_n \notin \Delta'_n
+        \overline{y_n \notin \Delta'_n}
         \\
         \Delta'_1 = \Delta'_2 = \dots = \Delta'_n
     }
@@ -652,15 +780,21 @@ its constructors stand for any ADT defined as |data T = C1 X1 mid C2 X2 mid ... 
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ \mid\ C_n\ y_n
     \rightarrow M_n : C}
 \end{mathpar}
-
+%
 % repetition does not legitimize :p
-
-A more general formulation of ADTs says an ADT can be recursive (or
-"inductively defined"), meaning constructors can take as arguments
-values of the type they are defining. This change has
-a significant impact in the synthesis process. Take, for instance, the ADT
-defined as |data T = C1 T|, the synthesis goal
-$T \lolli C$, and part of its derivation:
+%
+%A more general formulation of ADTs says an ADT can be recursive (or
+%"inductively defined"), meaning constructors can take as arguments
+%values of the type they are defining. This change has
+%a significant impact in the synthesis process. Take, for instance, the ADT
+%defined as |data T = C1 T|, the synthesis goal
+%$T \lolli C$, and part of its derivation:
+However, for recursively defined data types, i.e. for constructors that take as
+an argument a value of the type they construct, synthesis applying the naive
+ADT rules will not terminate, both when constructing and deconstructing data
+types. Consider, for example, type $T$ and its sole constructor $C_1$. When
+constructing a derivation for a goal $T \lolli D$, we could infinitely apply
+\textsc{adtL}:
 %
 {\small
 \begin{mathpar}
@@ -671,18 +805,17 @@ $T \lolli C$, and part of its derivation:
             \infer*[right=(adtL)]
             {\dots}
             {\Gamma; \Delta/\Delta'; \Omega, y{:}T \Uparrow\ \vdash \textrm{case}\ y\ 
-            \textrm{of}\ C_1\ z \rightarrow \dots : C}
+            \textrm{of}\ C_1\ z \rightarrow \dots : D}
         }
         {\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash \textrm{case}\ x\ 
-        \textrm{of}\ C_1\ y \rightarrow \dots : C}
+        \textrm{of}\ C_1\ y \rightarrow \dots : D}
     }
-    {\Gamma; \Delta/\Delta'; \Omega, x{:}T \vdash \dots : C
+    {\Gamma; \Delta/\Delta'; \Omega, x{:}T \vdash \dots : D
     \Uparrow}
 \end{mathpar}}
 %
-Using our current system, we are to apply an infinite number of times
-(\textsc{adtL}), never closing the proof. Symmetrically, the
-derivation for goal $T$ is also infinite.
+Symmetrically, the derivation for goal $T$ is also infinite, since we can apply
+\textsc{adtR} infinitely, never closing the proof.
 %
 {\small
 \begin{mathpar}
@@ -699,17 +832,18 @@ derivation for goal $T$ is also infinite.
     {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
 \end{mathpar}}
 %
-To account for this situation, we impede the decomposition of an ADT in subsequent
-proofs of its branches, and, symmetrically, don't allow construction of an
-ADT when trying to synthesize an argument for its constructor.
+To account for recursively defined data types, we restrict their decomposition
+in proofs for the branches of the first decomposition, and, symmetrically,
+disallow construction of data types when trying to synthesize an argument for
+their constructors.
 %
 %
-For this, we need two more contexts, $\Rho_C$
-for constraints on construction and $\Rho_D$ for constraints on
-deconstruction. Together, they hold a list of ADTs that cannot be constructed or
-deconstructed at a given point in the proof. For convenience, they are represented by a single $\Rho$ if
-unused. All non-ADT rules trivially propagate these. The ADT rules
-are then extended as follows, where $\Rho'_C = \Rho_C,T$ if $T$ is
+For this, we need two more contexts, $\Rho_C$ for constraints on construction
+and $\Rho_D$ for constraints on deconstruction. Together, they hold a list of
+data types that cannot be constructed or deconstructed at a given point in the
+proof. For convenience, they are represented by a single $\Rho$ if unused. All
+non-ADT rules trivially propagate these. The ADT rules are then extended to
+account for recursiveness as follows, where $\Rho'_C = \Rho_C,T$ if $T$ is
 recursive and $\Rho'_C = \Rho_C$ otherwise ($\Rho'_D$ is dual):
 %
 %TODO: ... we can actually instance ADTs that take no arguments even if they are restricted
@@ -723,19 +857,20 @@ recursive and $\Rho'_C = \Rho_C$ otherwise ($\Rho'_D$ is dual):
     \mprset{flushleft}
     \infer*[right=(adtL)]
     {
+        \overline{(\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C}
+        \and
+        %\\
+        %(\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
+        %\and
+        %y_1 \notin \Delta'_1
+        %\\\\
+        %\\ \dots
+        %\\\\
+        \overline{y_n \notin \Delta'_n}
+        \and
         T \notin \Rho_D
         \and
-        \Delta'_1 = \dots = \Delta'_n 
-        \\
-        (\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
-        \and
-        y_1 \notin \Delta'_1
-        \\\\
-        \\ \dots
-        \\\\
-        (\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
-        \and
-        y_n \notin \Delta'_n
+        {\Delta'_1 = \dots = \Delta'_n}
     }
     {(\Rho_C; \Rho_D); \Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ \mid\ C_n\ y_n
@@ -753,7 +888,7 @@ These modifications prevent the infinite derivations in the scenarios
 described above. However, they also greatly limit the space of
 derivable programs, leaving the synthesizer effectively unable to
 synthesize from specifications with recursive types. To prevent this,
-we add three rules to complement the restrictions on construction
+we add two rules to complement the restrictions on construction
 and destruction of recursive types.
 %
 First, since we can't deconstruct some ADTs any further because of a restriction,
@@ -764,8 +899,7 @@ Second, without any additional rules, an ADT in the linear context
 will loop back to the inversion context, jumping back and forth
 between the two contexts; instead, when focusing on an ADT, we should
 either instantiate the goal (provided they're the same type), or switch
-to inversion if and only if its decomposition isn't restricted. The
-three following rules ensure this:
+to inversion if and only if its decomposition isn't restricted:
 
 \begin{mathpar}
     \infer*[right=(adt$\Uparrow$L)]
@@ -776,10 +910,11 @@ three following rules ensure this:
     }
     {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}
     \and
-    \infer*[right=(adt-init)]
-    {  }
-    {\Rho; \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash x : T}
-    \and
+    % ROMES: This one is just equal to (INIT), no point in having a new one.
+    %\infer*[right=(adt-init)]
+    %{  }
+    %{\Rho; \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash x : T}
+    %\and
     \infer*[right=(adt$\Downarrow$L)]
     {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Uparrow\ \vdash M :
     T \and T \notin \Rho_D}
@@ -796,22 +931,17 @@ once, and that subsequent equal ADTs will only be useable from the linear
 context -- essentially forcing them to be used to instantiate another proposition,
 which will typically be an argument for the recursive call.
 
-
-\mypara{Recursion} The main idea behind synthesis of recursive
-programs is the labeling of the main goal and the addition of its
-type, under that name, to the unrestricted context. That is, to
-synthesize a recursive function of type $A \lolli B$ named \emph{f},
-the initial judgment can be written as
+To synthesize recursive functions, we can simply label the main goal and extend
+the unrestricted context with it. That is, to synthesize a recursive function
+of type $A \lolli B$ named \emph{f}, the
+initial judgment can be written as
 \begin{mathpar}
-    \infer
-    {\dots}
-    {\Gamma, f{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M :
-    A \lolli B \Uparrow}
+    \Gamma, f{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M : A \lolli B \Uparrow
 \end{mathpar}
 and, by definition, all subsequent inference rules will have
 ($f{:}A \lolli B$) in the $\Gamma$ context too.
-We can also force the usage of the recursive call by adding it not only to the
-unrestricted context, but to the linear one as well.
+We can also trivially force recursion to be used by adding the name to the
+linear context as well.
 %
 However, we must restrict immediate uses of the recursive call since
 otherwise every goal would have a trivial proof (a non-terminating
@@ -820,13 +950,17 @@ Instead, our framework allows the use of recursion only after having
 deconstructed a recursive ADT via the following invariant: the
 recursive hypothesis can only be used in \emph{recursive branches of
   ADT deconstruction}, i.e. the recursive call should only take
-``smaller'', recursive, hypothesis as arguments. To illustrate, in any
-recursive function with a list argument (whose type is defined as
-|data List = Nil mid Cons (A * List)|), recursive
-calls are only allowed when considering a judgment of the form
-$\textrm {List} \vdash C$, i.e.~when a list value is available to
-produce the goal $C$, and only in the \emph{Cons}
-branch. Furthermore, we also forbid the usage of the recursive function when
+``smaller'', recursive, hypothesis as arguments.
+%
+%To illustrate, in any
+%recursive function with a list argument (whose type is defined as
+%|data List = Nil mid Cons (A * List)|), recursive
+%calls are only allowed when considering a judgment of the form
+%$\textrm {List} \vdash C$, i.e.~when a list value is available to
+%produce the goal $C$, and only in the \emph{Cons}
+%branch.
+%
+Furthermore, we also forbid the usage of the recursive function when
 synthesizing arguments to use it.
 % TODO : não sei se precisa de melhor explicação mas foi uma coisa que fiz para
 % não gerar um programa recursivo.
@@ -859,10 +993,13 @@ $\tau'$ is an \emph{instantiation} of type scheme $\forall \overline{\alpha}.\
 As such, the construction of a derivation in which the only rule that can derive
 an atom is the \textsc{init} rule corresponds to the synthesis of a program
 where some expressions are treated agnostically (nothing constrains their type),
-i.e.~a polymorphic program. The simplest example is the polymorphic function
-\emph{id} of type $\forall \alpha .\ \alpha \lolli \alpha$. The program
-synthesized from that specification is $\lambda x . x$, a lambda abstraction
-that does not constrain the type of its parameter $x$ in any way.
+i.e.~a polymorphic program.
+%
+% TODO Cut?
+%The simplest example is the polymorphic function
+%\emph{id} of type $\forall \alpha .\ \alpha \lolli \alpha$. The program
+%synthesized from that specification is $\lambda x . x$, a lambda abstraction
+%that does not constrain the type of its parameter $x$ in any way.
 
 The main challenge of polymorphism in synthesis is the usage of schemes from the
 unrestricted context.  To begin with, $\Gamma$ now holds both (monomorphic)
@@ -887,8 +1024,8 @@ Note that we instantiate the scheme with \emph{existential} type variables
 ($?\alpha$) rather than just type variables ($\alpha$) since the latter
 represent universal types during synthesis, and the former represent a concrete
 instance of a scheme, that might induce constraints on other type variables.
-Additionally, we require that all existential type variables are assigned a
-type. These concepts are formalized with the following rules, where $\forall
+Additionally, we require that all existential type variables are eventually assigned a
+concrete type. These concepts are formalized with the following rules, where $\forall
 \overline{\alpha}.\ \tau \sqsubseteq_E \tau'$ means type $\tau'$
 is an \emph{existential instantiation} of scheme $\forall \overline{\alpha}.\ \tau$,
 $\textrm{ftv}_E(\tau')$ is the set of free \emph{existential} type variables in
@@ -921,139 +1058,224 @@ constrain $c$ can be unified with those in $\Theta$:
 \end{mathpar}
 
 
-\mypara{Further Challenges} We now consider two more sources of infinite
-recursion in the synthesis process. The first is the use of an unrestricted
-function to synthesize a term of type $\tau$ that in turn will require a term of
-the same type $\tau$. An example is the sub-goal judgment $(a \lolli
-b \lolli b); (a \lolli b \lolli b) \Downarrow\ \vdash b$ that
-appears while synthesizing \emph{foldr} -- we apply ($\lolli$L)
-until we can use \textsc{init} ($b \Downarrow\ \vdash b$), and then we must
-synthesize an argument of type $b$. Without any additional restrictions, we
-may become again left focused on $(a \lolli b \lolli b)$, and again require $b$,
-and on and on. The solution will be to disallow the usage of the same function
-to synthesize the same goal a second time further down in the derivation.
-
-The other situation occurs when using an unrestricted polymorphic function that
-requires synthesis of a term with an existential type when the goal is an
-existential type. In contrast to the previous problem, the type of the goal and
-of the argument that will cause the loop won't match exactly, since instantiated
-bound variables are always fresh. For example, for $\forall \alpha,\beta .\
-\alpha\lolli\beta\lolli\beta;?\alpha\lolli?\beta\lolli?\beta \Downarrow\ \vdash\
-?\sigma$, we'll unify $?\beta$ with $?\sigma$, and then require a term of type
-$?\beta$ (not $?\sigma$). We want to forbid the usage of the \emph{same}
-function to attain \emph{any} existential goal, provided that function might
-create existential sub-goals (i.e. it's polymorphic). However, we noticed that,
-even though for most tried problems this ``same function'' approach worked,
-context-heavy problems such as \emph{array} (seen in \S~\ref{sec:overview})
-wouldn't terminate in a reasonable amount of time.
+% ROMES: NOTE: Leave it be, its details. Fits in the appendice
+% TODO: We could add to the appendice all these extra rules for better synthesis, including refinements.
 %
-% In fact, with $n$ polymorphic functions in the unrestricted context, the
-% complexity of searching for a program of any existential type $?\alpha$, while
-% restricting solely the used function, is $O(n!)$~\ref{exemplo_apendice?}.
+%\mypara{Further Challenges} We now consider two more sources of infinite
+%recursion in the synthesis process. The first is the use of an unrestricted
+%function to synthesize a term of type $\tau$ that in turn will require a term of
+%the same type $\tau$. An example is the sub-goal judgment $(a \lolli
+%b \lolli b); (a \lolli b \lolli b) \Downarrow\ \vdash b$ that
+%appears while synthesizing \emph{foldr} -- we apply ($\lolli$L)
+%until we can use \textsc{init} ($b \Downarrow\ \vdash b$), and then we must
+%synthesize an argument of type $b$. Without any additional restrictions, we
+%may become again left focused on $(a \lolli b \lolli b)$, and again require $b$,
+%and on and on. The solution will be to disallow the usage of the same function
+%to synthesize the same goal a second time further down in the derivation.
 %
-As such, we'll instead define that, given an existential\footnote{a type 
-is existential when any of its components is an existential type variable} goal $C$,
-we can only ``decide left!'' on a proposition $A$ if, altogether, 
-the amount of times we've ``decided left!'' on an polymorphic function to produce
-an existential goal is less than a \emph{constant ``existential depth''} $d_e$
-(which controls a \emph{depth} aspect of the synthesis process).
+%The other situation occurs when using an unrestricted polymorphic function that
+%requires synthesis of a term with an existential type when the goal is an
+%existential type. In contrast to the previous problem, the type of the goal and
+%of the argument that will cause the loop won't match exactly, since instantiated
+%bound variables are always fresh. For example, for $\forall \alpha,\beta .\
+%\alpha\lolli\beta\lolli\beta;?\alpha\lolli?\beta\lolli?\beta \Downarrow\ \vdash\
+%?\sigma$, we'll unify $?\beta$ with $?\sigma$, and then require a term of type
+%$?\beta$ (not $?\sigma$). We want to forbid the usage of the \emph{same}
+%function to attain \emph{any} existential goal, provided that function might
+%create existential sub-goals (i.e. it's polymorphic). However, we noticed that,
+%even though for most tried problems this ``same function'' approach worked,
+%context-heavy problems such as \emph{array} (seen in \S~\ref{sec:overview})
+%wouldn't terminate in a reasonable amount of time.
+%%
+%% In fact, with $n$ polymorphic functions in the unrestricted context, the
+%% complexity of searching for a program of any existential type $?\alpha$, while
+%% restricting solely the used function, is $O(n!)$~\ref{exemplo_apendice?}.
+%%
+%As such, we'll instead define that, given an existential\footnote{a type 
+%is existential when any of its components is an existential type variable} goal $C$,
+%we can only ``decide left!'' on a proposition $A$ if, altogether, 
+%the amount of times we've ``decided left!'' on an polymorphic function to produce
+%an existential goal is less than a \emph{constant ``existential depth''} $d_e$
+%(which controls a \emph{depth} aspect of the synthesis process).
+%%
+%% This approach reduces the complexity of our proof-search algorithm for
+%% existential types to $O(\tfrac{n!}{d_e!}) = O(n^{d_e})$.
 %
-% This approach reduces the complexity of our proof-search algorithm for
-% existential types to $O(\tfrac{n!}{d_e!}) = O(n^{d_e})$.
-
-Extending the restrictions context ($\Rho$) with restrictions on using the
-unrestricted context ($\Rho_{L!}$), we modify \textsc{decideLeft!} to formalize
-the two previous paragraphs, where $\textsc{isExist}(C)$ is true if $C$ is an
-existential type, $\textsc{isPoly}(f)$ is true if $f$ is universally
-quantified (i.e. $f$ has form $\forall\overline{\alpha} f'$), and
-$\Rho_{L!}' = \Rho_{L!},(A, C)$ if $A$ is a function and $\Rho_{L!}' =
-\Rho_{L!}$ otherwise:
+%Extending the restrictions context ($\Rho$) with restrictions on using the
+%unrestricted context ($\Rho_{L!}$), we modify \textsc{decideLeft!} to formalize
+%the two previous paragraphs, where $\textsc{isExist}(C)$ is true if $C$ is an
+%existential type, $\textsc{isPoly}(f)$ is true if $f$ is universally
+%quantified (i.e. $f$ has form $\forall\overline{\alpha} f'$), and
+%$\Rho_{L!}' = \Rho_{L!},(A, C)$ if $A$ is a function and $\Rho_{L!}' =
+%\Rho_{L!}$ otherwise:
+%%
+%\begin{mathpar}
+%    \mprset{flushleft}
+%    \infer*[right=(decideL!)]
+%    {
+%    (A, C) \notin \Rho_{L!}
+%    \\
+%    \textsc{isExist}(C) \Rightarrow \bararound{\{u\ \mid\ (f,u)\in\Rho_{L!},\textsc{isPoly}(f),\textsc{isExist}(u)\}} < d_e
+%    \\
+%    \Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!}');\Gamma, A; \Delta/\Delta' ; A
+%    \Downarrow\ \vdash C
+%    }
+%    {\Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!});\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+%    \\
+%\end{mathpar}
 %
-\begin{mathpar}
-    \mprset{flushleft}
-    \infer*[right=(decideL!)]
-    {
-    (A, C) \notin \Rho_{L!}
-    \\
-    \textsc{isExist}(C) \Rightarrow \bararound{\{u\ \mid\ (f,u)\in\Rho_{L!},\textsc{isPoly}(f),\textsc{isExist}(u)\}} < d_e
-    \\
-    \Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!}');\Gamma, A; \Delta/\Delta' ; A
-    \Downarrow\ \vdash C
-    }
-    {\Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!});\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
-    \\
-\end{mathpar}
+%\mypara{Polymorphic ADTs} To allow type parameters and the use of universally quantified type
+%variables in ADT constructors, we must guarantee that the
+%\textsc{adt-init} rule can unify the type parameters and that when constructing or
+%destructing an ADT, type variables in constructor parameters are substituted by
+%the actual type (i.e. to construct |List Int| with
+%|data List a = Cons (a * List a)|, we wouldn't try to synthesize |(a * List a)|,
+%but rather |(Int * List Int)|). To unify $T_{\overline\alpha}$ with $T_{\overline\beta}$,
+%the sets of type parameters $\overline\alpha$ and $\overline\beta$ must satisfy $\bararound{\overline\alpha} = \bararound{\overline\beta}$
+%together with $\forall i\ 0 \leq i \land i < \bararound{\overline\alpha} \land
+%\textsc{unify}(\overline\alpha_i \mapsto \overline\beta_i)$. The constructor
+%type substitution needn't be explicit in the rule:
+%\begin{mathpar}
+%    \infer*[right=(adt-init)]
+%    {\textsc{unify}(T_{\overline\alpha} \mapsto T_{\overline\beta}, \Theta)}
+%    {\Theta/\Theta,T_{\overline\alpha} \mapsto T_{\overline\beta},\Rho; \Gamma; \Delta/\Delta'; x{:}T_{\overline\alpha} \Downarrow\ \vdash x :
+%    T_{\overline\beta}}
+%\end{mathpar}
 
-\mypara{Polymorphic ADTs} To allow type parameters and the use of universally quantified type
-variables in ADT constructors, we must guarantee that the
-\textsc{adt-init} rule can unify the type parameters and that when constructing or
-destructing an ADT, type variables in constructor parameters are substituted by
-the actual type (i.e. to construct |List Int| with
-|data List a = Cons (a * List a)|, we wouldn't try to synthesize |(a * List a)|,
-but rather |(Int * List Int)|). To unify $T_{\overline\alpha}$ with $T_{\overline\beta}$,
-the sets of type parameters $\overline\alpha$ and $\overline\beta$ must satisfy $\bararound{\overline\alpha} = \bararound{\overline\beta}$
-together with $\forall i\ 0 \leq i \land i < \bararound{\overline\alpha} \land
-\textsc{unify}(\overline\alpha_i \mapsto \overline\beta_i)$. The constructor
-type substitution needn't be explicit in the rule:
-\begin{mathpar}
-    \infer*[right=(adt-init)]
-    {\textsc{unify}(T_{\overline\alpha} \mapsto T_{\overline\beta}, \Theta)}
-    {\Theta/\Theta,T_{\overline\alpha} \mapsto T_{\overline\beta},\Rho; \Gamma; \Delta/\Delta'; x{:}T_{\overline\alpha} \Downarrow\ \vdash x :
-    T_{\overline\beta}}
-\end{mathpar}
+%\mypara{Refinement Types} Refinement types are types with a predicate (a non-existing predicate is the same as it
+%being \emph{true}); dependent types are functions with
+%refinement types in which the argument type is labeled and said label can be used in the predicates
+%of the return type (e.g. $(x : \mathsf{Int}) \lolli \{y : \mathsf{Int}\ \vert\ y = x\}$ specifies a function that
+%takes an Int and returns an Int of equal value). We extend
+%the types syntax with our refinement types:
+%\[
+%\begin{tabular}{lclc}
+%    $\tau$ & $\ ::=\ $ & $ \dots \vert\  (x:\tau) \lolli \sigma\ \vert\  \{x:\tau\ \vert\ P\}$ \\
+%    $P$ & $\ ::=\ $ & $P = P\ \vert\ P \neq P\ \vert\ P \vee P\ \vert\ P \wedge
+%    P\ \vert\ P \Rightarrow P\ \vert\ n = n\ \vert\ n \neq n$ \\
+%    & & $\vert\ n \leq n\ \vert\ n \geq n\ \vert\ n < n\ \vert\ n > n\ \vert\
+%    true\ \vert\ false\ \vert\ x$ \\
+%    $n$ & $\ ::=\ $ & $n * n\ \vert\ n + n\ \vert\ n - n\ \vert\
+%    \langle\emph{natural}\rangle\ \vert\ x$
+%    \\
+%\end{tabular}
+%\]
+%The addition of refinement types to the synthesizer doesn't
+%interfere with the rest of the process. We define the following right and
+%left rule, to synthesize or consume in synthesis a refinement type, where
+%$\textsc{getModel}(p)$ is a call to an SMT solver that returns a model of an
+%uninterpreted function that satisfies
+%$\forall_{a,b,\dots,n}\ h_{a} \Rightarrow h_{b} \Rightarrow \dots
+%\Rightarrow h_{n} \Rightarrow p$, where $n$ is the refinement type label
+%and $h_{n}$ its predicate, with $a,\dots,n$ standing for the label of every refinement type
+%in the propositional contexts;
+%and $\textsc{sat}(p_{a} \Rightarrow p_{b})$ is a call to an SMT solver that
+%determines universal satisfiability of the implication between predicates (the
+%left focused proposition subtypes the goal).
+%\begin{mathpar}
+%    \infer*[right=(refR)]
+%    { \textsc{getModel}(p) = M }
+%    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta' \vdash M : \{a : A\ \vert\
+%    p\}\Uparrow }
+%    \and
+%    \infer*[right=(refL)]
+%    { \textsc{sat}(p_{a} \Rightarrow p_{b}) }
+%    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta'; x{:}(\{a : A\ \vert\
+%    p_{a}\})\Downarrow\ \vdash x : \{b : A\ \vert\ p_{b}\} }
+%\end{mathpar}
+%
+%
+%\mypara{Fast path} To speed up the process and get a cleaner %and sometimes more correct
+%output, we add a rule that lets us ``skip some rules'' if left focused on a
+%$\bang$-ed proposition, and the goal is $\bang$-ed:
+%\begin{mathpar}
+%    \infer*[right=($\bang\Downarrow$L)]
+%    { \Theta/\Theta';\Rho;\Gamma;\Delta; x{:}A\Downarrow\ \vdash M : C}
+%    {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
+%\end{mathpar}
 
-\mypara{Refinement Types} Refinement types are types with a predicate (a non-existing predicate is the same as it
-being \emph{true}); dependent types are functions with
-refinement types in which the argument type is labeled and said label can be used in the predicates
-of the return type (e.g. $(x : \mathsf{Int}) \lolli \{y : \mathsf{Int}\ \vert\ y = x\}$ specifies a function that
-takes an Int and returns an Int of equal value). We extend
-the types syntax with our refinement types:
-\[
-\begin{tabular}{lclc}
-    $\tau$ & $\ ::=\ $ & $ \dots \vert\  (x:\tau) \lolli \sigma\ \vert\  \{x:\tau\ \vert\ P\}$ \\
-    $P$ & $\ ::=\ $ & $P = P\ \vert\ P \neq P\ \vert\ P \vee P\ \vert\ P \wedge
-    P\ \vert\ P \Rightarrow P\ \vert\ n = n\ \vert\ n \neq n$ \\
-    & & $\vert\ n \leq n\ \vert\ n \geq n\ \vert\ n < n\ \vert\ n > n\ \vert\
-    true\ \vert\ false\ \vert\ x$ \\
-    $n$ & $\ ::=\ $ & $n * n\ \vert\ n + n\ \vert\ n - n\ \vert\
-    \langle\emph{natural}\rangle\ \vert\ x$
-    \\
-\end{tabular}
-\]
-The addition of refinement types to the synthesizer doesn't
-interfere with the rest of the process. We define the following right and
-left rule, to synthesize or consume in synthesis a refinement type, where
-$\textsc{getModel}(p)$ is a call to an SMT solver that returns a model of an
-uninterpreted function that satisfies
-$\forall_{a,b,\dots,n}\ h_{a} \Rightarrow h_{b} \Rightarrow \dots
-\Rightarrow h_{n} \Rightarrow p$, where $n$ is the refinement type label
-and $h_{n}$ its predicate, with $a,\dots,n$ standing for the label of every refinement type
-in the propositional contexts;
-and $\textsc{sat}(p_{a} \Rightarrow p_{b})$ is a call to an SMT solver that
-determines universal satisfiability of the implication between predicates (the
-left focused proposition subtypes the goal).
-\begin{mathpar}
-    \infer*[right=(refR)]
-    { \textsc{getModel}(p) = M }
-    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta' \vdash M : \{a : A\ \vert\
-    p\}\Uparrow }
-    \and
-    \infer*[right=(refL)]
-    { \textsc{sat}(p_{a} \Rightarrow p_{b}) }
-    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta'; x{:}(\{a : A\ \vert\
-    p_{a}\})\Downarrow\ \vdash x : \{b : A\ \vert\ p_{b}\} }
-\end{mathpar}
+\section{Related Work}\label{sec:related}
 
+Type-based program synthesis is a vast field of study. Most
+works~\cite{DBLP:conf/lopstr/HughesO20,DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
+follow some variation of the synthesis-as-proof-search approach. However, the
+process is novel for each due to a variety of different rich types explored and
+their corresponding logics and languages; or nuances of the synthesis process
+itself, such as complementing types with program examples; or even the
+programming paradigm of the output produced (e.g. generating heap manipulating
+programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
+% Some other common
+% patterns we follow are the use of type
+% refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16}, polymorphic types, and the
+% support for synthesis of recursive
+% functions~\cite{DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15}. These
+% works share some common ground with each other and with us -- most
+% famously the Curry-Howard correspondence, but also, for example, 
+% focusing-based proof-search~\cite{10.1093/logcom/2.3.297}.
 
-\mypara{Fast path} To speed up the process and get a cleaner %and sometimes more correct
-output, we add a rule that lets us ``skip some rules'' if left focused on a
-$\bang$-ed proposition, and the goal is $\bang$-ed:
-\begin{mathpar}
-    \infer*[right=($\bang\Downarrow$L)]
-    { \Theta/\Theta';\Rho;\Gamma;\Delta; x{:}A\Downarrow\ \vdash M : C}
-    {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
-\end{mathpar}
+% \mypara{Type-and-Example-Directed Program Synthesis} This
+% work~\cite{DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
+% explores a purely functional, recursive program synthesis technique
+% based on types/proof search (as we intend to do), with examples as an
+% auxiliar technique to trim down the program synthesis vast search
+% space. A good use is
+% made of the general strategy of using a type system to generate
+% programs (by ``inverting'' the type system), rather than using it to
+% type-check one.  Moreover, the paper uses a data structure called
+% ``refinement tree'' in conjunction with the extra information provided
+% by the examples to allow for efficient synthesis of non-trivial
+% programs. Overall it employs good engineering to achieve type-based
+% synthesis of functional typed programs, with at least two additions
+% that we might want to follow too (type refinements and recursive
+% functions).
 
+% or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
+  
+\mypara{Program Synthesis from Polymorphic Refinement Types} The
+work~\cite{DBLP:conf/pldi/PolikarpovaKS16} also studies synthesis of recursive
+functional programs in an ``advanced'' context. Their specifications combine two
+rich forms of types: polymorphic and refinement types.
+% (which correspond to a
+% first-order logic through the Curry-Howard isomorphism).
+Their approach to
+refinement types consists of a new algorithm that supports decomposition of the
+refinement specification.
+%,allowing for separation between the language of
+%specification and programs and making the approach amenable to compositional
+%synthesis techniques.
+We also support refinements (and polymorphism),
+but they are not as integrated in the synthesis process as in \cite{DBLP:conf/pldi/PolikarpovaKS16}.
+Instead, our synthesizer leverages the expressiveness of linear
+types and techniques for proof-search in linear logic to guide its process.
+
+\mypara{Resourceful Program Synthesis from Graded Linear Types} The
+work~\cite{DBLP:conf/lopstr/HughesO20} synthesizes programs using an
+approach similar ours. It employs so-called graded
+modal types, which are a refinement of pure linear types
+% -- a more
+% \emph{fine-grained} version 
+that allows for quantitative
+specification of resource usage, in contrast to ours either
+\emph{linear} or \emph{unrestricted} (via the linear logic
+exponential) use of assumptions. Their resource management is more
+complex, and so they provide solutions which adapt Hodas and Miller's
+approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}.
+% -- which, in contrast, is the one used in our work.
+%
+They also use focusing as a solution to trim down search space and to
+ensure that synthesis only produces well-typed programs. However, since their
+underlying logic is \emph{modal} rather than purely \emph{linear}, it
+lacks a clear correspondence with concurrent session-typed
+programs~\cite{DBLP:journals/mscs/CairesPT16,DBLP:conf/concur/CairesP10},
+which is a crucial avenue of future work. Moreover, their use of grading
+effectively requires constraint solving to be integrated with the
+synthesis procedure, which can limit the effectiveness of the overall
+approach.
+% as one scales to more sophisticated settings (e.g.~refinement
+% types).
+Additionally, Our system extends the focusing-based system with
+recursion, ADTs, polymorphism and refinements to synthesize
+more expressive programs.
 
 
 \section{Results}
