@@ -900,7 +900,7 @@ will loop back to the inversion context, jumping back and forth
 between the two contexts; instead, when focusing on an ADT, we should
 either instantiate the goal (provided they're the same type), or switch
 to inversion if and only if its decomposition isn't restricted:
-
+%
 \begin{mathpar}
     \infer*[right=(adt$\Uparrow$L)]
     {
@@ -910,7 +910,7 @@ to inversion if and only if its decomposition isn't restricted:
     }
     {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}
     \and
-    % ROMES: This one is just equal to (INIT), no point in having a new one.
+    % ROMES: This one is just equal to (INIT), no point in having a new one? Except that this one isn't atomic?.
     %\infer*[right=(adt-init)]
     %{  }
     %{\Rho; \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash x : T}
@@ -1370,387 +1370,489 @@ benchmarks taking these all into account.
 
 \appendix
 
-% \section{Formal System}%
-% \label{sec:final_system}
-% {\small
-% \begin{mathparpagebreakable}
-%     \infer*[right=($\lolli R$)]
-%     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \vdash M : B \Uparrow \and x
-%     \notin \Delta'}
-%     {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x . M : A
-%     \lolli B \Uparrow}
-% \and
-%     \infer*[right=($\with R$)]
-%     {\Gamma ; \Delta/ \Delta' ; \Omega \vdash M : A \Uparrow \and \Gamma ;
-%     \Delta/ \Delta'' ; \Omega \vdash N : B \Uparrow \and \Delta' = \Delta''}
-%     {\Gamma ; \Delta/\Delta' ; \Omega \vdash  (M \with N) : A
-%     \with B \Uparrow}
-% \and
-%     \infer*[right=($\Uparrow$R)]
-%     {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
-%     right asynchronous}}
-%     {\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
-% \and
-%     \infer*[right=($\tensor L$)]
-%     {\Gamma ; \Delta/ \Delta' ; \Omega, y{:}A, z{:}B \Uparrow\ \vdash M : C
-%     \and y,z \notin \Delta'}
-%     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \tensor B \Uparrow\ \vdash\
-%     \textrm{let}\ y \tensor z = x\ \textrm{in}\ M : C}
-% \and
-%     \infer*[right=($1 L$)]
-%     {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
-%     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}1 \Uparrow\ \vdash\ \textrm{let}\
-%     \star =
-%     x\ \textrm{in}\ M : C}
-% \and
-%     \mprset{flushleft}
-%     \infer*[right=($\oplus L$)]
-%     {
-%     \Gamma ; \Delta/ \Delta' ; \Omega, y{:}A \Uparrow\ \vdash M : C \and
-%     y \notin \Delta' \\
-%     \Gamma ; \Delta/ \Delta'' ; \Omega, z{:}B \Uparrow\ \vdash N : C \\
-%     z \notin \Delta'' \\
-%     \Delta' = \Delta''
-%     }
-%     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \oplus B \Uparrow\ \vdash\
-%     \textrm{case}\ x\ \textrm{of}\ \textrm{inl}\ y \rightarrow M\ |\
-%     \textrm{inr}\ z \rightarrow N : C}
-% \and
-%     \infer*[right=($\bang L$)]
-%     {\Gamma, y{:}A ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
-%     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}\bang A \Uparrow\ \vdash\
-%     \textrm{let}\ \bang y = x\ \textrm{in}\ M : C}
-% \and
-%     \infer*[right=($\Uparrow$L)]
-%     {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
-%     \textrm{not left asynchronous}}
-%     {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
-% \and
-%     \infer*[right=(decideR)]
-%     {\Gamma; \Delta/\Delta' \vdash C \Downarrow \and C\ \textrm{not atomic}}
-%     {\Gamma; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
-% \and
-%     \infer*[right=(decideL)]
-%     {\Gamma; \Delta/\Delta' ; A \Downarrow\ \vdash C}
-%     {\Gamma; \Delta, A/\Delta';\cdot \Uparrow\ \vdash C}
-% \and
-%     \mprset{flushleft}
-%     \infer*[right=(decideL!)]
-%     {
-%     (A, C) \notin \Rho_{L!}
-%     \\
-%     \textsc{isExist}(C) \Rightarrow |\{u\ |\
-%     (f,u)\in\Rho_{L!},\textsc{isPoly}(f),\textsc{isExist}(u)\}| < d_e
-%     \\
-%     \Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!}');\Gamma, A; \Delta/\Delta' ; A
-%     \Downarrow\ \vdash C
-%     }
-%     {\Theta/\Theta';(\Rho_C,\Rho_D,\Rho_{L!});\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
-% \and
-%   \infer*[right=($\lolli L$)]
-%     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C \and \Gamma;
-%     \Delta'/\Delta''; \cdot \vdash N : A \Uparrow}
-%     {\Gamma; \Delta/\Delta''; x{:}A \lolli B \Downarrow\ \vdash M\{(x\,N)/y\} : C}
-% \and
-%     \infer*[right=($\with L_1$)]
-%     {\Gamma; \Delta/\Delta'; y{:}A \Downarrow\ \vdash M : C}
-%     {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{fst}\ x)/y\} : C}
-% \and
-%     \infer*[right=($\with L_2$)]
-%     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C}
-%     {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash
-%       M\{(\textrm{snd}\ x)/y\} : C}
-% \and
-%     \infer*[right=($\tensor R$)]
-%     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
-%     : B \Downarrow}
-%     {\Gamma; \Delta/\Delta'' \vdash (M \tensor N) : A \tensor B \Downarrow}
-% \and
-%     \infer*[right=($1 R$)]
-%     { }
-%     {\Gamma; \Delta/\Delta \vdash \star : \textbf{1} \Downarrow}
-% \and
-%     \infer*[right=($\oplus R_1$)]
-%     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow}
-%     {\Gamma; \Delta/\Delta' \vdash\ \textrm{inl}\ M : A \oplus B \Downarrow}
-% \and
-%     \infer*[right=($\oplus R_2$)]
-%     {\Gamma; \Delta/\Delta' \vdash M : B \Downarrow}
-%     {\Gamma; \Delta/\Delta' \vdash\ \textrm{inr}\ M : A \oplus B \Downarrow}
-% \and
-%     \infer*[right=($\bang R$)]
-%     {\Gamma; \Delta/\Delta'; \cdot \vdash M : A \Uparrow \and \Delta = \Delta'}
-%     {\Gamma; \Delta/\Delta \vdash \bang M : \bang A \Downarrow}
-% \and
-%     \infer*[right=(init)]
-%     {  }
-%     {\Gamma; \Delta/\Delta'; x{:}A \Downarrow\ \vdash x : A}
-% \and
-%      \infer*[right=($\Downarrow R$)]
-%     {\Gamma; \Delta/\Delta'; \cdot \vdash A \Uparrow}
-%     {\Gamma; \Delta/\Delta' \vdash A \Downarrow}
-% \and
-%     \infer*[right=($\Downarrow L$)]
-%     {\Gamma; \Delta/\Delta'; A \Uparrow\ \vdash C \and A\ \textrm{not atomic and not left synchronous}}
-%     {\Gamma; \Delta/\Delta'; A \Downarrow\ \vdash C}
-% \and
-%     \infer*[right=(adtR)]
-%     {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
-%     T \notin \Rho_C}
-%     {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
-% \and
-%     \mprset{flushleft}
-%     \infer*[right=(adtL)]
-%     {
-%         T \notin \Rho_D
-%         \and
-%         \Delta'_1 = \dots = \Delta'_n 
-%         \\
-%         (\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
-%         \and
-%         y_1 \notin \Delta'_1
-%         \\\\
-%         \\ \dots
-%         \\\\
-%         (\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C
-%         \and
-%         y_n \notin \Delta'_n
-%     }
-%     {(\Rho_C; \Rho_D); \Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
-%     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ |\ C_n\ y_n
-%     \rightarrow M_n : C}
-% \and
-%     \infer*[right=(adt$\Uparrow$L)]
-%     {
-%         (\Rho_C; \Rho_D);\Gamma; \Delta, x{:}T/\Delta'; \Omega \Uparrow\ \vdash M : C
-%         \and
-%         T \in \Rho_D
-%     }
-%     {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}
-% \and
-%     \infer*[right=(adt$\Downarrow$L)]
-%     {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Uparrow\ \vdash M :
-%     T \and T \notin \Rho_D}
-%     {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash M : T}
-% \and
-%     \infer*[right=(adt-init)]
-%     {\textsc{unify}(T_{\overline\alpha} \mapsto T_{\overline\beta}, \Theta)}
-%     {\Theta/\Theta,T_{\overline\alpha} \mapsto T_{\overline\beta},\Rho; \Gamma; \Delta/\Delta'; x{:}T_{\overline\alpha} \Downarrow\ \vdash x :
-%     T_{\overline\beta}}
-% \and
-%     \infer*[right=($\forall R$)]
-%     { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \tau' \Uparrow \and \forall
-%     \overline{\alpha}.\ \tau
-%     \sqsubseteq \tau'}
-%     {\Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \forall \overline{\alpha}.\
-%     \tau \Uparrow}
-% \and
-%     \infer*[right=($\forall L$)]
-%     {
-%         \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash C
-%         \\
-%         \forall \overline{\alpha}.\ \tau \sqsubseteq_E \tau'
-%         \\
-%         \textrm{ftv}_E(\tau') \cap \{ ?\alpha\ \vert\ (?\alpha \mapsto \tau_x) \in \Theta'\} = \emptyset
-%     }
-%     {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
-% \and
-%     \infer*[right=($?L$)]
-%     {\textsc{unify}(?\alpha
-%     \mapsto C, \Theta)}
-%     {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
-%     x{:}?\alpha \Downarrow\ \vdash x : C}
-% \and
-%     \infer*[right=($\Downarrow ?L$)]
-%     {\textsc{unify}(?\alpha
-%     \mapsto A, \Theta)}
-%     {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
-%     x{:}A \Downarrow\ \vdash x : ?\alpha}
-% \and
-%     \infer*[right=(refR)]
-%     { \textsc{getModel}(p) = M }
-%     {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta' \vdash M : \{a : A\ \vert\
-%     p\}\Uparrow }
-% \and
-%     \infer*[right=(refL)]
-%     { \textsc{sat}(p_{a} \Rightarrow p_{b}) }
-%     {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta'; x{:}(\{a : A\ \vert\
-%     p_{a}\})\Downarrow\ \vdash x : \{b : A\ \vert\ p_{b}\} }
-% \and
-%     \infer*[right=($\bang\Downarrow$L)]
-%     { \Theta/\Theta';\Rho;\Gamma;\Delta; x{:}A\Downarrow\ \vdash M : C}
-%     {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
-% \end{mathparpagebreakable}
-% }
-% 
-% \section{Examples}%
-% \label{sec:examples}
-% 
-% \mypara{Maybe}\
-% \\
-% Input program:
-% \begin{minted}{haskell}
-% data Maybe a = Nothing | Just a;
-% data List a = Nil | Cons (a * List a);
-% 
-% synth return :: a -o Maybe a;
-% synth empty :: Maybe a;
-% synth bind :: Maybe a -o (a -o Maybe b) -> Maybe b;
-% synth maybe :: b -> (a -o b) -> Maybe a -o b;
-% \end{minted}
-% Output program:
-% \begin{minted}{haskell}
-% return :: forall a . (a -o Maybe a);
-% return = Just;
-% 
-% empty :: forall a . Maybe a;
-% empty = Nothing;
-% 
-% bind :: forall a b . (Maybe a -o (!(a -o Maybe b) -o Maybe b));
-% bind c d = case c of
-%     Nothing ->
-%       let !e = d in Nothing
-%   | Just f -> let !g = d in g f;
-% 
-% maybe :: forall a b . (!b -o (!(a -o b) -o (Maybe a -o b)));
-% maybe c d e = let !f = c in
-%   let !g = d in
-%     case e of
-%         Nothing -> f
-%       | Just h -> g h;
-% \end{minted}
-% 
-% \mypara{List}\
-% \\
-% Input program:
-% \begin{minted}{haskell}
-% data List a = Nil | Cons (a * List a);
-% data Maybe a = Nothing | Just a;
-% 
-% synth singleton :: a -o List a;
-% synth append :: List a -o List a -o List a;
-% synth map :: (!(a -o b)) -o List a -o List b;
-% synth foldl :: !(b -o a -o b) -o b -o List a -o b | choose 1;
-% synth uncons :: List a -o Maybe (a * List a);
-% synth foldr :: !(a -o b -o b) -o b -o List a -o b;
-% synth insert :: a -o List a -o List a;
-% synth concat :: List (List a) -o List a;
-% \end{minted}
-% Ouput program:
-% \begin{minted}{haskell}
-% singleton :: forall a . (a -o List a);
-% singleton b = Cons (b, Nil);
-% 
-% append :: forall a . (List a -o (List a -o List a));
-% append b c = case b of
-%     Nil -> c
-%   | Cons d ->
-%       let e*f = d in
-%         Cons (e, append f c);
-% 
-% map :: forall a b . (!(a -o b) -o (List a -o List b));
-% map c d = let !e = c in
-%   case d of
-%       Nil -> Nil
-%     | Cons f ->
-%         let g*h = f in
-%           Cons (e g, map (!e) h);
-% 
-% foldl :: forall a b . (!(b -o (a -o b)) -o (b -o (List a -o b)));
-% foldl c d e = let !f = c in
-%   case e of
-%       Nil -> d
-%     | Cons g ->
-%         let h*i = g in
-%           foldl (!f) (f d h) i;
-% 
-% uncons :: forall a . (List a -o Maybe (a * List a));
-% uncons b = case b of
-%     Nil -> Nothing
-%   | Cons c -> let d*e = c in Just (d, e);
-% 
-% foldr :: forall a b . (!(a -o (b -o b)) -o (b -o (List a -o b)));
-% foldr c d e = let !f = c in
-%   case e of
-%       Nil -> d
-%     | Cons g ->
-%         let h*i = g in
-%           f h (foldr (!f) d i);
-% 
-% insert :: forall a . (a -o (List a -o List a));
-% insert b c = case c of
-%     Nil -> Cons (b, Nil)
-%   | Cons h*i -> Cons (h, insert b i);
-% 
-% concat :: forall a . (List (List a) -o List a);
-% concat b = case b of
-%     Nil -> Nil
-%   | Cons d*e ->
-%         case d of
-%             Nil -> concat e
-%           | Cons k ->
-%               let l*m = k in
-%                 Cons (l, concat (Cons (m, e)));
-% \end{minted}
-% 
-% \mypara{State} (with a slight optimization that will be added as a control keyword
-% futurely, that allows bind using runState to terminate in a reasonable time)
-% \\
-% Input program:
-% \begin{minted}{haskell}
-% data State b a = State (!b -o (a * !b));
-% 
-% synth runState :: State b a -o (!b -o (a * !b));
-% synth bind :: (State c a -o (a -o State c b) -o State c b) | using (runState);
-% synth return :: a -o State b a;
-% synth get :: State a a;
-% synth put :: !a -o (State a 1);
-% synth modify :: (!a -o !a) -o State a 1;
-% synth evalState :: State b a -o !b -o a;
-% \end{minted}
-% Output program:
-% \begin{minted}{haskell}
-% data State b a = State (!b -o (a * !b));
-% 
-% runState :: forall a b . (State b a -o (!b -o (a * !b)));
-% runState c !f = case c of
-%     State e ->
-%         let h*i = e (!f) in
-%           let !j = i in (h, (!j));
-% 
-% bind :: forall a b c . (State c a -o ((a -o State c b) -o State c b));
-% bind bs bt = case bs of
-%     State bu ->
-%       State (\bv -> let !bw = bv in
-%                       let cu*cv = bu (!bw) in
-%                         let !cw = cv in
-%                           (let dr*ds = runState (bt cu) (!cw) in
-%                              let !dt = ds in dr, (!cw)));
-% 
-% return :: forall a b . (a -o State b a);
-% return c = State (\d -> let !e = d in
-%                (c, (!e)));
-% 
-% get :: forall a . State a a;
-% get = State (\b -> let !c = b in
-%                (c, (!c)));
-% 
-% put :: forall a . (!a -o State a 1);
-% put b = let !c = b in
-%   State (\d -> let !e = d in
-%                  ((), (!e)));
-% 
-% modify :: forall a . ((!a -o !a) -o State a 1);
-% modify b = State (\c -> let !d = c in
-%                let !f = b (!d) in ((), (!f)));
-% 
-% evalState :: forall a b . (State b a -o (!b -o a));
-% evalState c d = case c of
-%     State e ->
-%       let !f = d in
-%         let h*i = e (!f) in
-%           let !j = i in h;
-% \end{minted}
+\section{Formal System}%
+\label{sec:final_system}
+
+In this section we present the complete system specifying the synthesis process.
+
+\mypara{Core Rules}
+
+\begin{itemize}
+
+\item Right invertible rules
+\begin{mathpar}
+
+    % -o R
+    \infer*[right=($\lolli R$)]
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \vdash M : B \Uparrow \and x
+    \notin \Delta'}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x . M : A
+    \lolli B \Uparrow}
+
+\and
+
+    % & R
+    \infer*[right=($\with R$)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega \vdash M : A \Uparrow \and \Gamma ;
+    \Delta/ \Delta'' ; \Omega \vdash N : B \Uparrow \and \Delta' = \Delta''}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash  (M \with N) : A
+    \with B \Uparrow}
+
+\end{mathpar}
+
+\item Transition to left inversion
+
+\begin{mathpar}
+    \infer*[right=($\Uparrow$R)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
+    right asynchronous}}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
+\end{mathpar}
+
+\item Left invertible rules, which decompose asynchronous propositions in $\Omega$
+\[
+  \begin{array}{c}
+
+    \infer*[right=($\tensor L$)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega, y{:}A, z{:}B \Uparrow\ \vdash M : C
+    \and y,z \notin \Delta'}
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \tensor B \Uparrow\ \vdash\
+    \textrm{let}\ y \tensor z = x\ \textrm{in}\ M : C}\\[0.5em]
+    \infer*[right=($1 L$)]
+    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}1 \Uparrow\ \vdash\ \textrm{let}\
+    \star =
+    x\ \textrm{in}\ M : C}\\[0.5em]
+    \mprset{flushleft}
+    \infer*[right=($\oplus L$)]
+    {
+    \Gamma ; \Delta/ \Delta' ; \Omega, y{:}A \Uparrow\ \vdash M : C \and
+    y \notin \Delta' \\
+    \Gamma ; \Delta/ \Delta'' ; \Omega, z{:}B \Uparrow\ \vdash N : C \\
+    z \notin \Delta'' \\
+    \Delta' = \Delta''
+    }
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \oplus B \Uparrow\ \vdash\
+    \textrm{case}\ x\ \textrm{of}\ \textrm{inl}\ y \rightarrow M\ \mid\
+    \textrm{inr}\ z \rightarrow N : C}
+    \\[0.5em]
+    \infer*[right=($\bang L$)]
+    {\Gamma, y{:}A ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C}
+    {\Gamma ; \Delta/\Delta' ; \Omega, x{:}\bang A \Uparrow\ \vdash\
+    \textrm{let}\ \bang y = x\ \textrm{in}\ M : C}
+\end{array}
+\]
+\item When a non-invertible proposition is in $\Omega$, move it to $\Delta$ and keep inverting on the left
+\begin{mathpar}
+    \infer*[right=($\Uparrow$L)]
+    {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
+    \textrm{not left asynchronous}}
+    {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
+\end{mathpar}
+
+\item Transition to focusing, since there are no more propositions in $\Omega$ (the decision rules)
+\[
+  \begin{array}{c}
+    \infer*[right=(decideR)]
+    {\Gamma; \Delta/\Delta' \vdash C \Downarrow \and C\ \textrm{not atomic}}
+    {\Gamma; \Delta/\Delta';\cdot \Uparrow\ \vdash C}\\[0.5em]
+    \infer*[right=(decideL)]
+    {\Gamma; \Delta/\Delta' ; A \Downarrow\ \vdash C}
+    {\Gamma; \Delta, A/\Delta';\cdot \Uparrow\ \vdash C}
+\qquad
+    \infer*[right=(decideL!)]
+    {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash C}
+    {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+  \end{array}
+  \]
+\item Rules that focus on a right or left proposition, chosen with the decision rules
+
+\begin{mathpar}
+      \infer*[right=($\lolli L$)]
+    {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C \and \Gamma;
+    \Delta'/\Delta''; \cdot \vdash N : A \Uparrow}
+    {\Gamma; \Delta/\Delta''; x{:}A \lolli B \Downarrow\ \vdash M\{(x\,N)/y\} : C}
+\and
+    \infer*[right=($\with L_1$)]
+    {\Gamma; \Delta/\Delta'; y{:}A \Downarrow\ \vdash M : C}
+    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash M\{(\textrm{fst}\ x)/y\} : C}
+\and
+    \infer*[right=($\with L_2$)]
+    {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C}
+    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash
+      M\{(\textrm{snd}\ x)/y\} : C}
+\and
+    \infer*[right=($\tensor R$)]
+    {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
+    : B \Downarrow}
+    {\Gamma; \Delta/\Delta'' \vdash (M \tensor N) : A \tensor B \Downarrow}
+\and
+    \infer*[right=($1 R$)]
+    { }
+    {\Gamma; \Delta/\Delta \vdash \star : \textbf{1} \Downarrow}
+\and
+    \infer*[right=($\oplus R_1$)]
+    {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow}
+    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inl}\ M : A \oplus B \Downarrow}
+\and
+    \infer*[right=($\oplus R_2$)]
+    {\Gamma; \Delta/\Delta' \vdash M : B \Downarrow}
+    {\Gamma; \Delta/\Delta' \vdash\ \textrm{inr}\ M : A \oplus B \Downarrow}
+\and
+    \infer*[right=($\bang R$)]
+    {\Gamma; \Delta/\Delta'; \cdot \vdash M : A \Uparrow \and \Delta = \Delta'}
+    {\Gamma; \Delta/\Delta \vdash \bang M : \bang A \Downarrow}
+\end{mathpar}
+
+\item When the focused proposition becomes asynchronous, we do one of
+\[
+\begin{array}{c}
+    \infer*[right=(init)]
+    {  }
+    {\Gamma; \Delta/\Delta'; x{:}A \Downarrow\ \vdash x : A}
+    \qquad
+     \infer*[right=($\Downarrow R$)]
+    {\Gamma; \Delta/\Delta'; \cdot \vdash A \Uparrow}
+    {\Gamma; \Delta/\Delta' \vdash A \Downarrow}\\[0.5em]
+    \infer*[right=($\Downarrow L$)]
+    {\Gamma; \Delta/\Delta'; A \Uparrow\ \vdash C \and A\ \textrm{not atomic and not left synchronous}}
+    {\Gamma; \Delta/\Delta'; A \Downarrow\ \vdash C}
+
+\end{array}
+\]
+\end{itemize}
+
+\mypara{Beyond propositional logic}
+
+\begin{itemize}
+
+\item To synthesize an algebraic data type
+\begin{mathpar}
+    \infer*[right=(adtR)]
+    {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
+    T \notin \Rho_C}
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
+\and
+    \mprset{flushleft}
+    \infer*[right=(adtL)]
+    {
+        \overline{(\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C}
+        \and
+        \overline{y_n \notin \Delta'_n}
+        \and
+        T \notin \Rho_D
+        \and
+        {\Delta'_1 = \dots = \Delta'_n}
+    }
+    {(\Rho_C; \Rho_D); \Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
+    \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ \mid\ C_n\ y_n
+    \rightarrow M_n : C}
+\end{mathpar}
+\item And the additional rules to unblock synthesis given the restrictions on algebraic data types
+
+\begin{mathpar}
+    \infer*[right=(adt$\Uparrow$L)]
+    {
+        (\Rho_C; \Rho_D);\Gamma; \Delta, x{:}T/\Delta'; \Omega \Uparrow\ \vdash M : C
+        \and
+        T \in \Rho_D
+    }
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}
+    \and
+    \infer*[right=(adt$\Downarrow$L)]
+    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Uparrow\ \vdash M :
+    T \and T \notin \Rho_D}
+    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash M : T}
+\end{mathpar}
+\item Note that if a left focused algebraic data type cannot be deconstructed
+because of a restriction, it might still be instanced through \textsc{init}.
+Specialized to ADTs, it would be:
+\begin{mathpar}
+    \infer*[right=(adt-init)]
+    {  }
+    {\Rho; \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash x : T}
+    \and
+\end{mathpar}
+
+\end{itemize}
+
+\mypara{Polymorphism}
+
+\begin{itemize}
+\item Introducing and using schemes
+\begin{mathpar}
+    \infer*[right=($\forall R$)]
+    { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \tau' \Uparrow \and \forall
+    \overline{\alpha}.\ \tau
+    \sqsubseteq \tau'}
+    {\Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \forall \overline{\alpha}.\
+    \tau \Uparrow}
+  \and
+    \infer*[right=($\forall L$)]
+    {
+        \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash C
+        \\
+        \forall \overline{\alpha}.\ \tau \sqsubseteq_E \tau'
+        \\
+        \textrm{ftv}_E(\tau') \cap \{ ?\alpha\ \vert\ (?\alpha \mapsto \tau_x) \in \Theta'\} = \emptyset
+    }
+    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
+\end{mathpar}
+\item And rules regarding existential variables, both when using them for
+instancing a type and when instancing an algebraic data type existential
+argument type.
+\begin{mathpar}
+    \infer*[right=($?L$)]
+    {\textsc{unify}(?\alpha
+    \mapsto C, \Theta)}
+    {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
+    x{:}?\alpha \Downarrow\ \vdash x : C}
+    \and
+    \infer*[right=($\Downarrow ?L$)]
+    {\textsc{unify}(?\alpha
+    \mapsto A, \Theta)}
+    {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
+    x{:}A \Downarrow\ \vdash x : ?\alpha}
+\end{mathpar}
+\end{itemize}
+
+\mypara{Polymorphic ADTs} To allow type parameters and the use of universally quantified type
+variables in ADT constructors, we must guarantee that the
+\textsc{adt-init} rule can unify the type parameters and that when constructing or
+destructing an ADT, type variables in constructor parameters are substituted by
+the actual type (i.e. to construct |List Int| with
+|data List a = Cons (a * List a)|, we wouldn't try to synthesize |(a * List a)|,
+but rather |(Int * List Int)|). To unify $T_{\overline\alpha}$ with $T_{\overline\beta}$,
+the sets of type parameters $\overline\alpha$ and $\overline\beta$ must satisfy $\bararound{\overline\alpha} = \bararound{\overline\beta}$
+together with $\forall i\ 0 \leq i \land i < \bararound{\overline\alpha} \land
+\textsc{unify}(\overline\alpha_i \mapsto \overline\beta_i)$. The constructor
+type substitution needn't be explicit in the rule:
+\begin{mathpar}
+    \infer*[right=(adt-init)]
+    {\textsc{unify}(T_{\overline\alpha} \mapsto T_{\overline\beta}, \Theta)}
+    {\Theta/\Theta,T_{\overline\alpha} \mapsto T_{\overline\beta},\Rho; \Gamma; \Delta/\Delta'; x{:}T_{\overline\alpha} \Downarrow\ \vdash x :
+    T_{\overline\beta}}
+\end{mathpar}
+
+\mypara{Refinement Types} Refinement types are types with a predicate (a non-existing predicate is the same as it
+being \emph{true}); dependent types are functions with
+refinement types in which the argument type is labeled and said label can be used in the predicates
+of the return type (e.g. $(x : \mathsf{Int}) \lolli \{y : \mathsf{Int}\ \vert\ y = x\}$ specifies a function that
+takes an Int and returns an Int of equal value). We extend
+the types syntax with our refinement types:
+\[
+\begin{tabular}{lclc}
+    $\tau$ & $\ ::=\ $ & $ \dots \vert\  (x:\tau) \lolli \sigma\ \vert\  \{x:\tau\ \vert\ P\}$ \\
+    $P$ & $\ ::=\ $ & $P = P\ \vert\ P \neq P\ \vert\ P \vee P\ \vert\ P \wedge
+    P\ \vert\ P \Rightarrow P\ \vert\ n = n\ \vert\ n \neq n$ \\
+    & & $\vert\ n \leq n\ \vert\ n \geq n\ \vert\ n < n\ \vert\ n > n\ \vert\
+    true\ \vert\ false\ \vert\ x$ \\
+    $n$ & $\ ::=\ $ & $n * n\ \vert\ n + n\ \vert\ n - n\ \vert\
+    \langle\emph{natural}\rangle\ \vert\ x$
+    \\
+\end{tabular}
+\]
+The addition of refinement types to the synthesizer doesn't
+interfere with the rest of the process. We define the following right and
+left rule, to synthesize or consume in synthesis a refinement type, where
+$\textsc{getModel}(p)$ is a call to an SMT solver that returns a model of an
+uninterpreted function that satisfies
+$\forall_{a,b,\dots,n}\ h_{a} \Rightarrow h_{b} \Rightarrow \dots
+\Rightarrow h_{n} \Rightarrow p$, where $n$ is the refinement type label
+and $h_{n}$ its predicate, with $a,\dots,n$ standing for the label of every refinement type
+in the propositional contexts;
+and $\textsc{sat}(p_{a} \Rightarrow p_{b})$ is a call to an SMT solver that
+determines universal satisfiability of the implication between predicates (the
+left focused proposition subtypes the goal).
+\begin{mathpar}
+    \infer*[right=(refR)]
+    { \textsc{getModel}(p) = M }
+    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta' \vdash M : \{a : A\ \vert\
+    p\}\Uparrow }
+    \and
+    \infer*[right=(refL)]
+    { \textsc{sat}(p_{a} \Rightarrow p_{b}) }
+    {\Theta/\Theta';\Rho;\Gamma;\Delta/\Delta'; x{:}(\{a : A\ \vert\
+    p_{a}\})\Downarrow\ \vdash x : \{b : A\ \vert\ p_{b}\} }
+\end{mathpar}
+
+\mypara{Fast path} To speed up the process and get a cleaner %and sometimes more correct
+output, we add a rule that lets us ``skip some rules'' if left focused on a
+$\bang$-ed proposition, and the goal is $\bang$-ed:
+\begin{mathpar}
+    \infer*[right=($\bang\Downarrow$L)]
+    { \Theta/\Theta';\Rho;\Gamma;\Delta; x{:}A\Downarrow\ \vdash M : C}
+    {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
+\end{mathpar}
+
+\section{Examples}%
+\label{sec:examples}
+
+\mypara{Maybe}\
+\\
+Input program:
+\begin{code}
+data Maybe a = Nothing | Just a;
+data List a = Nil | Cons (a * List a);
+
+synth return :: a -o Maybe a;
+synth empty :: Maybe a;
+synth bind :: Maybe a -o (a -o Maybe b) -> Maybe b;
+synth maybe :: b -> (a -o b) -> Maybe a -o b;
+\end{code}
+Output program:
+\begin{code}
+return :: forall a . (a -o Maybe a);
+return = Just;
+
+empty :: forall a . Maybe a;
+empty = Nothing;
+
+bind :: forall a b . (Maybe a -o (!(a -o Maybe b) -o Maybe b));
+bind c d = case c of
+    Nothing ->
+      let !e = d in Nothing
+  | Just f -> let !g = d in g f;
+
+maybe :: forall a b . (!b -o (!(a -o b) -o (Maybe a -o b)));
+maybe c d e = let !f = c in
+  let !g = d in
+    case e of
+        Nothing -> f
+      | Just h -> g h;
+\end{code}
+
+\mypara{List}\
+\\
+Input program:
+\begin{code}
+data List a = Nil | Cons (a * List a);
+data Maybe a = Nothing | Just a;
+
+synth singleton :: a -o List a;
+synth append :: List a -o List a -o List a;
+synth map :: (!(a -o b)) -o List a -o List b;
+synth foldl :: !(b -o a -o b) -o b -o List a -o b | choose 1;
+synth uncons :: List a -o Maybe (a * List a);
+synth foldr :: !(a -o b -o b) -o b -o List a -o b;
+synth insert :: a -o List a -o List a;
+synth concat :: List (List a) -o List a;
+\end{code}
+Ouput program:
+\begin{code}
+singleton :: forall a . (a -o List a);
+singleton b = Cons (b, Nil);
+
+append :: forall a . (List a -o (List a -o List a));
+append b c = case b of
+    Nil -> c
+  | Cons d ->
+      let e*f = d in
+        Cons (e, append f c);
+
+map :: forall a b . (!(a -o b) -o (List a -o List b));
+map c d = let !e = c in
+  case d of
+      Nil -> Nil
+    | Cons f ->
+        let g*h = f in
+          Cons (e g, map (!e) h);
+
+foldl :: forall a b . (!(b -o (a -o b)) -o (b -o (List a -o b)));
+foldl c d e = let !f = c in
+  case e of
+      Nil -> d
+    | Cons g ->
+        let h*i = g in
+          foldl (!f) (f d h) i;
+
+uncons :: forall a . (List a -o Maybe (a * List a));
+uncons b = case b of
+    Nil -> Nothing
+  | Cons c -> let d*e = c in Just (d, e);
+
+foldr :: forall a b . (!(a -o (b -o b)) -o (b -o (List a -o b)));
+foldr c d e = let !f = c in
+  case e of
+      Nil -> d
+    | Cons g ->
+        let h*i = g in
+          f h (foldr (!f) d i);
+
+insert :: forall a . (a -o (List a -o List a));
+insert b c = case c of
+    Nil -> Cons (b, Nil)
+  | Cons h*i -> Cons (h, insert b i);
+
+concat :: forall a . (List (List a) -o List a);
+concat b = case b of
+    Nil -> Nil
+  | Cons d*e ->
+        case d of
+            Nil -> concat e
+          | Cons k ->
+              let l*m = k in
+                Cons (l, concat (Cons (m, e)));
+\end{code}
+
+\mypara{State} (with a slight optimization that will be added as a control keyword
+futurely, that allows bind using runState to terminate in a reasonable time)
+\\
+Input program:
+\begin{code}
+data State b a = State (!b -o (a * !b));
+
+synth runState :: State b a -o (!b -o (a * !b));
+synth bind :: (State c a -o (a -o State c b) -o State c b) | using (runState);
+synth return :: a -o State b a;
+synth get :: State a a;
+synth put :: !a -o (State a 1);
+synth modify :: (!a -o !a) -o State a 1;
+synth evalState :: State b a -o !b -o a;
+\end{code}
+Output program:
+\begin{code}
+data State b a = State (!b -o (a * !b));
+
+runState :: forall a b . (State b a -o (!b -o (a * !b)));
+runState c !f = case c of
+    State e ->
+        let h*i = e (!f) in
+          let !j = i in (h, (!j));
+
+bind :: forall a b c . (State c a -o ((a -o State c b) -o State c b));
+bind bs bt = case bs of
+    State bu ->
+      State (\bv -> let !bw = bv in
+                      let cu*cv = bu (!bw) in
+                        let !cw = cv in
+                          (let dr*ds = runState (bt cu) (!cw) in
+                             let !dt = ds in dr, (!cw)));
+
+return :: forall a b . (a -o State b a);
+return c = State (\d -> let !e = d in
+               (c, (!e)));
+
+get :: forall a . State a a;
+get = State (\b -> let !c = b in
+               (c, (!c)));
+
+put :: forall a . (!a -o State a 1);
+put b = let !c = b in
+  State (\d -> let !e = d in
+                 ((), (!e)));
+
+modify :: forall a . ((!a -o !a) -o State a 1);
+modify b = State (\c -> let !d = c in
+               let !f = b (!d) in ((), (!f)));
+
+evalState :: forall a b . (State b a -o (!b -o a));
+evalState c d = case c of
+    State e ->
+      let !f = d in
+        let h*i = e (!f) in
+          let !j = i in h;
+\end{code}
 
 \end{document}
 
