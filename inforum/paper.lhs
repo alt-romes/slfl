@@ -530,7 +530,7 @@ to the state at which the focusing phase began.
 %
 As such, with
 focusing, the linear sequent calculus judgment 
-$\Gamma; \Delta \vdash A$, meaning that $A$ is derivable from the linear
+$\Gamma; \Delta \vdash M : A$, meaning that $M:A$ is derivable from the linear
 assumptions in $\Delta$ and non-linear assumptions in $\Gamma$,
 is split into four judgments, grouped into the two phases.
 
@@ -540,14 +540,14 @@ decomposing connectives.
 % (propositions we'll later try to invert,
 % moving them to the linear context ($\Delta$) when we fail to).
 The right inversion and left inversion judgments are written
-$\Gamma; \Delta; \Omega \vdash A \Uparrow$ and $\Gamma; \Delta;
-\Omega \Uparrow\ \vdash A$, respectively, where the $\Uparrow$
+$\Gamma; \Delta; \Omega \vdash M : A \Uparrow$ and $\Gamma; \Delta;
+\Omega \Uparrow\ \vdash M : A$, respectively, where the $\Uparrow$
 indicates the connective or context being inverted.
 For the focusing phase (i.e.~all non-invertible rules can apply), 
 the proposition under focus can be the goal or 
 one in $\Gamma$ or $\Delta$. The right focus judgment is written 
-$\Gamma;\Delta \vdash A \Downarrow$ and the left focus judgment
-$\Gamma;\Delta; B\Downarrow\ \vdash A$, where $\Downarrow$
+$\Gamma;\Delta \vdash M : A \Downarrow$ and the left focus judgment
+$\Gamma;\Delta; B\Downarrow\ \vdash M: A$, where $\Downarrow$
 indicates the proposition under focus.
 
 As alluded in the previous section, to handle the context splitting required to prove subgoals, we augment the
@@ -556,14 +556,14 @@ technique~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
 where a pair of
 input/output linear contexts is used to propagate the yet unused linear
 resources across subgoals; e.g. the left inversion judgment is written
-$\Gamma; \Delta/\Delta'; \Omega \Uparrow\ \nolinebreak\vdash A$ where $\Delta$ is the input
+$\Gamma; \Delta/\Delta'; \Omega \Uparrow\ \nolinebreak\vdash M : A$ where $\Delta$ is the input
 linear context and $\Delta'$ is the output one. 
 
 
 Combining linear logic (i.e., the linear lambda calculus through the Curry-Howard correspondence), resource
 management, and focusing, we obtain the following core formal system\footnote{For
 the sake of brevity, we've ommitted some rules such as those for the additive
-pair and disjunction. The complete system can be found in Appendix~\cite{app:final_system}.}
+pair and disjunction. The complete system can be found in Appendix~\ref{app:final_system}.}
 (inspired by~\cite{DBLP:conf/cade/ChaudhuriP05,fpnotes}) -- in which the
 rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
@@ -600,9 +600,9 @@ $\Omega$ context. The rule to transition to inversion on the left is:
 \begin{mathpar}
   {\small
     \infer*[right=($\Uparrow$R)]
-    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
+    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M : C \and C\ \textrm{not
     right asynchronous}}
-{\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
+{\Gamma ; \Delta/\Delta' ; \Omega \vdash M : C \Uparrow}
 }
 \end{mathpar}
 %
@@ -647,9 +647,9 @@ we simply move it to the linear context $\Delta$, and keep inverting on the left
 \begin{mathpar}
   {\small
     \infer*[right=($\Uparrow$L)]
-    {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
+    {\Gamma; \Delta, x:A/\Delta'; \Omega \Uparrow\ \vdash M : C \and A\ 
     \textrm{not left asynchronous}}
-  {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
+  {\Gamma; \Delta/\Delta'; \Omega, x:A \Uparrow\ \vdash M : C}
   }
 \end{mathpar}
 %
@@ -666,11 +666,11 @@ rules:
 {\small\[
   \begin{array}{c}
     \infer*[right=(decideR)]
-    {\Gamma; \Delta/\Delta' \vdash C \Downarrow \and C\ \textrm{not atomic}}
-    {\Gamma; \Delta/\Delta';\cdot \Uparrow\ \vdash C}\\[0.5em]
+    {\Gamma; \Delta/\Delta' \vdash M: C \Downarrow \and C\ \textrm{not atomic}}
+    {\Gamma; \Delta/\Delta';\cdot \Uparrow\ \vdash M: C}\\[0.5em]
     \infer*[right=(decideL)]
-    {\Gamma; \Delta/\Delta' ; A \Downarrow\ \vdash C}
-    {\Gamma; \Delta, A/\Delta';\cdot \Uparrow\ \vdash C}
+    {\Gamma; \Delta/\Delta' ; x:A \Downarrow\ \vdash M :C}
+    {\Gamma; \Delta, x:A/\Delta';\cdot \Uparrow\ \vdash M: C}
 \qquad
     \infer*[right=(decideL!)]
     {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash C}
@@ -745,11 +745,11 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
     {\Gamma; \Delta/\Delta'; x{:}A \Downarrow\ \vdash x : A}
     \qquad
      \infer*[right=($\Downarrow R$)]
-    {\Gamma; \Delta/\Delta'; \cdot \vdash A \Uparrow}
-    {\Gamma; \Delta/\Delta' \vdash A \Downarrow}\\[0.5em]
+    {\Gamma; \Delta/\Delta'; \cdot \vdash M :A \Uparrow}
+    {\Gamma; \Delta/\Delta' \vdash M :A \Downarrow}\\[0.5em]
     \infer*[right=($\Downarrow L$)]
-    {\Gamma; \Delta/\Delta'; A \Uparrow\ \vdash C \and A\ \textrm{not atomic and not left synchronous}}
-    {\Gamma; \Delta/\Delta'; A \Downarrow\ \vdash C}
+    {\Gamma; \Delta/\Delta'; x:A \Uparrow\ \vdash M : C \and A\ \textrm{not atomic and not left synchronous}}
+    {\Gamma; \Delta/\Delta'; x:A \Downarrow\ \vdash M : C}
 
 \end{array}
 \]
@@ -1063,10 +1063,10 @@ $\tau'$ is an \emph{instantiation} of type scheme $\forall \overline{\alpha}.\
 %
 \begin{mathpar}
     \infer*[right=($\forall R$)]
-    { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \tau' \Uparrow \and \forall
+    { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash M: \tau' \Uparrow \and \forall
     \overline{\alpha}.\ \tau
     \sqsubseteq \tau'}
-    {\Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \forall \overline{\alpha}.\
+    {\Rho; \Gamma; \Delta/\Delta'; \Omega \vdash M : \forall \overline{\alpha}.\
     \tau \Uparrow}
 \end{mathpar}
 %
@@ -1471,8 +1471,7 @@ more expressive programs.
 
 \appendix
 
-\section{Formal System}%
-\label{app:final_system}
+\section{Formal System}~\label{app:final_system}
 
 In this section we present the complete system specifying the synthesis process.
 
