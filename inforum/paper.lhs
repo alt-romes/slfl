@@ -57,8 +57,8 @@
 % TODO: Mention justDoIt and djinn
 
 \begin{abstract}
-Type-driven program synthesis concerns itself with generating programs that
-satisfy a given type-based specification. One of the key challenges of program
+Type-driven program synthesis is concerned with automatic generation of programs that
+satisfy a given specification, formulated as a type. One of the key challenges of program
 synthesis lies in finding candidate solutions that adhere to both the
 specification and the user's intent in an actionable amount of time.
 %
@@ -99,7 +99,7 @@ proof theory
 \section{Introduction}
 
 Program synthesis is the automated or semi-automated process of deriving a
-program, i.e.~generating code, from a high-level specification. Synthesis can be
+program, i.e.~generating code, from some (high-level) specification. Synthesis can be
 seen as a means to improve programmer productivity and program correctness
 (e.g. through suggestion and autocompletion).
 %
@@ -194,20 +194,28 @@ typed functional programs and linear logic proofs.
 Our contributions are as follows:
 \begin{itemize}
 
-\item We introduce linear types as specifications suitable for synthesis both
-in their expressiveness and conciseness, by example.
 
-\item We present a framework for synthesis of linear types
+
+\item We present a framework for synthesis of functional programs
 (\S~\ref{sec:formal_system}) from specifications based on linear
-types extended with recursive algebraic data types, parametric polymorphism and
-refinements, leveraging established proof-search techniques for linear logic
-through the Curry-Howard isomorphism. Specifically, the core of the synthesis
+types, leveraging established proof-search techniques for linear logic
+under the lens of the Curry-Howard isomorphism.
+Specifically, the core of the synthesis procedure
 is a \emph{sound} and \emph{complete} system consisting of \emph{bottom-up}
-proof-search in propositional linear logic through \emph{focusing}~\cite{}. Our
+proof-search in propositional linear logic, using a technique called \emph{focusing}~\cite{}. Our
 approach, being grounded in propositions-as-types, ensures that all synthesized
 programs (i.e.~proofs) are well-typed \emph{by construction} (i.e.~if the
 synthesis procedure produces a program, then the program intrinsically
 satisfies its specification).
+
+\item  We extend the core synthesis framework and language with
+  algebraic data types, recursive functions, parametric polymorphism and
+type refinements. These extra-logical extensions require us to abandon
+completeness and to develop techniques to effectively explore the
+search space in the presence of recursion (\S~\ref{sec:extension}).
+
+%\item We argue that linear types are suitable specifications for synthesis both
+%in their expressiveness and conciseness, by example.
 
 \item We present two implementations of our synthesis framework, one as a GHC
 plugin that synthesizes expressions for Linear Haskell~\cite{} program holes,
@@ -433,7 +441,7 @@ We note that a \emph{sound} set of rules guarantees we cannot synthesize
 incorrect programs; and that the valid programs derivable through them
 reflect the subjective trade-offs we committed to.
 
-\subsection{Core Language}
+\subsection{Core Language}\label{sec:core}
 
 \mypara{Core Rules} The core language for synthesis terms and specifications is
 a simply-typed linear $\lambda$-calculus with linear functions ($\lolli$),
@@ -517,7 +525,7 @@ linear context and $\Delta'$ is the output one.
 Putting together linear logic and linear lambda calculus through the Curry-Howard correspondence, resource
 management, and focusing, we get the following core formal system\footnote{For
 the sake of brevity, we've ommitted some rules such as those for the additive
-pair and disjunction. The complete system can be found in the appendice.}
+pair and disjunction. The complete system can be found in the Appendix.}
 (inspired by~\cite{DBLP:conf/cade/ChaudhuriP05,fpnotes}) -- in which the
 rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
@@ -700,7 +708,7 @@ The rules written above together make the core of our synthesizer. Next, we'll
 present new rules that align and build on top of these to synthesize recursive
 programs from more expressive (richer) types.
 
-\section{Beyond Propositional Logic}
+\section{Beyond Propositional Logic}\label{sec:extension}
 
 By itself, the core synthesis process can only generate simple non-recursive
 programs.
