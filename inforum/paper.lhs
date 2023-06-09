@@ -1234,6 +1234,95 @@ constrain $c$ can be unified with those in $\Theta$:
 %    {\Theta/\Theta';\Rho;\Gamma;\Delta; x{:}\bang A\Downarrow\ \vdash M : \bang C}
 %\end{mathpar}
 
+\section{Evaluation}\label{sec:evaluation}
+
+We've implemented our framework synthesis both as a GHC type-hole plugin and as
+a standalone synthesizer that can typecheck Haskell-like programs with ``goal
+signatures'' for which valid expressions are synthesized. We've tested and
+benchmarked both implementations on numerous synthesis challenges with
+successful results. Amongst the interesting challenges, we can easily
+synthesize the Monad instances of Maybe and State, but the more interesting
+result is a real-world example that comes from the Linear Haskell paper:
+%
+with Linear types one can provide a safe interface to manipulate mutable arrays. In
+Linear Haskell~\cite{Bernardy_2018} -- they provide an implementation of |array :: Int ->
+[(Int,a)] -> Array a| using mutable arrays under the hood with the interface:
+%
+\begin{code}
+newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
+write :: MArray a ⊸ (Int,a) -> MArray a
+read :: MArray a ⊸ Int -> (MArray a, Ur b)
+freeze :: MArray a ⊸ Ur (Array a)
+\end{code}
+%
+The flagship result from our synthesis framework, which also illustrates the
+preciseness of linear types, is that we're able to synthesize the exact
+implementation of |array| given in Linear Haskell given the above interface and
+the |array| type goal, all in a hundred miliseconds:
+\begin{code}
+array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
+\end{code}
+%
+The standalone implementation further supports (experimentally) refinement
+types and additional synth guidelines. In appendix~\ref{sec:examples} we list
+multiple examples of synth goals and the resulting programs, and the following
+table presents synthesis benchmarks for some of these examples.
+%
+{\scriptsize
+\begin{center}
+    \begin{tabular}{ccccc}
+        \hline
+        Group & Goal & Avg. time $\pm\,\sigma$ & Keywords & Components \\
+        \hline
+        \multirow{4}{4em}{Linear Logic} & uncurry & $133\mu s\pm 4.9\mu s$ &&\\ 
+        %& distributivity & $179\mu s\pm 5.0\mu s$ && \\ 
+        & call by name & $196\mu s\pm 4.6\mu s$ && \\ 
+        & 0/1 & $294\mu s\pm 5.3\mu s$ && \\ 
+        \hline
+        \multirow{7}{4em}{List} & map & $288\mu s\pm 7.2\mu s$  && \\ 
+        & append & $292\mu s\pm 7.0\mu s$ & & \\ 
+        & foldl & $1.69ms\pm 5.3\mu s$ & \emph{choose 1} & \\ 
+        & foldr & $704\mu s\pm 10\mu s$ && \\ 
+        & concat & $505\mu s\pm 18\mu s$ && \\
+        %& uncons & $215\mu s\pm 15\mu s$ && \\
+        & reverse & $17.4ms\pm 515\mu s$ & \emph{reverse [1,2] == [2,1]} & \\ 
+        \hline
+        \multirow{2}{4em}{Maybe} & $>>=$ & $194\mu s\pm 5.3\mu s$ && \\ 
+        & maybe & $161\mu s\pm 4.8\mu s$&& \\
+        \hline
+        \multirow{7}{4em}{State} & runState & $190\mu s\pm 6.8\mu s$ && \\ 
+        & $>>=$ & $979\mu s\pm 23\mu s$ && \\
+        %& $>>=$ & $\infty$ & \emph{using (runState)} & \\
+        & get & $133\mu s\pm 3.8\mu s$ && \\
+        & put & $146\mu s\pm 3.4\mu s$ && \\
+        & modify & $219\mu s\pm 4.9\mu s$ && \\
+        & evalState & $156\mu s\pm 4.0\mu s$ && \\
+        % \multirow{5}{4em}{Binary Tree} & singleton & 1s & yes & yes \\ 
+        % & insert & 1s & yes & unordered \\
+        % & map & 1s & yes & yes \\
+        % & append & 1s & yes & appends to rightmost leaf \\
+        % & join node & 1s & yes & joins at rightmost leaf \\
+        % \hline
+        % \multirow{7}{4em}{Map} & singleton & 1s & yes & yes \\ 
+        % & insert & 1s & yes & unordered \\
+        % & insertWithKey & 1s & yes & ignores function \\
+        % & union & 1s & yes & ignores keys \\
+        % & mapAccum & 1s & no & ?? \\
+        % & map & 1s & yes & yes \\
+        % & mapKeys & 1s & yes & yes \\
+        \hline
+        Misc & either & $197\mu s\pm 5.3\mu s$ && \\ 
+        \hline
+        \multirow{2}{4em}{Array} & & & \emph{depth 3} & \emph{freeze, foldl} \\
+        & array~\ref{sec:evaluation} & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
+        \hline
+        Refinements & add3 & $39ms\pm 1.1ms$ & & + \\
+        \hline
+    \end{tabular}
+  \end{center}
+}
+
+
 \section{Related Work}\label{sec:related}
 
 Type-based program synthesis is a vast field of study. Most
@@ -1318,93 +1407,6 @@ Additionally, Our system extends the focusing-based system with
 recursion, ADTs, polymorphism and refinements to synthesize
 more expressive programs.
 
-
-\section{Evaluation}\label{sec:evaluation}
-
-We've implemented our framework synthesis both as a GHC type-hole plugin and as
-a standalone synthesizer that can typecheck Haskell-like programs with ``goal
-signatures'' for which valid expressions are synthesized. We've tested and
-benchmarked both implementations on numerous synthesis challenges with
-successful results. Amongst the interesting challenges, we can easily
-synthesize the Monad instances of Maybe and State, but the more interesting
-result is a real-world example that comes from the Linear Haskell paper:
-%
-with Linear types one can provide a safe interface to manipulate mutable arrays. In
-Linear Haskell~\cite{Bernardy_2018} -- they provide an implementation of |array :: Int ->
-[(Int,a)] -> Array a| using mutable arrays under the hood with the interface:
-%
-\begin{code}
-newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
-write :: MArray a ⊸ (Int,a) -> MArray a
-read :: MArray a ⊸ Int -> (MArray a, Ur b)
-freeze :: MArray a ⊸ Ur (Array a)
-\end{code}
-%
-The flagship result from our synthesis framework, which also illustrates the
-preciseness of linear types, is that we're able to synthesize the exact
-implementation of |array| given in Linear Haskell given the above interface and
-the |array| type goal, all in a hundred miliseconds:
-\begin{code}
-array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
-\end{code}
-%
-The standalone implementation further supports (experimentally) refinement
-types and additional synth guidelines. In the following table we present
-benchmarks taking these all into account.
-%
-{\scriptsize
-\begin{center}
-    \begin{tabular}{ccccc}
-        \hline
-        Group & Goal & Avg. time $\pm\,\sigma$ & Keywords & Components \\
-        \hline
-        \multirow{4}{4em}{Linear Logic} & uncurry & $133\mu s\pm 4.9\mu s$ &&\\ 
-        %& distributivity & $179\mu s\pm 5.0\mu s$ && \\ 
-        & call by name & $196\mu s\pm 4.6\mu s$ && \\ 
-        & 0/1 & $294\mu s\pm 5.3\mu s$ && \\ 
-        \hline
-        \multirow{7}{4em}{List} & map & $288\mu s\pm 7.2\mu s$  && \\ 
-        & append & $292\mu s\pm 7.0\mu s$ & & \\ 
-        & foldl & $1.69ms\pm 5.3\mu s$ & \emph{choose 1} & \\ 
-        & foldr & $704\mu s\pm 10\mu s$ && \\ 
-        & concat & $505\mu s\pm 18\mu s$ && \\
-        %& uncons & $215\mu s\pm 15\mu s$ && \\
-        & reverse & $17.4ms\pm 515\mu s$ & \emph{reverse [1,2] == [2,1]} & \\ 
-        \hline
-        \multirow{2}{4em}{Maybe} & $>>=$ & $194\mu s\pm 5.3\mu s$ && \\ 
-        & maybe & $161\mu s\pm 4.8\mu s$&& \\
-        \hline
-        \multirow{7}{4em}{State} & runState & $190\mu s\pm 6.8\mu s$ && \\ 
-        & $>>=$ & $979\mu s\pm 23\mu s$ && \\
-        %& $>>=$ & $\infty$ & \emph{using (runState)} & \\
-        & get & $133\mu s\pm 3.8\mu s$ && \\
-        & put & $146\mu s\pm 3.4\mu s$ && \\
-        & modify & $219\mu s\pm 4.9\mu s$ && \\
-        & evalState & $156\mu s\pm 4.0\mu s$ && \\
-        % \multirow{5}{4em}{Binary Tree} & singleton & 1s & yes & yes \\ 
-        % & insert & 1s & yes & unordered \\
-        % & map & 1s & yes & yes \\
-        % & append & 1s & yes & appends to rightmost leaf \\
-        % & join node & 1s & yes & joins at rightmost leaf \\
-        % \hline
-        % \multirow{7}{4em}{Map} & singleton & 1s & yes & yes \\ 
-        % & insert & 1s & yes & unordered \\
-        % & insertWithKey & 1s & yes & ignores function \\
-        % & union & 1s & yes & ignores keys \\
-        % & mapAccum & 1s & no & ?? \\
-        % & map & 1s & yes & yes \\
-        % & mapKeys & 1s & yes & yes \\
-        \hline
-        Misc & either & $197\mu s\pm 5.3\mu s$ && \\ 
-        \hline
-        \multirow{2}{4em}{Array} & & & \emph{depth 3} & \emph{freeze, foldl} \\
-        & array~\ref{sec:evaluation} & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
-        \hline
-        Refinements & add3 & $39ms\pm 1.1ms$ & & + \\
-        \hline
-    \end{tabular}
-  \end{center}
-}
 
 \bibliographystyle{splncs04}
 \bibliography{references}
@@ -1729,6 +1731,13 @@ $\bang$-ed proposition, and the goal is $\bang$-ed:
 \section{Examples}%
 \label{sec:examples}
 
+The following examples have two components, the input program that was
+processed by our standalone synthesizer program, and the resulting program
+including the synthesized fragments. In the examples, signatures preceeded by
+|synth| mark synthesis goals for which programs using the type as the
+specification will be synthesized. These examples also make use of the
+experimental keywords such as |choose| and |using|.
+
 \mypara{Maybe}\
 \\
 Input program:
@@ -1736,26 +1745,26 @@ Input program:
 data Maybe a = Nothing | Just a;
 data List a = Nil | Cons (a * List a);
 
-synth return :: a -o Maybe a;
+synth return :: a ⊸ Maybe a;
 synth empty :: Maybe a;
-synth bind :: Maybe a -o (a -o Maybe b) -> Maybe b;
-synth maybe :: b -> (a -o b) -> Maybe a -o b;
+synth bind :: Maybe a ⊸ (a ⊸ Maybe b) -> Maybe b;
+synth maybe :: b -> (a ⊸ b) -> Maybe a ⊸ b;
 \end{code}
 Output program:
 \begin{code}
-return :: forall a . (a -o Maybe a);
+return :: (a ⊸ Maybe a);
 return = Just;
 
-empty :: forall a . Maybe a;
+empty :: Maybe a;
 empty = Nothing;
 
-bind :: forall a b . (Maybe a -o (!(a -o Maybe b) -o Maybe b));
+bind :: (Maybe a ⊸ (!(a ⊸ Maybe b) ⊸ Maybe b));
 bind c d = case c of
     Nothing ->
       let !e = d in Nothing
   | Just f -> let !g = d in g f;
 
-maybe :: forall a b . (!b -o (!(a -o b) -o (Maybe a -o b)));
+maybe :: (!b ⊸ (!(a ⊸ b) ⊸ (Maybe a ⊸ b)));
 maybe c d e = let !f = c in
   let !g = d in
     case e of
@@ -1770,28 +1779,28 @@ Input program:
 data List a = Nil | Cons (a * List a);
 data Maybe a = Nothing | Just a;
 
-synth singleton :: a -o List a;
-synth append :: List a -o List a -o List a;
-synth map :: (!(a -o b)) -o List a -o List b;
-synth foldl :: !(b -o a -o b) -o b -o List a -o b | choose 1;
-synth uncons :: List a -o Maybe (a * List a);
-synth foldr :: !(a -o b -o b) -o b -o List a -o b;
-synth insert :: a -o List a -o List a;
-synth concat :: List (List a) -o List a;
+synth singleton :: a ⊸ List a;
+synth append :: List a ⊸ List a ⊸ List a;
+synth map :: (!(a ⊸ b)) ⊸ List a ⊸ List b;
+synth foldl :: !(b ⊸ a ⊸ b) ⊸ b ⊸ List a ⊸ b | choose 1;
+synth uncons :: List a ⊸ Maybe (a * List a);
+synth foldr :: !(a ⊸ b ⊸ b) ⊸ b ⊸ List a ⊸ b;
+synth insert :: a ⊸ List a ⊸ List a;
+synth concat :: List (List a) ⊸ List a;
 \end{code}
 Ouput program:
 \begin{code}
-singleton :: forall a . (a -o List a);
+singleton :: (a ⊸ List a);
 singleton b = Cons (b, Nil);
 
-append :: forall a . (List a -o (List a -o List a));
+append :: (List a ⊸ (List a ⊸ List a));
 append b c = case b of
     Nil -> c
   | Cons d ->
       let e*f = d in
         Cons (e, append f c);
 
-map :: forall a b . (!(a -o b) -o (List a -o List b));
+map :: (!(a ⊸ b) ⊸ (List a ⊸ List b));
 map c d = let !e = c in
   case d of
       Nil -> Nil
@@ -1799,7 +1808,7 @@ map c d = let !e = c in
         let g*h = f in
           Cons (e g, map (!e) h);
 
-foldl :: forall a b . (!(b -o (a -o b)) -o (b -o (List a -o b)));
+foldl :: (!(b ⊸ (a ⊸ b)) ⊸ (b ⊸ (List a ⊸ b)));
 foldl c d e = let !f = c in
   case e of
       Nil -> d
@@ -1807,12 +1816,12 @@ foldl c d e = let !f = c in
         let h*i = g in
           foldl (!f) (f d h) i;
 
-uncons :: forall a . (List a -o Maybe (a * List a));
+uncons :: (List a ⊸ Maybe (a * List a));
 uncons b = case b of
     Nil -> Nothing
   | Cons c -> let d*e = c in Just (d, e);
 
-foldr :: forall a b . (!(a -o (b -o b)) -o (b -o (List a -o b)));
+foldr :: (!(a ⊸ (b ⊸ b)) ⊸ (b ⊸ (List a ⊸ b)));
 foldr c d e = let !f = c in
   case e of
       Nil -> d
@@ -1820,12 +1829,12 @@ foldr c d e = let !f = c in
         let h*i = g in
           f h (foldr (!f) d i);
 
-insert :: forall a . (a -o (List a -o List a));
+insert :: (a ⊸ (List a ⊸ List a));
 insert b c = case c of
     Nil -> Cons (b, Nil)
   | Cons h*i -> Cons (h, insert b i);
 
-concat :: forall a . (List (List a) -o List a);
+concat :: (List (List a) ⊸ List a);
 concat b = case b of
     Nil -> Nil
   | Cons d*e ->
@@ -1841,27 +1850,27 @@ futurely, that allows bind using runState to terminate in a reasonable time)
 \\
 Input program:
 \begin{code}
-data State b a = State (!b -o (a * !b));
+data State b a = State (!b ⊸ (a * !b));
 
-synth runState :: State b a -o (!b -o (a * !b));
-synth bind :: (State c a -o (a -o State c b) -o State c b) | using (runState);
-synth return :: a -o State b a;
+synth runState :: State b a ⊸ (!b ⊸ (a * !b));
+synth bind :: (State c a ⊸ (a ⊸ State c b) ⊸ State c b) | using (runState);
+synth return :: a ⊸ State b a;
 synth get :: State a a;
-synth put :: !a -o (State a 1);
-synth modify :: (!a -o !a) -o State a 1;
-synth evalState :: State b a -o !b -o a;
+synth put :: !a ⊸ (State a 1);
+synth modify :: (!a ⊸ !a) ⊸ State a 1;
+synth evalState :: State b a ⊸ !b ⊸ a;
 \end{code}
 Output program:
 \begin{code}
-data State b a = State (!b -o (a * !b));
+data State b a = State (!b ⊸ (a * !b));
 
-runState :: forall a b . (State b a -o (!b -o (a * !b)));
+runState :: (State b a ⊸ (!b ⊸ (a * !b)));
 runState c !f = case c of
     State e ->
         let h*i = e (!f) in
           let !j = i in (h, (!j));
 
-bind :: forall a b c . (State c a -o ((a -o State c b) -o State c b));
+bind :: (State c a ⊸ ((a ⊸ State c b) ⊸ State c b));
 bind bs bt = case bs of
     State bu ->
       State (\bv -> let !bw = bv in
@@ -1870,24 +1879,24 @@ bind bs bt = case bs of
                           (let dr*ds = runState (bt cu) (!cw) in
                              let !dt = ds in dr, (!cw)));
 
-return :: forall a b . (a -o State b a);
+return :: (a ⊸ State b a);
 return c = State (\d -> let !e = d in
                (c, (!e)));
 
-get :: forall a . State a a;
+get :: State a a;
 get = State (\b -> let !c = b in
                (c, (!c)));
 
-put :: forall a . (!a -o State a 1);
+put :: (!a ⊸ State a 1);
 put b = let !c = b in
   State (\d -> let !e = d in
                  ((), (!e)));
 
-modify :: forall a . ((!a -o !a) -o State a 1);
+modify :: ((!a ⊸ !a) ⊸ State a 1);
 modify b = State (\c -> let !d = c in
                let !f = b (!d) in ((), (!f)));
 
-evalState :: forall a b . (State b a -o (!b -o a));
+evalState :: (State b a ⊸ (!b ⊸ a));
 evalState c d = case c of
     State e ->
       let !f = d in
