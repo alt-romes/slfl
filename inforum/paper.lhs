@@ -190,7 +190,7 @@ are identified during synthesis, constraining the space of valid programs.
 
 In this work we explore the problem of type-based synthesis of
 functional programs using linear types under the lens of the
-Curry-Howard isomorphism. Specifically, we employ techniques from
+Curry-Howard correspondence. Specifically, we employ techniques from
 linear logic \emph{proof search} as a 
 mechanism for program synthesis, leveraging the proofs-as-programs
 connection between linearly
@@ -202,7 +202,7 @@ Our contributions are as follows:
 
 
 \item We present a framework for synthesis of functional programs
-(\S~\ref{sec:formal_system}) from specifications based on linear
+(\S~\ref{sec:core}) from specifications based on linear
 types, leveraging established proof-search techniques for linear logic
 under the lens of the Curry-Howard isomorphism.
 Specifically, the core of the synthesis procedure
@@ -248,39 +248,45 @@ linearity.
 
 \section{Synthesis as Proof Search}\label{sec:overview}
 
-The Curry-Howard isomorphism~\cite{DBLP:journals/cacm/Wadler15} describes the fundamental correspondence
+The Curry-Howard correspondence~\cite{DBLP:journals/cacm/Wadler15}
+describes the fundamental connection 
 between logic and programming languages: propositions are types, and proofs are
-programs. Under this lens, we can view \emph{bottom-up proof-search as
-synthesis} -- starting from the goal, finding a proof \emph{is} generating a
-program, which is also a compact representation of the proof.
+programs. Under this lens, we can view \emph{bottom-up} proof-search
+as \emph{program synthesis} -- starting from a goal proposition $A$,
+finding a proof of $A$ \emph{is exactly} the process of generating a
+program of type $A$.
 
-Typically, the Curry-Howard correspondence is developed between the so called
-natural deduction logical systems and functional programming languages such as
-the $\lambda$-calculus, where logical rules have a one-to-one mapping to typing rules.
+Typically, the Curry-Howard correspondence is developed between so-called
+systems of natural deduction and core functional languages such as
+the $\lambda$-calculus, where logical rules have a direct, one-to-one,
+mapping to typing rules.
 %
-However, even though a proof in a system of natural deduction can be
-interpreted as a program, by itself, a natural deduction system does not
-describe an algorithm for proof search.
+However, even though proofs in natural deduction can be
+interpreted as programs, a natural deduction proof system does not
+directly describe an algorithm for proof search.
 %
 An example that highlights this is the \emph{modus ponens} rule from
-intuitionistic logic and its analagous \emph{function application} typing rule
-from the simply-typed $\lambda$-calculus:
+intuitionistic logic (below on the left) and its analogous
+\emph{function application} typing rule
+from the simply-typed $\lambda$-calculus (below on the right):
 %
 \begin{mathpar}
-\infer*[right=]
+\infer*[right=(mp)]
 {\Gamma \vdash \alpha \rightarrow \beta \and \Gamma \vdash \alpha}
 {\Gamma \vdash \beta}
 \and
-\infer*[right=($\rightarrow$ E)]
+\infer*[right=($\rightarrow$\! E)]
 {\Gamma \vdash M : \alpha \rightarrow \beta \and \Gamma \vdash N : \alpha}
 {\Gamma \vdash M~N : \beta}
 \end{mathpar}
 %
-Through the lens of \emph{bottom-up} proof search, one can read ``to find a
-proof of $\beta$ with assumptions $\Gamma$, find a proof of $\alpha \rightarrow
-\beta$ and a proof of $\alpha$ with the same assumptions''. However, an
-algorithm based on these rules would have to come up with an instantiation of
-$\alpha$ for which the proof is complete, which is considerably hard. In
+If we interpret the rules \emph{bottom-up} we can see the modus ponens
+rule as ``to find a
+proof of $\beta$ under assumptions $\Gamma$, find a proof of $\alpha \rightarrow
+\beta$ and a proof of $\alpha$ with the same assumptions, for some $\alpha$''. However, an
+algorithm based on these rules would have to invent an
+$\alpha$ for which the proof can be completed, with no obvious
+relation between $\alpha$ and the goal $\beta$. In
 essence, inference rules in natural deduction are ill-suited for bottom-up
 proof-search since elimination rules work top-down, despite introduction rules working
 bottom-up.
