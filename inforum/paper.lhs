@@ -201,16 +201,17 @@ in their expressiveness and conciseness, by example.
 (\S~\ref{sec:formal_system}) from specifications based on linear
 types extended with recursive algebraic data types, parametric polymorphism and
 refinements, leveraging established proof-search techniques for linear logic
-through the Curry-Howard isomorphism. Specifically, the core of the synthesis
+through the Curry-Howard isomorphism~\cite{DBLP:journals/cacm/Wadler15}.
+Specifically, the core of the synthesis
 is a \emph{sound} and \emph{complete} system consisting of \emph{bottom-up}
-proof-search in propositional linear logic through \emph{focusing}~\cite{}. Our
+proof-search in propositional linear logic through \emph{focusing}~\cite{10.1093/logcom/2.3.297}. Our
 approach, being grounded in propositions-as-types, ensures that all synthesized
 programs (i.e.~proofs) are well-typed \emph{by construction} (i.e.~if the
 synthesis procedure produces a program, then the program intrinsically
 satisfies its specification).
 
 \item We present two implementations of our synthesis framework, one as a GHC
-plugin that synthesizes expressions for Linear Haskell~\cite{} program holes,
+plugin that synthesizes expressions for Linear Haskell~\cite{Bernardy_2018} program holes,
 the other in a standalone language with the same features the synthesis process
 supports, and benchmark them against similar synthesis that doesn't leverage
 linearity.
@@ -235,7 +236,7 @@ linearity.
 
 \section{Synthesis as Proof Search}\label{sec:overview}
 
-The Curry-Howard isomorphism~\cite{} describes the fundamental correspondence
+The Curry-Howard isomorphism~\cite{DBLP:journals/cacm/Wadler15} describes the fundamental correspondence
 between logic and programming languages: propositions are types, and proofs are
 programs. Under this lens, we can view \emph{bottom-up proof-search as
 synthesis} -- starting from the goal, finding a proof \emph{is} generating a
@@ -294,7 +295,7 @@ deal with excessive non-determinism (e.g.~multiple rules may be applicable, or
 there might be multiple functions in the context, which should we attempt to
 use?).
 
-Andreoli's focusing~\cite{} % for linear logic
+Andreoli's focusing~\cite{10.1093/logcom/2.3.297} % for linear logic
 emerges from the literature as a
 technique to discipline proof-search by reformulating the logical rules from
 sequent calculus. Focusing greatly prunes the search space of valid proofs --
@@ -330,7 +331,7 @@ linear-type-based based specification....
 
 % TODO: Acho que talvez faça mais sentido falar disto noutro sítio, está out-of-place
 % Não estou a imaginar como começar a falar de linear types/logic
-Linear logic~\cite{} can be seen as a resource-aware logic, where propositions
+Linear logic~\cite{DBLP:journals/tcs/Girard87} can be seen as a resource-aware logic, where propositions
 are interpreted as resources that are consumed during the inference process.
 Where in standard propositional logic we are able to use an assumption as many
 times as we want, in linear logic every resource (i.e., every assumption) must
@@ -1289,7 +1290,7 @@ synthesize the Monad instances of Maybe and State, but the more interesting
 result is a real-world example that comes from the Linear Haskell paper:
 %
 with Linear types one can provide a safe interface to manipulate mutable arrays. In
-Linear Haskell~\cite{} -- they provide an implementation of |array :: Int ->
+Linear Haskell~\cite{Bernardy_2018} -- they provide an implementation of |array :: Int ->
 [(Int,a)] -> Array a| using mutable arrays under the hood with the interface:
 %
 \begin{code}
