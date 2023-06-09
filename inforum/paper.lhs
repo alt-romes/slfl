@@ -288,12 +288,13 @@ algorithm based on these rules would have to invent an
 $\alpha$ for which the proof can be completed, with no obvious
 relation between $\alpha$ and the goal $\beta$. In
 essence, inference rules in natural deduction are ill-suited for bottom-up
-proof-search since elimination rules work top-down, despite introduction rules working
-bottom-up.
+proof-search since not all rules have an algorithmic bottom-up
+reading.
 %
-A more suitable candidate for bottom-up proof search than natural deduction is
-the equivalent \emph{sequent calculus} system in which all inference rules can
-be understood naturally in a bottom-up manner. The \emph{function application}
+A more suitable candidate for bottom-up proof search system is
+the equivalent \emph{sequent calculus} in which all inference rules can
+be naturally read in a bottom-up manner. The corresponding
+implication elimination (or \emph{function application})
 rule is instead:
 %
 \begin{mathpar}
@@ -302,75 +303,99 @@ rule is instead:
   {\Gamma, f{:}\alpha\rightarrow\beta \vdash M[f~N/x] : \tau}
 \end{mathpar}
 %
-which can naturally be read \emph{bottom-up}, through the lens of synthesis
+which can be understood \emph{bottom-up}, through the lens of synthesis
 this time, as ``to synthesize an expression of type $\tau$ when
 $f{:}\alpha\rightarrow\beta$ is in the context, synthesize an argument
-$N{:}\alpha$, and an expression $M{:}\tau$ assuming $x{:}\beta$ in the context -- then
+$N$ of type $\alpha$, and an expression $M{:}\tau$ assuming $x{:}\beta$ in the context -- then
 replace occurrences of $x$ by $f~N$ in $M$''.
 %
-Nevertheless, sequent calculus rules naively considered for proof search still
-deal with excessive non-determinism (e.g.~multiple rules may be applicable, or
-there might be multiple functions in the context, which should we attempt to
+Nevertheless, a sequent calculus is still not completely suited for
+proof search due to non-determinism in selecting which rules to apply
+(e.g.~if multiple function types are available in the context, which should we attempt to
 use?).
 
 Andreoli's focusing~\cite{10.1093/logcom/2.3.297} % for linear logic
-emerges from the literature as a
-technique to discipline proof-search by reformulating the logical rules from
-sequent calculus. Focusing greatly prunes the search space of valid proofs --
-focusing eliminates all of the “don’t care” non-determinism from proof search,
-since the order in which certain rules are applied does not affect the outcome
-of the search, leaving only the non-determinism that pertains to unknowns (or
-“don’t know” non-determinism), identifying precisely the points at which
-backtracking search is necessary.
+is a technique that aims to discipline (linear logic) proof-search by
+reformulating the rules of the
+sequent calculus. Focusing reduces the
+non-determinism inherent to proof search, by leveraging
+the fact that the \emph{order} in which certain rules are applied does not affect the outcome
+of the search; and, by identifying the non-determinism in the search
+process that pertains to true unknowns (i.e., rules whose application
+modifies what can be subsequently proved),marking precisely the branches of the search
+space that may need to be revisited (i.e.,~backtracked to).
 
-% TODO: Falamos de linear types antes ou depois? Parece estranho falar de linear types sem ter falado nada deles ainda
-% TODO não falamos de resource management, aparece aqui?
-Our key idea is that linear types, in their correspondence with linear logic,
-form an system well we can consolidate bottom-up proof-search in
-linear logic these concepts into a uniform system of rules that describes
-synthesis of functional programs from linear-type-based specifications, which
-besides being amenable to prof systems
+Andreoli's focused sequent calculus can thus be effectively read
+as a procedure for proof search for (a significant fragment of) linear logic that
+turns out to be both \emph{sound} and \emph{complete} (i.e., a sequent
+is provable if and only if it is derivable in the focused
+system). Following propositions-as-types, this means that through
+focusing we can derive a procedure for \emph{program synthesis} for the
+\emph{linear} $\lambda$-calculus from type-based specifications,
+exploring the logical~\cite{DBLP:journals/tcs/Girard87} origins of linear types.
+%
 
-, besides being suitable synthesis specifications
-in their preciseness and expressiveness.
-
-Our key idea is then that putting together 
-
-but are also and in its correspondence with \emph{linear logic}.
-
-The system comprises of proof search in (intuitionistic) linear logic sequent
-calculus, based on a system of resource
+Our core synthesis framework thus comprises of a reading of
+focused proof search in (intuitionistic) linear logic, where proofs
+are seen as programs in a linearly-typed $\lambda$ calculus.
+In linear logic, propositions are interpreted as resources that are
+\emph{consumed} during the inference process. 
+Where in standard propositional logic we are able to use an assumption as many
+times as we want, in linear logic every resource (i.e., every assumption) must
+be used \emph{exactly once}, or \emph{linearly}. In the remainder of
+this work we will move interchangeably from linear propositions to
+linear \emph{types}. As an example, consider the typing rules for the
+linear function ($\lolli$), the linear counterpart to the standard function type;
+linear product ($\tensor$), related to the standard product
+type; and linear variables:
+\begin{mathpar}
+{\small
+\infer[($\lolli$\! R)]
+{\Delta, x{:}A \vdash M : B}
+{ \Delta \vdash \lambda x. M : A\lolli B}
+\and
+\infer[($\tensor$ \! R)]
+{\Delta_1 \vdash M : A \and \Delta_2 \vdash N : B}
+{\Delta_1, \Delta_2 \vdash (M,N) : A \tensor B}
+\and
+\infer[(var)]
+{ \, }
+{x : A \vdash x : A}
+}
+\end{mathpar}
+The rules define the judgment $\Delta \vdash M : A$, stating that term
+$M$ has type $A$ using linear variables in $\Delta$. Rule {\sc
+  ($\lolli$\! R)} explicates that to type a $\lambda$-abstraction
+$\lambda x. M$ with type
+$A\lolli B$, the body $M$ must use $x$ exactly once with type $A$ to
+produce $B$. Note how the variable rule enforces the exact usage since
+no other ambient variables are allowed. This is also observed in the
+{\sc ($\tensor$ \! R)} rule, which states that to type the linear pair
+$(M,N)$ with $A\tensor B$, the available resources must be split in
+two regions ($\Delta_1$ and $\Delta_2$), one that is used in $M$ and
+the other, disjointly, in $N$ (the logical rules can be obtained by
+omitting the terms).
+Unlike in standard propositional logic, where assumptions can be
+weakened and contracted (i.e., discarded and duplicated) and so can
+simply be maintained globally as they are introduced in a derivation,
+in linear logic assumptions cannot be weakened or contracted and thus
+a system of resource
 management~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
-and focusing.
+is combined with focusing in order to algorithmically track linear
+resource usage. 
 
-In this section, we present the key idea for synthesizing programs from a
-linear-type-based based specification....
 
 
 % TODO: Acho que talvez faça mais sentido falar disto noutro sítio, está out-of-place
 % Não estou a imaginar como começar a falar de linear types/logic
-Linear logic~\cite{DBLP:journals/tcs/Girard87} can be seen as a resource-aware logic, where propositions
-are interpreted as resources that are consumed during the inference process.
-Where in standard propositional logic we are able to use an assumption as many
-times as we want, in linear logic every resource (i.e., every assumption) must
-be used \emph{exactly once}, or \emph{linearly}.
-%
-% TODO Não gosto deste paragrafo em geral
-Linear types are analogous to linear logic connectives, through the
-Curry-Howard isomorphism. As an example, consider the typing rules for the
-linear function ($\lolli$), the linear counterpart to the common function type,
-and the linear tensor product ($\tensor$), similar to the common product type:
-\begin{mathpar}
-\infer*[right=($\lolli$ R)]
-{\Gamma; \Delta, x{:}\alpha \vdash M : \beta}
-{\Gamma; \Delta \vdash \lambda x. M : \alpha\lolli\beta}
-\and
-\infer*[right=($\tensor$ R)]
-{\Gamma; \Delta_1 \vdash M : \alpha \and \Gamma; \Delta_2 \vdash N : \beta}
-{\Gamma; \Delta_1, \Delta_2 \vdash (M,N) : \alpha\tensor\beta}
-\end{mathpar}
-%
-Note how we have a new context $\Delta$ threading the linear resources...
+% Linear logic~\cite{DBLP:journals/tcs/Girard87} can be seen as a resource-aware logic, where propositions
+
+% %
+% % TODO Não gosto deste paragrafo em geral
+% Linear types are analogous to linear logic connectives, through the
+% Curry-Howard isomorphism. 
+% %
+% Note how we have a new context $\Delta$ threading the linear resources...
 
 % \begin{itemize}
 % \item Curry-Howard tens uma correspondencia um para um entre regras
@@ -392,11 +417,6 @@ Note how we have a new context $\Delta$ threading the linear resources...
 %   sequencia de forma a isolar o nao determinismo.
 % \end{itemize}
 
-Antes do Core calculus, apresentar linear types (linear function e tensor)
-
-Não é qq sistema de linear logic que serve para síntese
-
-\todo{god}
 
 % TODO: Better to separate completely the implementation talk from the
 % synthesis framework talk.
@@ -440,17 +460,18 @@ Não é qq sistema de linear logic que serve para síntese
 % richer types and their intrinsic challenges (such as infinite
 % recursion) must be developed.
 
-In this section we formalize the techniques that guide synthesis from our more
-expressive specifications, alongside the already well defined rules that model
-the core of the synthesizer, putting together a \emph{sound} set of inference
-rules that characterizes our framework for linear synthesis of recursive
-programs from specifications with the select richer types, and describes the
-system in enough detail for the synthesizer to be reproducible by a
-theory-driven implementation.
+We now present in detail the techniques that make up our synthesis
+framework based on linear types.  We first introduce 
+the core of the synthesizer (\S~\ref{sec:core}) which is a more or
+less direct interpretation of focusing as proof search; which we
+soundly extend (\S~\ref{sec:extension}) with extra-logical but
+programming-centric features such as general recursion and abstract
+data types (necessarily abandoning completeness).
 %
 We note that a \emph{sound} set of rules guarantees we cannot synthesize
-incorrect programs; and that the valid programs derivable through them
-reflect the subjective trade-offs we committed to.
+ill-typed programs; and that the valid programs derivable through them
+reflect the subjective trade-offs we committed to in order to produce
+an effective synthesizer.
 
 \subsection{Core Language}\label{sec:core}
 
