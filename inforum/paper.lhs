@@ -246,7 +246,7 @@ linearity.
 % Appendix~\ref{sec:examples} lists concrete examples of synthesis with \synname.
 
 
-\section{Synthesis as Proof Search}\label{sec:overview}
+\section{Synthesis as Proof Search}\label{sec:core_synthesis}
 
 The Curry-Howard correspondence~\cite{DBLP:journals/cacm/Wadler15}
 describes the fundamental connection 
@@ -1298,7 +1298,7 @@ recursion, ADTs, polymorphism and refinements to synthesize
 more expressive programs.
 
 
-\section{Evaluation}
+\section{Evaluation}\label{sec:evaluation}
 
 We've implemented our framework synthesis both as a GHC type-hole plugin and as
 a standalone synthesizer that can typecheck Haskell-like programs with ``goal
@@ -1377,7 +1377,7 @@ benchmarks taking these all into account.
         Misc & either & $197\mu s\pm 5.3\mu s$ && \\ 
         \hline
         \multirow{2}{4em}{Array} & & & \emph{depth 3} & \emph{freeze, foldl} \\
-        & array~\ref{sec:overview} & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
+        & array~\ref{sec:evaluation} & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
         \hline
         Refinements & add3 & $39ms\pm 1.1ms$ & & + \\
         \hline
