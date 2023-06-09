@@ -1199,12 +1199,13 @@ constrain $c$ can be unified with those in $\Theta$:
 
 Type-based program synthesis is a vast field of study. Most
 works~\cite{DBLP:conf/lopstr/HughesO20,DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
-follow some variation of the synthesis-as-proof-search approach. However, the
-process is novel for each due to a variety of different rich types explored and
-their corresponding logics and languages; or nuances of the synthesis process
-itself, such as complementing types with program examples; or even the
-programming paradigm of the output produced (e.g. generating heap manipulating
-programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
+follow some variation of the synthesis-as-proof-search approach, and focusing
+in synthesis appeared first in the literature in~\cite{10.1145/3408991}.
+However, the process is novel for each due to a variety of different rich
+types explored and their corresponding logics and languages; or nuances of the
+synthesis process itself, such as complementing types with program examples;
+or even the programming paradigm of the output produced (e.g. generating heap
+manipulating programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
 % Some other common
 % patterns we follow are the use of type
 % refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16}, polymorphic types, and the
