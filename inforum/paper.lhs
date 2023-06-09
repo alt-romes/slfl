@@ -107,8 +107,8 @@ Specifications can take many forms such as natural
 language~\cite{chen2021evaluating}, examples~\cite{DBLP:conf/popl/FrankleOWZ16}
 or rich types such as polymorphic refinement
 types~\cite{DBLP:conf/pldi/PolikarpovaKS16} or graded
-types~\cite{DBLP:conf/lopstr/HughesO20}. Regardless of the specification kind,
-program synthesis must deal with two main inherent sources of complexity --
+types~\cite{DBLP:conf/lopstr/HughesO20}. Regardless of the specification form,
+program synthesis must address two main sources of complexity --
 searching over the space of valid programs, and interpreting user intent.
 
 % Cuttable
@@ -127,24 +127,27 @@ expressive and prune the valid programs search space, while maintaining a
 For instance, the type $\mathsf{Int} \rightarrow \mathsf{Int} \rightarrow
 \mathsf{Int}$ can be viewed as a specification, but there are an infinite
 number of functions that instance this type/satisfy this specification -- it is
-extremely imprecise. On the other hand, the richer type $(x{:}\mathsf{Int})
+extremely imprecise. On the other hand, the refinement type $(x{:}\mathsf{Int})
 \rightarrow (y{:}\mathsf{Int}) \rightarrow \{z{:}\mathsf{Int} \mid z = x+y\}$
 precisely specifies a function that adds its two arguments.
 
 % The focus of our work is type-driven synthesis where specifications take the
 % form of \emph{linear types}.
 %
-Linear types are a form of richer types that constrains resource usage in
+Linear types are another form of rich types that constrains resource usage in
 programs by \emph{statically} limiting the number of times certain resources
 can be used during their lifetime; in particular, linear resources must be used
 \emph{exactly once}. Linearity allows us to concisely describe interesting
-functions, since we can easily specify which arguments must be used linearly in
-the body of a function. For example, the type of the linear map function,
-|map :: (a ⊸ b) -> [a] ⊸ [b]|, specifies a function that must consume the list of $a$s exactly once
+functions, since we can easily specify which arguments must be used
+exactly once in
+the body of a function. For example, the type of the linear map
+function (using Haskell syntax),
+|map :: (a ⊸ b) -> [a] ⊸ [b]|, specifies a function that, given a
+\emph{linear} function from |a| to |b|, must consume the list of |a|s exactly once
 to produce a list of $b$s, which can only be done by applying the function to
 each element.
 % 
-A linear type aware type-driven synthesizer might take the |map| type
+A linearity-aware program synthesizer can take the |map| type
 as a specification to unambiguously produce the correct output:
 %
 \begin{code}
@@ -170,25 +173,27 @@ matches the user intent in a reasonable time frame.
 % structures~\cite{Bernardy_2018}, enforcing protocols for external \textsc{api}s~\cite{Bernardy_2018}, to name a few.
 
 %\mypara{Contributions}
-Synthesis with linear types combined with other advanced typing features has
+Synthesis with linear types, combined with other advanced typing features, has
 generally been overlooked in the literature, despite their long-known potential
 \cite{Wadler90lineartypes,DBLP:journals/mscs/CairesPT16,Bernardy_2018} and
 strong proof-theoretic foundations
 \cite{10.1093/logcom/2.3.297,DBLP:conf/cade/ChaudhuriP05,DBLP:journals/tcs/CervesatoHP00}.
 %
-Their preciseness
-also affects the search space: all programs where a linear resource is used
-non-linearly %(i.e. not exactly once)
-are ill-typed. With linearity built into the synthesis process, usage of a
+One aspect that makes linear types particularly appealing from the
+point of view of program synthesis is how linearity 
+can affect the search space of valid programs: all programs where a linear resource is used
+non-linearly (i.e. not exactly once)
+are ill-typed and can be discarded. With linearity built into the synthesis process, usage of a
 linear variable more than once is not considered, and unused variables
 are identified during synthesis, constraining the space of valid programs.
 %
 
 In this work we explore the problem of type-based synthesis of
 functional programs using linear types under the lens of the
-Curry-Howard isomorphism. Specifically, in this
-work we employ techniques from linear logic \emph{proof search} as a
-mechanism for program synthesis, leveraging the connection between linearly
+Curry-Howard isomorphism. Specifically, we employ techniques from
+linear logic \emph{proof search} as a 
+mechanism for program synthesis, leveraging the proofs-as-programs
+connection between linearly
 typed functional programs and linear logic proofs. 
 %
 Our contributions are as follows:
