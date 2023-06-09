@@ -1,4 +1,4 @@
-\documentclass{llncs}
+\documentclass[runningheads]{llncs}
 
 \usepackage[dvipsnames]{xcolor}
 \usepackage{xcolor}
@@ -70,8 +70,7 @@ specification and the user's intent in an actionable amount of time.
 In this work, we explore how linear types allow for precise specifications
 suitable for synthesis, and present a framework for synthesis with linear types
 that, through the Curry-Howard correspondence, leverages existing proof-search
-techniques for Linear Logic to efficiently find programs satisfying the given
-specifications.
+techniques for Linear Logic to efficiently find type-correct programs.
 
 We implement the synthesis framework both as a standalone language which
 supports classical linear types extended with recursive algebraic data types,
@@ -475,13 +474,14 @@ an effective synthesizer.
 
 \subsection{Core Language}\label{sec:core}
 
-\mypara{Core Rules} The core language for synthesis terms and specifications is
+\mypara{Core Rules} The core language of our framework is
 a simply-typed linear $\lambda$-calculus with linear functions ($\lolli$),
 additive ($\with$) and multiplicative ($\tensor$) pairs (denoting alternative
-\emph{vs} simultaneous occurrence of resources), multiplicative unit
+and simultaneous occurrence of resources, respectively), multiplicative unit
 (\textbf{1}), additive sums ($\oplus$) and the exponential modality ($\bang$),
-to internalize unrestricted use of variables. The syntax of terms $(M,N)$ and
-types $(\tau, \sigma)$ is given below:
+which internalizes unrestricted use of variables. The syntax of terms $(M,N)$ and
+types $(\tau, \sigma)$ is given below (we highlight the type for which
+the terms in a given line form the introduction and elimination forms, respectively):
 \[
   \begin{array}{lclcc}
     M,N & ::= & u, v & \quad & \\
@@ -503,34 +503,38 @@ types $(\tau, \sigma)$ is given below:
 In intuitionistic sequent calculi, each connective has a so-called \emph{left}
 and a \emph{right} rule, which effectively define how to decompose an ambient
 assumption of a given proposition and how to prove a certain proposition is
-true, respectively.  Andreoli's \emph{focusing} for linear logic~\cite{10.1093/logcom/2.3.297} 
-is a technique to remove non-essential nondeterminism from
-proof-search by structuring the application of so-called invertible and
-non-invertible inference rules. Andreoli observed that the connectives of linear
-logic can be divided into two categories, dubbed synchronous and asynchronous.
-Asynchronous connectives are those whose right rules are \emph{invertible}, i.e.
-they can be applied eagerly during proof search without losing provability and
-so the order in which these rules are applied is irrelevant, and whose left
+true, respectively. In a \emph{focused} sequent calculus
+we further identify so-called invertible and
+non-invertible inference rules. Andreoli~\cite{10.1093/logcom/2.3.297}
+observed that the connectives of linear 
+logic can be divided into two categories, dubbed synchronous and
+asynchronous.
+%
+Asynchronous connectives are those whose right rules are
+\emph{invertible}, i.e.
+they can be applied eagerly during proof search without altering provability (and
+so the order in which these rules are applied is irrelevant) and whose left
 rules are not invertible. Synchronous connectives are dual. The asynchronous
-connectives are $\lolli$ and $\with$ and the synchronous are
+connectives are $\lolli$ and $\with$ and the synchronous ones are
 $\tensor,\textbf{1},\oplus,\bang$.
 
-Given this separation, focusing divides proof search into two
+Given this separation, focusing divides proof search into two alternating
 phases: %
-the inversion phase ($\Uparrow$), in which we apply \emph{all}
-invertible rules eagerly, and the focusing phase ($\Downarrow$), in
-which we decide a proposition to focus on, and then apply
+the inversion phase, in which we apply \emph{all}
+invertible rules eagerly, and the focusing phase, in
+which we decide a proposition to \emph{focus} on, and then apply
 non-invertible rules, staying \emph{in focus} until we reach an
 asynchronous/invertible proposition, the proof is complete, or
 no rules are applicable, in which case the proof must \emph{backtrack}
-to the state at which the focusing phase began.  As such, with
+to the state at which the focusing phase began.
+%
+As such, with
 focusing, the linear sequent calculus judgment 
 $\Gamma; \Delta \vdash A$, meaning that $A$ is derivable from the linear
-assumptions in $\Delta$ and unrestricted assumptions in $\Gamma$,
-is split into four judgments, grouped into the two phases ($\Uparrow,
-\Downarrow$).
-%
-For the invertible phase, an \emph{inversion} 
+assumptions in $\Delta$ and non-linear assumptions in $\Gamma$,
+is split into four judgments, grouped into the two phases.
+
+For the invertible phase, a
 context $\Omega$ holds propositions that result from
 decomposing connectives.
 % (propositions we'll later try to invert,
@@ -542,62 +546,68 @@ indicates the connective or context being inverted.
 For the focusing phase (i.e.~all non-invertible rules can apply), 
 the proposition under focus can be the goal or 
 one in $\Gamma$ or $\Delta$. The right focus judgment is written 
-$\Gamma;\Delta \vdash A \Downarrow$ and the left focus judgment is
-written $\Gamma;\Delta; B\Downarrow\ \vdash A$, where $\Downarrow$
+$\Gamma;\Delta \vdash A \Downarrow$ and the left focus judgment
+$\Gamma;\Delta; B\Downarrow\ \vdash A$, where $\Downarrow$
 indicates the proposition under focus.
 
-To handle the context splitting required to prove subgoals, we augment the
-judgments above using Hodas and Miller's resource management technique where a pair of
+As alluded in the previous section, to handle the context splitting required to prove subgoals, we augment the
+judgments above using Hodas and Miller's resource management
+technique~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
+where a pair of
 input/output linear contexts is used to propagate the yet unused linear
-resources across subgoals; e.g. the left inversion judment is written
+resources across subgoals; e.g. the left inversion judgment is written
 $\Gamma; \Delta/\Delta'; \Omega \Uparrow\ \nolinebreak\vdash A$ where $\Delta$ is the input
-linear context and $\Delta'$ is the output one.
+linear context and $\Delta'$ is the output one. 
 
 
-Putting together linear logic and linear lambda calculus through the Curry-Howard correspondence, resource
-management, and focusing, we get the following core formal system\footnote{For
+Combining linear logic (i.e., the linear lambda calculus through the Curry-Howard correspondence), resource
+management, and focusing, we obtain the following core formal system\footnote{For
 the sake of brevity, we've ommitted some rules such as those for the additive
-pair and disjunction. The complete system can be found in the Appendix.}
+pair and disjunction. The complete system can be found in Appendix~\cite{app:final_system}.}
 (inspired by~\cite{DBLP:conf/cade/ChaudhuriP05,fpnotes}) -- in which the
 rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
 context $\Delta$, and inversion context $\Omega$, assume $x{:}A$ in $\Omega$ to
 synthesize a program $M$ of type $B$, and return $\lambda x. M$.
 %
-We start with right invertible rules, which decompose the goal proposition until it's synchronous.
+We begin with right invertible rules, which decompose the goal until
+it becomes a synchronous proposition (note the condition on rule
+($\with R$) which forces both subterms to use the same linear variables):
 %
 \begin{mathpar}
-
+{\small
     % -o R
     \infer*[right=($\lolli R$)]
     {\Gamma ; \Delta/\Delta' ; \Omega, x{:}A \vdash M : B \Uparrow \and x
     \notin \Delta'}
     {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x . M : A
     \lolli B \Uparrow}
-
-\and
-
+}
+  \and
+{\small
     % & R
     \infer*[right=($\with R$)]
     {\Gamma ; \Delta/ \Delta' ; \Omega \vdash M : A \Uparrow \and \Gamma ;
     \Delta/ \Delta'' ; \Omega \vdash N : B \Uparrow \and \Delta' = \Delta''}
     {\Gamma ; \Delta/\Delta' ; \Omega \vdash  (M \with N) : A
     \with B \Uparrow}
-
+}
 \end{mathpar}
 %
 When we reach a non-invertible proposition on the right, we start inverting the
 $\Omega$ context. The rule to transition to inversion on the left is:
 %
 \begin{mathpar}
+  {\small
     \infer*[right=($\Uparrow$R)]
     {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
     right asynchronous}}
-    {\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
+{\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
+}
 \end{mathpar}
 %
-We follow with left invertible rules for asynchronous connectives, which
-decompose asynchronous propositions in $\Omega$.
+We then apply left invertible rules for asynchronous connectives, which
+decompose asynchronous propositions in $\Omega$:
 %
 \[
   \begin{array}{c}
@@ -635,13 +645,15 @@ decompose asynchronous propositions in $\Omega$.
 When we find a synchronous (i.e. non-invertible) proposition in $\Omega$,
 we simply move it to the linear context $\Delta$, and keep inverting on the left:
 \begin{mathpar}
+  {\small
     \infer*[right=($\Uparrow$L)]
     {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
     \textrm{not left asynchronous}}
-    {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
+  {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
+  }
 \end{mathpar}
 %
-After inverting all the asynchronous propositions in $\Omega$ we'll reach a state
+After inverting all the asynchronous propositions in $\Omega$ we reach a state
 where there are no more propositions to invert ($\Gamma'; \Delta'; \cdot
 \Uparrow\ \vdash C$). At this point, we want to \emph{focus} on a proposition.
 The focus object will be: the proposition on the right (the
@@ -649,7 +661,9 @@ goal), a proposition from the linear $\Delta$ context, or a proposition from the
 unrestricted $\Gamma$ context. For these options we have three \emph{decision}
 rules:
 %
-\[
+
+\vspace{-0.5cm}
+{\small\[
   \begin{array}{c}
     \infer*[right=(decideR)]
     {\Gamma; \Delta/\Delta' \vdash C \Downarrow \and C\ \textrm{not atomic}}
@@ -662,7 +676,8 @@ rules:
     {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash C}
     {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
   \end{array}
-  \]
+\]}
+
 %
 The decision rules are followed by either left or right focus rules.
 To illustrate, consider the $\lolli$L left focus rule. The rule
@@ -677,11 +692,14 @@ application $x\,N$. The remaining left rules follow a similar
 pattern. The right focus rules are read similarly to right inversion ones,
 albeit the goal and sub-goals are under focus (except for $\bang R$).
 %
+
+\vspace{-0.5cm}
 \begin{mathpar}
+  {\small
       \infer*[right=($\lolli L$)]
     {\Gamma; \Delta/\Delta'; y{:}B \Downarrow\ \vdash M : C \and \Gamma;
     \Delta'/\Delta''; \cdot \vdash N : A \Uparrow}
-    {\Gamma; \Delta/\Delta''; x{:}A \lolli B \Downarrow\ \vdash M\{(x\,N)/y\} : C}
+    {\Gamma; \Delta/\Delta''; x{:}A \lolli B \Downarrow\ \vdash M\{(x\,N)/y\} : C}}
 %\and
 %    \infer*[right=($\with L_1$)]
 %    {\Gamma; \Delta/\Delta'; y{:}A \Downarrow\ \vdash M : C}
@@ -692,14 +710,14 @@ albeit the goal and sub-goals are under focus (except for $\bang R$).
 %    {\Gamma; \Delta/\Delta'; x{:}A \with B \Downarrow\ \vdash
 %      M\{(\textrm{snd}\ x)/y\} : C}
 \and
-    \infer*[right=($\tensor R$)]
+   {\small \infer*[right=($\tensor R$)]
     {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow \and \Gamma ; \Delta'/\Delta'' \vdash N
     : B \Downarrow}
     {\Gamma; \Delta/\Delta'' \vdash (M \tensor N) : A \tensor B \Downarrow}
 \and
     \infer*[right=($1 R$)]
     { }
-    {\Gamma; \Delta/\Delta \vdash \star : \textbf{1} \Downarrow}
+    {\Gamma; \Delta/\Delta \vdash \star : \textbf{1} \Downarrow}}
 %\and
 %    \infer*[right=($\oplus R_1$)]
 %    {\Gamma; \Delta/\Delta' \vdash M : A \Downarrow}
@@ -736,33 +754,42 @@ synchronous, we switch to inversion as well. Three rules model these conditions:
 \end{array}
 \]
 %
-The rules written above together make the core of our synthesizer. Next, we'll
-present new rules that align and build on top of these to synthesize recursive
-programs from more expressive (richer) types.
+The rules presented above make the core of our synthesizer. As a proof
+system, focusing is both sound and complete -- a sequent is provable
+in the focused system if and only if it is provable in linear
+logic. We note however, that proof search in full linear logic is
+\emph{undecidable}~\cite{DBLP:conf/lics/LincolnSS95}.
+
+
+% Next, we'll
+% present new rules that align and build on top of these to synthesize recursive
+% programs from more expressive (richer) types.
 
 \section{Beyond Propositional Logic}\label{sec:extension}
 
-By itself, the core synthesis process can only generate simple non-recursive
+By itself, the core synthesis process can only output simple non-recursive
 programs.
-In this section, we extend the synthesis with recursion and polymorphism,
-leaving the realm of completeness of proof search??, and show how we can tame
-non-terminating proof serach??
-Extending the core synthesis process into 
-\todo{intro to section, mention algebraic data types and recursion as a whole
-(text that follows it assumes both have been announced), and polymorphism}
+In this section, we extend our framework to be able to synthesize more
+interesting programs featuring general recursion over algebraic data
+types (ADTs) and
+polymorphism. The combination of these features diverges from the pure
+logical interpretation of focusing since general recursion is unsound
+from a logical perspective (and ADTs are not of particular proof
+theoretic interest).
 
-In its simplest form, an algebraic data type (ADT) is a tagged sum of any type,
-i.e. a named type that can be instantiated by one of many tags (or
-constructors) that take some value of  a fixed type, which might be, e.g., a
-product type ($A \tensor B$), or unit ($1$), in practice allowing for
-constructors with an arbitrary number of parameters.
+In its simplest form, an algebraic data type (ADT) is a tagged sum of
+any type (i.e. a named type that can be instantiated by one of many tags, or
+constructors) that take some value of  a fixed type. In general,
+since the tagged types can be products ($A \tensor B$), or the unit
+($1$), constructors can have an arbitrary fixed number of parameters.
 %
 %In the \synname\
 %language, the programmer can define custom ADTs; as an example, we show the
 %definition of an ADT which holds zero, one, or two
 %values of type $A$, using the syntax: |data Container = None 1 mid One A mid Two (A * A)|.
 %
-The grammar of our core calculus is extended as (where $C_n$ constructs values of some type $T$):
+The grammar of our core calculus is extended as (where $C_n$ is a
+constructor for values of some type $T$):
 %
 \[
 \begin{array}{lclc}
@@ -773,13 +800,12 @@ The grammar of our core calculus is extended as (where $C_n$ constructs values o
 \end{array}
 \]
 %
-Algebraic data types are closely related to the ($\oplus$) type -- both are
-additive disjunctions. There is a right rule for each constructor of the data
-type, each requiring only that a term is synthesized for the argument of the
-constructor; and there is one left rule to deconstruct an ADT term in the
-context by pattern matching on it, requiring a term of the same type to be
-synthesized for each possible branch -- akin to the left rule for the $\oplus$
-connective. Naively, one might consider the rules:
+Algebraic data types are related to the ($\oplus$) type -- both are
+forms of disjunction. There is a right rule for each constructor of the data
+type, requiring only that a term is synthesized for the argument of the
+constructor; and there is one left rule to deconstruct a value of ADT type in the
+context by pattern matching, requiring a term of the same type to be
+synthesized for each possible branch. Naively, one might consider the rules:
 %
 %The semantics of ADTs relate to those of the plus ($\oplus$) type -- both are
 %additive disjunctions.  To construct a value of an ADT we must use one of its
@@ -793,11 +819,12 @@ connective. Naively, one might consider the rules:
 %its constructors stand for any ADT defined as |data T = C1 X1 mid C2 X2 mid ... mid Cn Xn|:
 %
 \begin{mathpar}
+  {\small
     \infer*[right=(adtR)]
     {\Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow}
-    {\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
+    {\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}}
 \and
-    \mprset{flushleft}
+    {\small\mprset{flushleft}
     \infer*[right=(adtL)]
     {
         %\Gamma ; \Delta/ \Delta'_1 ; \Omega, y_1{:}X_1 \Uparrow\ \vdash M_1 : C
@@ -818,8 +845,10 @@ connective. Naively, one might consider the rules:
     }
     {\Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ \mid\ C_n\ y_n
-    \rightarrow M_n : C}
+    \rightarrow M_n : C}}
+
 \end{mathpar}
+
 %
 % repetition does not legitimize :p
 %
@@ -830,12 +859,15 @@ connective. Naively, one might consider the rules:
 %defined as |data T = C1 T|, the synthesis goal
 %$T \lolli C$, and part of its derivation:
 However, for recursively defined data types, i.e. for constructors that take as
-an argument a value of the type they construct, synthesis applying the naive
-ADT rules will not terminate, both when constructing and deconstructing data
-types. Consider, for example, type $T$ and its sole constructor $C_1$. When
-constructing a derivation for a goal $T \lolli D$, we could infinitely apply
+an argument a value of the type they construct, a direct application
+of the rules above will not terminate.
+%
+Consider, for example, type $T$ and its sole constructor $C_1$. When
+synthesizing a derivation for a goal $T \lolli D$, for some $D$, we could infinitely apply
 \textsc{adtL}:
 %
+
+\vspace{-0.5cm}
 {\small
 \begin{mathpar}
     \infer*[right=($\Uparrow R$)]
@@ -855,8 +887,9 @@ constructing a derivation for a goal $T \lolli D$, we could infinitely apply
 \end{mathpar}}
 %
 Symmetrically, the derivation for goal $T$ is also infinite, since we can apply
-\textsc{adtR} infinitely, never closing the proof.
-%
+\textsc{adtR} infinitely, never closing the proof:
+
+\vspace{-0.5cm}
 {\small
 \begin{mathpar}
     \infer*[left=(adtR)]
@@ -871,31 +904,35 @@ Symmetrically, the derivation for goal $T$ is also infinite, since we can apply
     }
     {\Gamma; \Delta/\Delta'; \Omega \vdash C_1 \dots : T \Downarrow}
 \end{mathpar}}
-%
-To account for recursively defined data types, we restrict their decomposition
-in proofs for the branches of the first decomposition, and, symmetrically,
+
+
+To account for recursively defined types, we restrict their decomposition
+when synthesizing branches of a case construct, and, symmetrically,
 disallow construction of data types when trying to synthesize an argument for
 their constructors.
 %
 %
-For this, we need two more contexts, $\Rho_C$ for constraints on construction
+To model this, we use two more contexts, $\Rho_C$ for constraints on construction
 and $\Rho_D$ for constraints on deconstruction. Together, they hold a list of
-data types that cannot be constructed or deconstructed at a given point in the
-proof. For convenience, they are represented by a single $\Rho$ if unused. All
-non-ADT rules trivially propagate these. The ADT rules are then extended to
-account for recursiveness as follows, where $\Rho'_C = \Rho_C,T$ if $T$ is
+data types that cannot be constructed or deconstructed at a given
+point, respectively. For convenience, they are represented by a single $\Rho$ if
+unused and all non-ADT rules trivially propagate these.
+The ADT rules
+account for recursion as follows, where $\Rho'_C = \Rho_C,T$ if $T$ is
 recursive and $\Rho'_C = \Rho_C$ otherwise ($\Rho'_D$ is dual):
 %
 %TODO: ... we can actually instance ADTs that take no arguments even if they are restricted
 
+\vspace{-0.5cm}
 \begin{mathpar}
+  {\small
     \infer*[right=(adtR)]
     {(\Rho_C'; \Rho_D) ; \Gamma; \Delta/\Delta' \vdash M : X_n \Downarrow \and
     T \notin \Rho_C}
-    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta' \vdash\ C_n \ M : T \Downarrow}}
 \and
     \mprset{flushleft}
-    \infer*[right=(adtL)]
+    {\small\infer[(adtL)]
     {
         \overline{(\Rho_C; \Rho'_D);\Gamma ; \Delta/ \Delta'_n ; \Omega, y_n{:}X_n \Uparrow\ \vdash M_n : C}
         \and
@@ -914,7 +951,7 @@ recursive and $\Rho'_C = \Rho_C$ otherwise ($\Rho'_D$ is dual):
     }
     {(\Rho_C; \Rho_D); \Gamma ; \Delta/\Delta'_1 ; \Omega, x{:}T \Uparrow\
     \vdash\ \textrm{case}\ x\ \textrm{of}\ \dots\ \mid\ C_n\ y_n
-    \rightarrow M_n : C}
+    \rightarrow M_n : C}}
 \end{mathpar}
 % where
 % \begin{mathpar}
@@ -924,14 +961,14 @@ recursive and $\Rho'_C = \Rho_C$ otherwise ($\Rho'_D$ is dual):
 %     \Rho'_D = \textrm{likewise}
 % \end{mathpar}
 
-These modifications prevent the infinite derivations in the scenarios
+These modifications block the infinite derivations
 described above. However, they also greatly limit the space of
 derivable programs, leaving the synthesizer effectively unable to
 synthesize from specifications with recursive types. To prevent this,
 we add two rules to complement the restrictions on construction
 and destruction of recursive types.
 %
-First, since we can't deconstruct some ADTs any further because of a restriction,
+First, since we can't deconstruct some ADTs any further due to these constraints,
 but must utilize all propositions linearly in some way, all propositions in $\Omega$ whose
 deconstruction is restricted are to be moved to the linear context $\Delta$.
 %
@@ -939,26 +976,27 @@ Second, without any additional rules, an ADT in the linear context
 will loop back to the inversion context, jumping back and forth
 between the two contexts; instead, when focusing on an ADT, we should
 either instantiate the goal (provided they're the same type), or switch
-to inversion if and only if its decomposition isn't restricted:
+to inversion if and only if its decomposition is \emph{not} restricted:
 %
 \begin{mathpar}
-    \infer*[right=(adt$\Uparrow$L)]
+
+  {\small\infer*[right=(adt$\Uparrow$L)]
     {
         (\Rho_C; \Rho_D);\Gamma; \Delta, x{:}T/\Delta'; \Omega \Uparrow\ \vdash M : C
         \and
         T \in \Rho_D
     }
-    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}
+    {(\Rho_C; \Rho_D);\Gamma; \Delta/\Delta'; \Omega, x{:}T \Uparrow\ \vdash M : C}}
     \and
     % ROMES: This one is just equal to (INIT), no point in having a new one? Except that this one isn't atomic?.
     %\infer*[right=(adt-init)]
     %{  }
     %{\Rho; \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash x : T}
     %\and
-    \infer*[right=(adt$\Downarrow$L)]
+    {\small\infer*[right=(adt$\Downarrow$L)]
     {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Uparrow\ \vdash M :
     T \and T \notin \Rho_D}
-    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash M : T}
+    {(\Rho_C; \Rho_D); \Gamma; \Delta/\Delta'; x{:}T \Downarrow\ \vdash M : T}}
 \end{mathpar}
 % TODO: Adicionar regra que diz que se for ADT Rec -o A então a construção de
 % ADT Rec é logo restrita?? parece que acelera minimamente mas não arranjo um
@@ -971,26 +1009,27 @@ once, and that subsequent equal ADTs will only be useable from the linear
 context -- essentially forcing them to be used to instantiate another proposition,
 which will typically be an argument for the recursive call.
 
-To synthesize recursive functions, we can simply label the main goal and extend
-the unrestricted context with it. That is, to synthesize a recursive function
+To synthesize recursive functions, we can simply label the main goal
+as $f$ and extend
+the unrestricted context with the label $f$ of the appropriate type. That is, to synthesize a recursive function
 of type $A \lolli B$ named \emph{f}, the
 initial judgment can be written as
 \begin{mathpar}
     \Gamma, f{:}A \lolli B; \Delta/\Delta'; \Omega \vdash M : A \lolli B \Uparrow
 \end{mathpar}
-and, by definition, all subsequent inference rules will have
-($f{:}A \lolli B$) in the $\Gamma$ context too.
-We can also trivially force recursion to be used by adding the name to the
-linear context as well.
+and so all subderivations will have
+($f{:}A \lolli B$) available in $\Gamma$.
+% We can also trivially force recursion to be used by adding the name to the
+% linear context as well.
 %
 However, we must restrict immediate uses of the recursive call since
 otherwise every goal would have a trivial proof (a non-terminating
 function that just calls itself), shadowing relevant solutions.
-Instead, our framework allows the use of recursion only after having
-deconstructed a recursive ADT via the following invariant: the
-recursive hypothesis can only be used in \emph{recursive branches of
+Instead, our framework allows the use of recursion only \emph{after} having
+deconstructed a recursive ADT, satisfying the invariant: the
+recursive call can only be used in \emph{recursive branches of
   ADT deconstruction}, i.e. the recursive call should only take
-``smaller'', recursive, hypothesis as arguments.
+``smaller'' terms as arguments.
 %
 %To illustrate, in any
 %recursive function with a list argument (whose type is defined as
@@ -1000,24 +1039,25 @@ recursive hypothesis can only be used in \emph{recursive branches of
 %produce the goal $C$, and only in the \emph{Cons}
 %branch.
 %
-Furthermore, we also forbid the usage of the recursive function when
-synthesizing arguments to use it.
+We also forbid further recursive calls when
+synthesizing arguments for the recursive call itself.
 % TODO : não sei se precisa de melhor explicação mas foi uma coisa que fiz para
 % não gerar um programa recursivo.
 % (TODO: rewrite? O bold é meio estranho não?)
 
 
-\mypara{Polymorphic Types} A polymorphic specification is a type of form
+\mypara{Polymorphism} A polymorphic type, or a type \emph{scheme}, is of the form
 $\forall \overline{\alpha}.\ \tau$ where $\overline{\alpha}$ is a set of
-variables that stand for any (non-polymorphic) type in $\tau$. Such a type is
-also called a \emph{scheme}.  Synthesis of a scheme comprises of turning it into
-a non-quantified type, and then treating its type variables uniformly.  First,
+variables that stand for (non-polymorphic) types in $\tau$.
+
+Synthesis for a scheme comprises of effectively removing the quantification,
+and then treating its type variables uniformly.  First,
 type variables are considered \emph{atomic types}, then, we instantiate the
-bound variables of the scheme as described by the Hindley-Milner inference
-method's~\cite{DBLP:journals/jcss/Milner78,10.2307/1995158} instantiation rule (put simply, generate fresh names
+bound variables of the scheme as described by the Hindley-Milner~\cite{DBLP:journals/jcss/Milner78,10.2307/1995158}
+type instantiation rule (put simply, generate fresh names 
 for each bound type variable); e.g. the scheme $\forall \alpha.\ \alpha \lolli
-\alpha$ could be instantiated to $\alpha0 \lolli \alpha0$. We add a rule for
-this, where $\forall \overline{\alpha}.\ \tau \sqsubseteq \tau'$ indicates type
+\alpha$ could be instantiated to $\alpha_0 \lolli \alpha_0$, for some
+fresh $\alpha_0$. We add such a rule to our system, where $\forall \overline{\alpha}.\ \tau \sqsubseteq \tau'$ indicates type
 $\tau'$ is an \emph{instantiation} of type scheme $\forall \overline{\alpha}.\
 \tau$:
 %
@@ -1032,7 +1072,7 @@ $\tau'$ is an \emph{instantiation} of type scheme $\forall \overline{\alpha}.\
 %
 As such, the construction of a derivation in which the only rule that can derive
 an atom is the \textsc{init} rule corresponds to the synthesis of a program
-where some expressions are treated agnostically (nothing constrains their type),
+where some expressions are treated agnostically,
 i.e.~a polymorphic program.
 %
 % TODO Cut?
@@ -1042,26 +1082,26 @@ i.e.~a polymorphic program.
 %that does not constrain the type of its parameter $x$ in any way.
 
 The main challenge of polymorphism in synthesis is the usage of schemes from the
-unrestricted context.  To begin with, $\Gamma$ now holds both (monomorphic)
+unrestricted context.  The context $\Gamma$ now holds both (monomorphic)
 types and schemes. Consequently, after the rule \textsc{decideLeft!} is applied,
 we are left-focused on either a type or a scheme. Since left focus on a type is
 already well defined, we need only specify how to focus on a scheme.
+
 %
 Our algorithm instantiates bound type variables of the focused scheme with fresh
 \emph{existential} type variables, and the instantiated type becomes the left
 focus. Inspired by the Hindley-Milner system, we also generate inference
 constraints on the existential type variables (postponing the decision of what
 type it should be to be used in the proof), and collect them in a new
-constraints context $\Theta$ that is propagated across derivation branches the
-same way the linear context is (by having an input and output context
-($\Theta/\Theta'$)).  In contrast to Hindley-Milner's inference, everytime a
-constraint is added it is solved against all other constraints -- a branch of
-the proof search is desired to fail as soon as possible.
+constraints context $\Theta$ that is propagated across derivation branches (by having an input and output context
+($\Theta/\Theta'$)).  In contrast to Hindley-Milner inference, new 
+constraints are immediately solved against all other constraints -- a branch of
+the search is desired to fail as soon as possible. 
 %TODO: Como fazer? \todo{O que significa $?\alpha$ ? Não foi explicado -- no
 %Hindley-Milner nao ha propriamente o problema de misturar variaveis
 %existenciais com universais}
 Note that we instantiate the scheme with \emph{existential} type variables
-($?\alpha$) rather than just type variables ($\alpha$) since the latter
+($?\alpha$) rather than type variables ($\alpha$) since the latter
 represent universal types during synthesis, and the former represent a concrete
 instance of a scheme, that might induce constraints on other type variables.
 Additionally, we require that all existential type variables are eventually assigned a
@@ -1070,11 +1110,12 @@ concrete type. These concepts are formalized with the following rules, where $\f
 is an \emph{existential instantiation} of scheme $\forall \overline{\alpha}.\ \tau$,
 $\textrm{ftv}_E(\tau')$ is the set of free \emph{existential} type variables in
 type $\tau'$, $?\alpha \mapsto \tau_x$ is a mapping from \emph{existential} type
-$?\alpha$ to type $\tau_x$, and $\textsc{unify}(c, \Theta)$ indicates wether
-constrain $c$ can be unified with those in $\Theta$:
+$?\alpha$ to type $\tau_x$, and $\textsc{unify}(c, \Theta)$ indicates whether
+constraint $c$ can be unified with those in $\Theta$:
 
+\vspace{-0.5cm}
 \begin{mathpar}
-    \infer*[right=($\forall L$)]
+    {\scriptsize\infer*[right=($\forall L$)]
     {
         \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash C
         \\
@@ -1082,9 +1123,9 @@ constrain $c$ can be unified with those in $\Theta$:
         \\
         \textrm{ftv}_E(\tau') \cap \{ ?\alpha\ \vert\ (?\alpha \mapsto \tau_x) \in \Theta'\} = \emptyset
     }
-    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
+    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}}
     \and
-    \infer*[right=($?L$)]
+    {\scriptsize\infer*[right=($?L$)]
     {\textsc{unify}(?\alpha
     \mapsto C, \Theta)}
     {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
@@ -1094,7 +1135,7 @@ constrain $c$ can be unified with those in $\Theta$:
     {\textsc{unify}(?\alpha
     \mapsto A, \Theta)}
     {\Theta/\Theta, ?\alpha \mapsto A ; \Rho; \Gamma; \Delta/\Delta';
-    x{:}A \Downarrow\ \vdash x : ?\alpha}
+    x{:}A \Downarrow\ \vdash x : ?\alpha}}
 \end{mathpar}
 
 
@@ -1236,38 +1277,52 @@ constrain $c$ can be unified with those in $\Theta$:
 
 \section{Evaluation}\label{sec:evaluation}
 
-We've implemented our framework synthesis both as a GHC type-hole plugin and as
+We implemented our framework both as a Haskell GHC plugin and as
 a standalone synthesizer that can typecheck Haskell-like programs with ``goal
 signatures'' for which valid expressions are synthesized. We've tested and
 benchmarked both implementations on numerous synthesis challenges with
-successful results. Amongst the interesting challenges, we can easily
-synthesize the Monad instances of Maybe and State, but the more interesting
-result is a real-world example that comes from the Linear Haskell paper:
+successful results (see Appendix~\ref{app:examples} for an extended
+list of examples). Among the more intricate examples, we can easily
+synthesize the |Monad| instances of |Maybe| and |State|. However, the more interesting
+result is a real-world example from \cite{Bernardy_2018}:
 %
-with Linear types one can provide a safe interface to manipulate mutable arrays. In
-Linear Haskell~\cite{Bernardy_2018} -- they provide an implementation of |array :: Int ->
-[(Int,a)] -> Array a| using mutable arrays under the hood with the interface:
+with linear types one can provide a safe interface to manipulate mutable arrays.
+Linear Haskell~\cite{Bernardy_2018}  provides an implementation of |array :: Int ->
+[(Int,a)] -> Array a| which, internally, uses mutable arrays via the interface:
 %
+
+%\vspace{-0.5cm}
+{\small
 \begin{code}
 newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
 write :: MArray a ⊸ (Int,a) -> MArray a
 read :: MArray a ⊸ Int -> (MArray a, Ur b)
 freeze :: MArray a ⊸ Ur (Array a)
-\end{code}
+\end{code}}
 %
 The flagship result from our synthesis framework, which also illustrates the
 preciseness of linear types, is that we're able to synthesize the exact
 implementation of |array| given in Linear Haskell given the above interface and
-the |array| type goal, all in a hundred miliseconds:
+the |array| type goal, all in a hundred milliseconds:
+%
+%\vspace{-0.5cm}
 \begin{code}
 array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
 \end{code}
-%
 The standalone implementation further supports (experimentally) refinement
-types and additional synth guidelines. In appendix~\ref{sec:examples} we list
-multiple examples of synth goals and the resulting programs, and the following
-table presents synthesis benchmarks for some of these examples.
-%
+types and additional synth guidelines. Figure~\ref{fig:benchmarks}
+lists benchmarks for a suite of examples. The Goal column describes
+the type of the synthesized term using typical Haskell
+terminology. The Keywords column denotes the use of additional
+synthesis guidance features that we implemented in our synthesizer:
+the \emph{choose} keyword instructs the synthesizer to stop after one
+valid term is found, the equality clause in the list reverse function
+serves as an input output example that guides the search, the
+\emph{depth} keyword controls the instantiation depth of
+quantifiers. The Components column describes the library of function
+(signatures) provided for the particular synthesis goal.
+
+\begin{figure}
 {\scriptsize
 \begin{center}
     \begin{tabular}{ccccc}
@@ -1321,15 +1376,17 @@ table presents synthesis benchmarks for some of these examples.
     \end{tabular}
   \end{center}
 }
+\caption{Benchmarks\label{fig:benchmarks}}
+\end{figure}
 
 
 \section{Related Work}\label{sec:related}
 
 Type-based program synthesis is a vast field of study. Most
 works~\cite{DBLP:conf/lopstr/HughesO20,DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
-follow some variation of the synthesis-as-proof-search approach, and focusing
+follow some variation of the synthesis-as-proof-search approach. Focusing
 in synthesis appeared first in the literature in~\cite{10.1145/3408991}.
-However, the process is novel for each due to a variety of different rich
+However, the specifics of each synthesis framework differ due to a variety of rich
 types explored and their corresponding logics and languages; or nuances of the
 synthesis process itself, such as complementing types with program examples;
 or even the programming paradigm of the output produced (e.g. generating heap
@@ -1361,14 +1418,15 @@ manipulating programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
 
 % or how to turn your type system upside down ~ não apagar a Kubrick reference? :)
   
-\mypara{Program Synthesis from Polymorphic Refinement Types} The
+% \mypara{Program Synthesis from Polymorphic Refinement Types}
+The
 work~\cite{DBLP:conf/pldi/PolikarpovaKS16} also studies synthesis of recursive
 functional programs in an ``advanced'' context. Their specifications combine two
 rich forms of types: polymorphic and refinement types.
 % (which correspond to a
 % first-order logic through the Curry-Howard isomorphism).
 Their approach to
-refinement types consists of a new algorithm that supports decomposition of the
+refinement types consists of an algorithm that supports decomposition of the
 refinement specification.
 %,allowing for separation between the language of
 %specification and programs and making the approach amenable to compositional
@@ -1378,18 +1436,18 @@ but they are not as integrated in the synthesis process as in \cite{DBLP:conf/pl
 Instead, our synthesizer leverages the expressiveness of linear
 types and techniques for proof-search in linear logic to guide its process.
 
-\mypara{Resourceful Program Synthesis from Graded Linear Types} The
+% \mypara{Resourceful Program Synthesis from Graded Linear Types}
+The
 work~\cite{DBLP:conf/lopstr/HughesO20} synthesizes programs using an
 approach similar ours. It employs so-called graded
 modal types, which are a refinement of pure linear types
 % -- a more
 % \emph{fine-grained} version 
-that allows for quantitative
+that allows for a quantitative
 specification of resource usage, in contrast to ours either
 \emph{linear} or \emph{unrestricted} (via the linear logic
-exponential) use of assumptions. Their resource management is more
-complex, and so they provide solutions which adapt Hodas and Miller's
-approach~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}.
+exponential) use of assumptions. Their resource management is thus more
+complex than ours.
 % -- which, in contrast, is the one used in our work.
 %
 They also use focusing as a solution to trim down search space and to
@@ -1398,12 +1456,12 @@ underlying logic is \emph{modal} rather than purely \emph{linear}, it
 lacks a clear correspondence with concurrent session-typed
 programs~\cite{DBLP:journals/mscs/CairesPT16,DBLP:conf/concur/CairesP10},
 which is a crucial avenue of future work. Moreover, their use of grading
-effectively requires constraint solving to be integrated with the
+effectively requires an SMT solver to be integrated with the
 synthesis procedure, which can limit the effectiveness of the overall
 approach.
 % as one scales to more sophisticated settings (e.g.~refinement
 % types).
-Additionally, Our system extends the focusing-based system with
+Additionally, our system extends the focusing-based system with
 recursion, ADTs, polymorphism and refinements to synthesize
 more expressive programs.
 
@@ -1414,7 +1472,7 @@ more expressive programs.
 \appendix
 
 \section{Formal System}%
-\label{sec:final_system}
+\label{app:final_system}
 
 In this section we present the complete system specifying the synthesis process.
 
@@ -1729,7 +1787,7 @@ $\bang$-ed proposition, and the goal is $\bang$-ed:
 \end{mathpar}
 
 \section{Examples}%
-\label{sec:examples}
+\label{app:examples}
 
 The following examples have two components, the input program that was
 processed by our standalone synthesizer program, and the resulting program
@@ -1760,8 +1818,7 @@ empty = Nothing;
 
 bind :: (Maybe a ⊸ (!(a ⊸ Maybe b) ⊸ Maybe b));
 bind c d = case c of
-    Nothing ->
-      let !e = d in Nothing
+    Nothing -> let !e = d in Nothing
   | Just f -> let !g = d in g f;
 
 maybe :: (!b ⊸ (!(a ⊸ b) ⊸ (Maybe a ⊸ b)));
@@ -1797,16 +1854,14 @@ append :: (List a ⊸ (List a ⊸ List a));
 append b c = case b of
     Nil -> c
   | Cons d ->
-      let e*f = d in
-        Cons (e, append f c);
+      let e*f = d in Cons (e, append f c);
 
 map :: (!(a ⊸ b) ⊸ (List a ⊸ List b));
 map c d = let !e = c in
   case d of
       Nil -> Nil
     | Cons f ->
-        let g*h = f in
-          Cons (e g, map (!e) h);
+        let g*h = f in Cons (e g, map (!e) h);
 
 foldl :: (!(b ⊸ (a ⊸ b)) ⊸ (b ⊸ (List a ⊸ b)));
 foldl c d e = let !f = c in
@@ -1845,9 +1900,9 @@ concat b = case b of
                 Cons (l, concat (Cons (m, e)));
 \end{code}
 
-\mypara{State} (with a slight optimization that will be added as a control keyword
-futurely, that allows bind using runState to terminate in a reasonable time)
-\\
+\mypara{State}
+%(with a slight optimization that will be added as a control keyword
+%futurely, that allows bind using runState to terminate in a reasonable time)
 Input program:
 \begin{code}
 data State b a = State (!b ⊸ (a * !b));
