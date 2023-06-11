@@ -673,8 +673,8 @@ rules:
     {\Gamma; \Delta, x:A/\Delta';\cdot \Uparrow\ \vdash M: C}
 \qquad
     \infer*[right=(decideL!)]
-    {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash C}
-    {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+    {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash M: C}
+    {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash M: C}
   \end{array}
 \]}
 
@@ -1117,13 +1117,13 @@ constraint $c$ can be unified with those in $\Theta$:
 \begin{mathpar}
     {\scriptsize\infer*[right=($\forall L$)]
     {
-        \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash C
+        \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash M: C
         \\
         \forall \overline{\alpha}.\ \tau \sqsubseteq_E \tau'
         \\
         \textrm{ftv}_E(\tau') \cap \{ ?\alpha\ \vert\ (?\alpha \mapsto \tau_x) \in \Theta'\} = \emptyset
     }
-    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}}
+    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash M: C}}
     \and
     {\scriptsize\infer*[right=($?L$)]
     {\textsc{unify}(?\alpha
@@ -1504,9 +1504,9 @@ In this section we present the complete system specifying the synthesis process.
 
 \begin{mathpar}
     \infer*[right=($\Uparrow$R)]
-    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash C \and C\ \textrm{not
+    {\Gamma ; \Delta/ \Delta' ; \Omega \Uparrow\ \vdash M: C \and C\ \textrm{not
     right asynchronous}}
-    {\Gamma ; \Delta/\Delta' ; \Omega \vdash C \Uparrow}
+    {\Gamma ; \Delta/\Delta' ; \Omega \vdash M: C \Uparrow}
 \end{mathpar}
 
 \item Left invertible rules, which decompose asynchronous propositions in $\Omega$
@@ -1545,24 +1545,24 @@ In this section we present the complete system specifying the synthesis process.
 \item When a non-invertible proposition is in $\Omega$, move it to $\Delta$ and keep inverting on the left
 \begin{mathpar}
     \infer*[right=($\Uparrow$L)]
-    {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash C \and A\ 
+    {\Gamma; \Delta, A/\Delta'; \Omega \Uparrow\ \vdash M: C \and A\ 
     \textrm{not left asynchronous}}
-    {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash C}
+    {\Gamma; \Delta/\Delta'; \Omega, A \Uparrow\ \vdash M: C}
 \end{mathpar}
 
 \item Transition to focusing, since there are no more propositions in $\Omega$ (the decision rules)
 \[
   \begin{array}{c}
     \infer*[right=(decideR)]
-    {\Gamma; \Delta/\Delta' \vdash C \Downarrow \and C\ \textrm{not atomic}}
-    {\Gamma; \Delta/\Delta';\cdot \Uparrow\ \vdash C}\\[0.5em]
+    {\Gamma; \Delta/\Delta' \vdash M: C \Downarrow \and C\ \textrm{not atomic}}
+    {\Gamma; \Delta/\Delta';\cdot \Uparrow\ \vdash M: C}\\[0.5em]
     \infer*[right=(decideL)]
-    {\Gamma; \Delta/\Delta' ; A \Downarrow\ \vdash C}
-    {\Gamma; \Delta, A/\Delta';\cdot \Uparrow\ \vdash C}
+    {\Gamma; \Delta/\Delta' ; A \Downarrow\ \vdash M: C}
+    {\Gamma; \Delta, A/\Delta';\cdot \Uparrow\ \vdash M: C}
 \qquad
     \infer*[right=(decideL!)]
-    {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash C}
-    {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash C}
+    {\Gamma, A; \Delta/\Delta' ; A \Downarrow\ \vdash M: C}
+    {\Gamma, A; \Delta/\Delta';\cdot \Uparrow\ \vdash M: C}
   \end{array}
   \]
 \item Rules that focus on a right or left proposition, chosen with the decision rules
@@ -1612,11 +1612,11 @@ In this section we present the complete system specifying the synthesis process.
     {\Gamma; \Delta/\Delta'; x{:}A \Downarrow\ \vdash x : A}
     \qquad
      \infer*[right=($\Downarrow R$)]
-    {\Gamma; \Delta/\Delta'; \cdot \vdash A \Uparrow}
-    {\Gamma; \Delta/\Delta' \vdash A \Downarrow}\\[0.5em]
+    {\Gamma; \Delta/\Delta'; \cdot \vdash M: A \Uparrow}
+    {\Gamma; \Delta/\Delta' \vdash M: A \Downarrow}\\[0.5em]
     \infer*[right=($\Downarrow L$)]
-    {\Gamma; \Delta/\Delta'; A \Uparrow\ \vdash C \and A\ \textrm{not atomic and not left synchronous}}
-    {\Gamma; \Delta/\Delta'; A \Downarrow\ \vdash C}
+    {\Gamma; \Delta/\Delta'; A \Uparrow\ \vdash M: C \and A\ \textrm{not atomic and not left synchronous}}
+    {\Gamma; \Delta/\Delta'; A \Downarrow\ \vdash M: C}
 
 \end{array}
 \]
@@ -1682,21 +1682,21 @@ Specialized to ADTs, it would be:
 \item Introducing and using schemes
 \begin{mathpar}
     \infer*[right=($\forall R$)]
-    { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \tau' \Uparrow \and \forall
+    { \Rho; \Gamma; \Delta/\Delta'; \Omega \vdash M: \tau' \Uparrow \and \forall
     \overline{\alpha}.\ \tau
     \sqsubseteq \tau'}
-    {\Rho; \Gamma; \Delta/\Delta'; \Omega \vdash \forall \overline{\alpha}.\
+    {\Rho; \Gamma; \Delta/\Delta'; \Omega \vdash M: \forall \overline{\alpha}.\
     \tau \Uparrow}
   \and
     \infer*[right=($\forall L$)]
     {
-        \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash C
+        \Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \tau' \Downarrow\ \vdash M: C
         \\
         \forall \overline{\alpha}.\ \tau \sqsubseteq_E \tau'
         \\
         \textrm{ftv}_E(\tau') \cap \{ ?\alpha\ \vert\ (?\alpha \mapsto \tau_x) \in \Theta'\} = \emptyset
     }
-    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash C}
+    {\Theta/\Theta'; \Rho; \Gamma; \Delta/\Delta'; \forall \overline{\alpha}.\ \tau \Downarrow\ \vdash M: C}
 \end{mathpar}
 \item And rules regarding existential variables, both when using them for
 instancing a type and when instancing an algebraic data type existential
