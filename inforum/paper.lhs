@@ -77,7 +77,8 @@ supports classical linear types extended with recursive algebraic data types,
 parametric polymorphism and basic refinements; and as a GHC type-hole plugin
 that synthesises expressions for Haskell program holes, using the recently
 introduced linear types feature -- showing it can generate precise solutions,
-faster than existing alternatives.
+% faster than existing alternatives.
+remarkably fast.
 
 % Linear types allow programmers to give more precise and expressive
 % specifications of their programs in the form of type signatures.
@@ -142,18 +143,25 @@ exactly once in
 the body of a function. For example, the type of the linear map
 function (using Haskell syntax),
 |map :: (a ⊸ b) -> [a] ⊸ [b]|, specifies a function that, given a
-\emph{linear} function from |a| to |b|, must consume the list of |a|s exactly once
-to produce a list of $b$s, which can only be done by applying the function to
+\emph{linear} function from |a| to |b|, must consume the list of |as| exactly once
+to produce a list of |bs|, which can only be done by applying the function to
 each element.
 % 
 A linearity-aware program synthesizer can take the |map| type
-as a specification to unambiguously produce the correct output:
-%
+as a specification to unambiguously produce:
+% \vspace{-0.5cm}
 \begin{code}
 map f ls = case ls of
   [] -> []
-  x:xs -> f x:map f xs
+  (x:xs) -> f x:map f xs
 \end{code}
+% \vspace{-0.5cm}
+% whereas a non-linear synthesizer instantiation of the unrestricted |map| goal.
+Another example is the much harder |array :: Int -> [(Int,a)] -> Array a|
+goal taken from Linear Haskell~\cite{Bernardy_2018}, which is implemented in terms
+of a linear interface to mutable arrays. Remarkably, that linear interface is
+also precise enough that our framework is capable of synthesizing the correct
+implementation (\S~\ref{sec:evaluation}).
 
 However, it is not at all obvious how to automate such a synthesis
 procedure in a general setting where functions can make use of
@@ -189,7 +197,7 @@ are identified during synthesis, constraining the space of valid programs.
 
 In this work we explore the problem of type-based synthesis of
 functional programs using linear types under the lens of the
-Curry-Howard correspondence. Specifically, we employ techniques from
+Curry-Howard correspondence. Notably, we employ techniques from
 linear logic \emph{proof search} as a 
 mechanism for program synthesis, leveraging the proofs-as-programs
 connection between linearly
@@ -212,8 +220,8 @@ programs (i.e.~proofs) are well-typed \emph{by construction} (i.e.~if the
 synthesis procedure produces a program, then the program intrinsically
 satisfies its specification).
 
-\item  We extend the core synthesis framework and language with
-  algebraic data types, recursive functions, parametric polymorphism and
+\item  We extend the core synthesis framework and language
+with algebraic data types, recursive functions, parametric polymorphism and
 type refinements. These extra-logical extensions require us to abandon
 completeness and to develop techniques to effectively explore the
 search space in the presence of recursion (\S~\ref{sec:extension}).
@@ -221,11 +229,15 @@ search space in the presence of recursion (\S~\ref{sec:extension}).
 %\item We argue that linear types are suitable specifications for synthesis both
 %in their expressiveness and conciseness, by example.
 
-\item We present two implementations of our synthesis framework, one as a GHC
-plugin that synthesizes expressions for Linear Haskell~\cite{Bernardy_2018} program holes,
-the other in a standalone language with the same features the synthesis process
-supports, and benchmark them against similar synthesis that doesn't leverage
-linearity.
+% If we remove the footnote a part of the paragraph moves up
+\item We present two implementations of our synthesis framework~\cite{ghc-linear-synthesis-plugin,slfl}, %\footnote{https://github.com/alt-romes/\{ghc-linear-synthesis-plugin,slfl\}},
+one as a GHC plugin that synthesizes expressions for Linear
+Haskell~\cite{Bernardy_2018} program holes, the other in a standalone language
+with the same features the synthesis process supports, and benchmark them on
+diverse synthesis goals (\S~\ref{sec:evaluation}).
+% , |array :: Int -> [(Int,a)] -> Array a|.
+
+% against similar synthesis that doesn't leverage linearity.
 
 \end{itemize}
 
@@ -314,24 +326,25 @@ proof search due to non-determinism in selecting which rules to apply
 use?).
 
 Andreoli's focusing~\cite{10.1093/logcom/2.3.297} % for linear logic
-is a technique that aims to discipline (linear logic) proof-search by
+is a technique that further disciplines (linear logic) proof-search by
 reformulating the rules of the
 sequent calculus. Focusing reduces the
-non-determinism inherent to proof search, by leveraging
+non-determinism inherent to proof search by leveraging
 the fact that the \emph{order} in which certain rules are applied does not affect the outcome
-of the search; and, by identifying the non-determinism in the search
+of the search, and by identifying the non-determinism in the search
 process that pertains to true unknowns (i.e., rules whose application
-modifies what can be subsequently proved),marking precisely the branches of the search
+modifies what can be subsequently proved) -- marking precisely the branches of the search
 space that may need to be revisited (i.e.,~backtracked to).
-
-Andreoli's focused sequent calculus can thus be effectively read
+%
+A \emph{focused sequent calculus} can hence be effectively read
 as a procedure for proof search for (a significant fragment of) linear logic that
-turns out to be both \emph{sound} and \emph{complete} (i.e., a sequent
+turns out to be both \emph{sound} and \emph{complete} -- a sequent
 is provable if and only if it is derivable in the focused
-system). Following propositions-as-types, this means that through
-focusing we can derive a procedure for \emph{program synthesis} for the
-\emph{linear} $\lambda$-calculus from type-based specifications,
-exploring the logical~\cite{DBLP:journals/tcs/Girard87} origins of linear types.
+system.
+% Following the Curry-Howard correspondence,
+% Hence, through focusing, we can derive a procedure for program synthesis for the
+% linear $\lambda$-calculus from type-based specifications,
+% exploring the logical~\cite{DBLP:journals/tcs/Girard87} origins of linear types.
 %
 
 Our core synthesis framework thus comprises of a reading of
@@ -382,8 +395,6 @@ a system of resource
 management~\cite{DBLP:journals/tcs/CervesatoHP00,DBLP:journals/tcs/LiangM09}
 is combined with focusing in order to algorithmically track linear
 resource usage. 
-
-
 
 % TODO: Acho que talvez faça mais sentido falar disto noutro sítio, está out-of-place
 % Não estou a imaginar como começar a falar de linear types/logic
@@ -467,7 +478,7 @@ soundly extend (\S~\ref{sec:extension}) with extra-logical but
 programming-centric features such as general recursion and abstract
 data types (necessarily abandoning completeness).
 %
-We note that a \emph{sound} set of rules guarantees we cannot synthesize
+We note that a \emph{sound} set of rules guarantees cannot synthesize
 ill-typed programs; and that the valid programs derivable through them
 reflect the subjective trade-offs we committed to in order to produce
 an effective synthesizer.
@@ -541,9 +552,9 @@ decomposing connectives.
 % moving them to the linear context ($\Delta$) when we fail to).
 The right inversion and left inversion judgments are written
 $\Gamma; \Delta; \Omega \vdash M : A \Uparrow$ and $\Gamma; \Delta;
-\Omega \Uparrow\ \vdash M : A$, respectively, where the $\Uparrow$
+\Omega \Uparrow\ \vdash M : A$, where the $\Uparrow$
 indicates the connective or context being inverted.
-For the focusing phase (i.e.~all non-invertible rules can apply), 
+For the focusing phase (all non-invertible rules can apply), 
 the proposition under focus can be the goal or 
 one in $\Gamma$ or $\Delta$. The right focus judgment is written 
 $\Gamma;\Delta \vdash M : A \Downarrow$ and the left focus judgment
@@ -562,8 +573,9 @@ linear context and $\Delta'$ is the output one.
 
 Combining linear logic (i.e., the linear lambda calculus through the Curry-Howard correspondence), resource
 management, and focusing, we obtain the following core formal system\footnote{For
-the sake of brevity, we've ommitted some rules such as those for the additive
-pair and disjunction. The complete system can be found in Appendix~\ref{app:final_system}.}
+the sake of brevity, we've omitted some rules such as those for the additive
+pair and disjunction.}
+% \todo{The complete system can be found in Appendix~\ref{app:final_system}.}
 (inspired by~\cite{DBLP:conf/cade/ChaudhuriP05,fpnotes}) -- in which the
 rule $\lolli$R is read: to synthesize a program of type $A \lolli B$ while inverting
 right (the $\Uparrow$ on the goal), with unrestricted context $\Gamma$, linear
@@ -571,8 +583,8 @@ context $\Delta$, and inversion context $\Omega$, assume $x{:}A$ in $\Omega$ to
 synthesize a program $M$ of type $B$, and return $\lambda x. M$.
 %
 We begin with right invertible rules, which decompose the goal until
-it becomes a synchronous proposition (note the condition on rule
-($\with R$) which forces both subterms to use the same linear variables):
+it becomes a synchronous proposition:
+% (note the condition on rule ($\with R$) which forces both subterms to use the same linear variables):
 %
 \begin{mathpar}
 {\small
@@ -583,15 +595,15 @@ it becomes a synchronous proposition (note the condition on rule
     {\Gamma ; \Delta/\Delta' ; \Omega \vdash \lambda x . M : A
     \lolli B \Uparrow}
 }
-  \and
-{\small
-    % & R
-    \infer*[right=($\with R$)]
-    {\Gamma ; \Delta/ \Delta' ; \Omega \vdash M : A \Uparrow \and \Gamma ;
-    \Delta/ \Delta'' ; \Omega \vdash N : B \Uparrow \and \Delta' = \Delta''}
-    {\Gamma ; \Delta/\Delta' ; \Omega \vdash  (M \with N) : A
-    \with B \Uparrow}
-}
+%  \and
+%{\small
+%    % & R
+%    \infer*[right=($\with R$)]
+%    {\Gamma ; \Delta/ \Delta' ; \Omega \vdash M : A \Uparrow \and \Gamma ;
+%    \Delta/ \Delta'' ; \Omega \vdash N : B \Uparrow \and \Delta' = \Delta''}
+%    {\Gamma ; \Delta/\Delta' ; \Omega \vdash  (M \with N) : A
+%    \with B \Uparrow}
+%}
 \end{mathpar}
 %
 When we reach a non-invertible proposition on the right, we start inverting the
@@ -759,7 +771,41 @@ system, focusing is both sound and complete -- a sequent is provable
 in the focused system if and only if it is provable in linear
 logic. We note however, that proof search in full linear logic is
 \emph{undecidable}~\cite{DBLP:conf/lics/LincolnSS95}.
+% This is repeated, is it on purpose?
 
+%%%%% Example Sec 2.1 %%%%%%%
+
+To illustrate the core synthesis framework, consider the goal $A\tensor B
+\lolli B\tensor A$. Starting focused on the goal, we can construct a derivation (i.e. a program) by identifying the
+rules that are applicable at any given moment. If more than one rule is applicable,
+we must make a non-determinisic choice, but focusing guarantees those choices
+are only required for "true unknowns". A very precise derivation for this goal can be
+constructed by applying, from the bottom-up, $\lolli\!R,
+\Uparrow\!R, \tensor L, \Uparrow\!L, \Uparrow\!L, \textsc{decideR},
+\tensor R$, and then instantiating both the sub-goals $B$ and $A$ using
+$\Downarrow\!R, \Uparrow\!R, \Uparrow\!L, \textsc{decideL}, \textsc{Init}$.
+Note that many of these rules don't intrisically change the proof, but are
+necessary in the proof-search procedure to eliminate non-essential
+non-determinism.
+We leave writing the derivation tree and the corresponding program as an
+exercise for the reader.
+
+% \[
+% \infer*[right=($\lolli R$)]
+% {
+%   \infer*[right=($\Uparrow R$)]
+%   {
+% ...
+%     \infer*[right=($\tensor L,\Uparrow L, \Uparrow L,decideR$)]
+%     {\cdot ; A,B ; \cdot \vdash B \tensor A \Uparrow}
+%     {\cdot; \cdot; A\tensor B \Uparrow \vdash B\tensor A}
+%   }
+%   {\cdot; \cdot; A\tensor B \vdash B \tensor A}
+% }
+% {\cdot; \cdot; \cdot \vdash A\tensor B \lolli B\tensor A \Uparrow}
+% \]
+
+%%%%% End Example %%%%%%%%%%
 
 % Next, we'll
 % present new rules that align and build on top of these to synthesize recursive
@@ -773,9 +819,9 @@ In this section, we extend our framework to be able to synthesize more
 interesting programs featuring general recursion over algebraic data
 types (ADTs) and
 polymorphism. The combination of these features diverges from the pure
-logical interpretation of focusing since general recursion is unsound
-from a logical perspective (and ADTs are not of particular proof
-theoretic interest).
+logical interpretation of focusing since unguarded general recursion is unsound
+from a logical perspective (and decomposing ADTs through pattern matching over
+recursors is uncommon in proof theory).
 
 In its simplest form, an algebraic data type (ADT) is a tagged sum of
 any type (i.e. a named type that can be instantiated by one of many tags, or
@@ -1281,8 +1327,9 @@ We implemented our framework both as a Haskell GHC plugin and as
 a standalone synthesizer that can typecheck Haskell-like programs with ``goal
 signatures'' for which valid expressions are synthesized. We've tested and
 benchmarked both implementations on numerous synthesis challenges with
-successful results (see Appendix~\ref{app:examples} for an extended
-list of examples). Among the more intricate examples, we can easily
+successful results.
+% (see Appendix~\ref{app:examples} for an extended list of examples).
+Among the more intricate examples, we can easily
 synthesize the |Monad| instances of |Maybe| and |State|. However, the more interesting
 result is a real-world example from \cite{Bernardy_2018}:
 %
@@ -1347,7 +1394,7 @@ quantifiers. The Components column describes the library of function
         \hline
         \multirow{7}{4em}{State} & runState & $190\mu s\pm 6.8\mu s$ && \\ 
         & $>>=$ & $979\mu s\pm 23\mu s$ && \\
-        %& $>>=$ & $\infty$ & \emph{using (runState)} & \\
+        & $>>=$ & $\infty$ & \emph{using (runState)} & \\
         & get & $133\mu s\pm 3.8\mu s$ && \\
         & put & $146\mu s\pm 3.4\mu s$ && \\
         & modify & $219\mu s\pm 4.9\mu s$ && \\
@@ -1468,6 +1515,8 @@ more expressive programs.
 
 \bibliographystyle{splncs04}
 \bibliography{references}
+
+\end{document}
 
 \appendix
 
@@ -1957,6 +2006,4 @@ evalState c d = case c of
         let h*i = e (!f) in
           let !j = i in h;
 \end{code}
-
-\end{document}
 
