@@ -96,6 +96,8 @@ propositions-as-types,
 proof theory
 }
 
+\
+
 \section{Introduction}
 
 Program synthesis is the automated or semi-automated process of deriving a
@@ -157,7 +159,7 @@ map f ls = case ls of
 \end{code}
 % \vspace{-0.5cm}
 % whereas a non-linear synthesizer instantiation of the unrestricted |map| goal.
-Another example is the much harder |array :: Int -> [(Int,a)] -> Array a|
+Another example is the more challenging |array :: Int -> [(Int,a)] -> Array a|
 goal taken from Linear Haskell~\cite{Bernardy_2018}, which is implemented in terms
 of a linear interface to mutable arrays. Remarkably, that linear interface is
 also precise enough that our framework is capable of synthesizing the correct
@@ -195,7 +197,7 @@ linear variable more than once is not considered, and unused variables
 are identified during synthesis, constraining the space of valid programs.
 %
 
-In this work we explore the problem of type-based synthesis of
+In this work we explore type-based synthesis of
 functional programs using linear types under the lens of the
 Curry-Howard correspondence. Notably, we employ techniques from
 linear logic \emph{proof search} as a 
@@ -779,16 +781,16 @@ To illustrate the core synthesis framework, consider the goal $A\tensor B
 \lolli B\tensor A$. Starting focused on the goal, we can construct a derivation (i.e. a program) by identifying the
 rules that are applicable at any given moment. If more than one rule is applicable,
 we must make a non-determinisic choice, but focusing guarantees those choices
-are only required for "true unknowns". A very precise derivation for this goal can be
+are only required for "true unknowns". A derivation for this goal can be
 constructed by applying, from the bottom-up, $\lolli\!R,
 \Uparrow\!R, \tensor L, \Uparrow\!L, \Uparrow\!L, \textsc{decideR},
 \tensor R$, and then instantiating both the sub-goals $B$ and $A$ using
 $\Downarrow\!R, \Uparrow\!R, \Uparrow\!L, \textsc{decideL}, \textsc{Init}$.
-Note that many of these rules don't intrisically change the proof, but are
+Note that many of these rules don't intrinsically change the proof, but are
 necessary in the proof-search procedure to eliminate non-essential
-non-determinism.
-We leave writing the derivation tree and the corresponding program as an
-exercise for the reader.
+non-determinism. The program corresponding to the proof is $\lambda x.~\llet{(a,b) = x}{(b,a)}$.
+%
+We leave writing the derivation as an exercise.
 
 % \[
 % \infer*[right=($\lolli R$)]
@@ -820,8 +822,8 @@ interesting programs featuring general recursion over algebraic data
 types (ADTs) and
 polymorphism. The combination of these features diverges from the pure
 logical interpretation of focusing since unguarded general recursion is unsound
-from a logical perspective (and decomposing ADTs through pattern matching over
-recursors is uncommon in proof theory).
+from a logical perspective (and decomposing ADTs through pattern matching is
+uncommon in proof theory).
 
 In its simplest form, an algebraic data type (ADT) is a tagged sum of
 any type (i.e. a named type that can be instantiated by one of many tags, or
@@ -838,9 +840,9 @@ The grammar of our core calculus is extended as (where $C_n$ is a
 constructor for values of some type $T$):
 %
 \[
-\begin{array}{lclc}
-    M,N & ::= & \dots\ \vert\ \emph{C}_n\ M\ \vert\ (\mathsf{case}\ M\ \mathsf{of}\ \dots\ \vert\ \emph{C}_n\ u \Rightarrow N) \\
-    \tau, \sigma & ::= & \dots\ \vert\ T \\
+\begin{array}{lclcclc}
+    M,N & ::= & \dots\ \vert\ \emph{C}_n\ M\ \vert\ (\mathsf{case}\ M\ \mathsf{of}\ \dots\ \vert\ \emph{C}_n\ u \Rightarrow N)
+    & \qquad\tau, \sigma & ::= & \dots\ \vert\ T \\
  %    $ADT$ & $\ ::=\ $ & (\textsf{data} $\langle\emph{name}\rangle$\ $=$\ $\emph{Cons}_1\ \tau$\
 % $\vert$\ $\dots$\ $\vert$\ $\emph{Cons}_n\ \tau$) \\
 \end{array}
@@ -1423,9 +1425,9 @@ quantifiers. The Components column describes the library of function
     \end{tabular}
   \end{center}
 }
+\vspace{-0.5cm}
 \caption{Benchmarks\label{fig:benchmarks}}
 \end{figure}
-
 
 \section{Related Work}\label{sec:related}
 
@@ -1433,11 +1435,14 @@ Type-based program synthesis is a vast field of study. Most
 works~\cite{DBLP:conf/lopstr/HughesO20,DBLP:conf/pldi/PolikarpovaKS16,DBLP:conf/pldi/OseraZ15,DBLP:conf/popl/FrankleOWZ16}
 follow some variation of the synthesis-as-proof-search approach. Focusing
 in synthesis appeared first in the literature in~\cite{10.1145/3408991}.
-However, the specifics of each synthesis framework differ due to a variety of rich
-types explored and their corresponding logics and languages; or nuances of the
-synthesis process itself, such as complementing types with program examples;
-or even the programming paradigm of the output produced (e.g. generating heap
-manipulating programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
+%
+Each synthesis framework differ due to a variety of rich
+types explored and their corresponding logics and languages.
+% ; or nuances of the synthesis process itself.
+% , such as complementing types with program examples;
+%or even the programming paradigm of the output produced (e.g. generating heap
+%manipulating programs~\cite{DBLP:journals/pacmpl/PolikarpovaS19}).
+%
 % Some other common
 % patterns we follow are the use of type
 % refinements~\cite{DBLP:conf/pldi/PolikarpovaKS16}, polymorphic types, and the
@@ -1472,9 +1477,11 @@ functional programs in an ``advanced'' context. Their specifications combine two
 rich forms of types: polymorphic and refinement types.
 % (which correspond to a
 % first-order logic through the Curry-Howard isomorphism).
-Their approach to
-refinement types consists of an algorithm that supports decomposition of the
-refinement specification.
+%
+% Their approach to
+% refinement types consists of an algorithm that supports decomposition of the
+% refinement specification.
+%
 %,allowing for separation between the language of
 %specification and programs and making the approach amenable to compositional
 %synthesis techniques.
@@ -1512,6 +1519,11 @@ Additionally, our system extends the focusing-based system with
 recursion, ADTs, polymorphism and refinements to synthesize
 more expressive programs.
 
+\vspace{0.2cm}
+\noindent
+\textbf{Acknowledgements}
+%
+This work is supported by NOVA LINCS (UIDB/04516/2020) with the financial support of FCT.IP.
 
 \bibliographystyle{splncs04}
 \bibliography{references}
