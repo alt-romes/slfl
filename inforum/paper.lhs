@@ -1161,7 +1161,7 @@ type $\tau'$, $?\alpha \mapsto \tau_x$ is a mapping from \emph{existential} type
 $?\alpha$ to type $\tau_x$, and $\textsc{unify}(c, \Theta)$ indicates whether
 constraint $c$ can be unified with those in $\Theta$:
 
-\vspace{-0.5cm}
+\vspace{-0.4cm}
 \begin{mathpar}
     {\scriptsize\infer*[right=($\forall L$)]
     {
@@ -1179,6 +1179,7 @@ constraint $c$ can be unified with those in $\Theta$:
     {\Theta/\Theta, ?\alpha \mapsto C ; \Rho; \Gamma; \Delta/\Delta';
     x{:}?\alpha \Downarrow\ \vdash x : C}
     \and
+    \hspace{-2.2em}
     \infer*[right=($\Downarrow ?L$)]
     {\textsc{unify}(?\alpha
     \mapsto A, \Theta)}
@@ -1337,7 +1338,7 @@ result is a real-world example from \cite{Bernardy_2018}:
 %
 with linear types one can provide a safe interface to manipulate mutable arrays.
 Linear Haskell~\cite{Bernardy_2018}  provides an implementation of |array :: Int ->
-[(Int,a)] -> Array a| which, internally, uses mutable arrays via the interface:
+[(Int,a)] -> Array a| which, internally, uses mutable arrays using:
 %
 
 %\vspace{-0.5cm}
@@ -1371,7 +1372,7 @@ serves as an input output example that guides the search, the
 quantifiers. The Components column describes the library of function
 (signatures) provided for the particular synthesis goal.
 
-\begin{figure}
+\begin{figure}[t]
 {\scriptsize
 \begin{center}
     \begin{tabular}{ccccc}
@@ -1523,7 +1524,7 @@ more expressive programs.
 \noindent
 \textbf{Acknowledgements}
 %
-This work is supported by NOVA LINCS (UIDB/04516/2020) with the financial support of FCT.IP.
+This work was partially supported by NOVA LINCS\\ (UIDB/04516/2020) with the financial support of FCT.IP.
 
 \bibliographystyle{splncs04}
 \bibliography{references}
