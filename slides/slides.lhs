@@ -1,5 +1,6 @@
 \documentclass[aspectratio=169,dvipsnames]{beamer}
 
+\usepackage{appendixnumberbeamer}
 \usepackage{xargs}
 \usepackage{fancyvrb}
 \usepackage{cmll}
@@ -51,13 +52,12 @@
 
 \frame[plain]{\titlepage}
 
-\begin{frame}{Type-driven program synthesis}
-
-Program synthesis is about deriving programs from high-level specifications.
-\begin{itemize}
-  \item<2-> The search space of valid programs is very large
-  \item<2-> We need to interpret user intent
-\end{itemize}
+\begin{frame}{Program synthesis}
+  Program synthesis is about deriving programs from high-level specifications.
+  \begin{itemize}
+    \item<2-> The search space of valid programs is very large
+    \item<2-> We need to interpret user intent
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Type-driven program synthesis}
@@ -71,26 +71,59 @@ In \emph{type-driven} synthesis, the high-level specifications are (rich) types
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Our contribution}
-We explore \textbf{synthesis} from specifications based on \textbf{linear types}.
+\begin{frame}{Example Synthesis from Types}
+
+\only<1>{
+\begin{example}[Goal]
+\begin{code}
+map :: (a -> b) -> [a] -> [b]
+\end{code}
+\end{example}
+}
+
+\only<2-3>{
+\begin{example}[Wrong program synthesized]
+\begin{code}
+map :: (a -> b) -> [a] -> [b]
+map _ _ = []
+\end{code}
+\end{example}
+}
+
+\only<3>{
 \begin{itemize}
-\item Linear types have been generally overlooked in synthesis
-\item And are making their way into mainstream languages, like Haskell
-\item This paves the way for synthesis of concurrent programs from Session Types
+\item Simples types specify what goes in and out
+\item But not much on what happens
 \end{itemize}
-\pause
-Linear types make for \textbf{great specifications}
+}
+
+\only<4->{
+\begin{example}[What we wanted]
+\begin{code}
+map :: (a -> b) -> [a] -> [b]
+map f ls = case ls of
+  [] -> []
+  x : xs -> f x : map f xs
+\end{code}
+\end{example}
+}
+
+\only<5->{
 \begin{itemize}
-\item Describe interesting programs by nature
-\item Greatly prune the search space % We don't consider programs where linear propositions are used more than once!
+\item We need goals to be more precise
+\item S.t. the correct map function follows unambiguously from its type
+\item<6> We argue linear types make for great specifications, concisely
+restricting what the function does with the arguments
 \end{itemize}
-\pause
-And we support that claim through a prototype standalone synthesizer\footnote{https://github.com/alt-romes/slfl} and a GHC type-hole plugin\footnote{https://github.com/alt-romes/ghc-linear-synthesis-plugin}
+}
+
+
 \end{frame}
 
-\begin{frame}{Linear Types (aside)}
+\begin{frame}{Linear Types}
 
-A linear function consumes its argument \emph{exactly once} \\(if its application is consumed exactly once)
+A linear function ($\lolli$) consumes its argument \emph{exactly once}
+% \\(if its application is consumed exactly once)
 
 \only<2>{
 \begin{example}[Bad!]
@@ -120,10 +153,42 @@ Linear types concisely describe interesting functions
 }
 \end{frame}
 
+\begin{frame}{Our contribution}
+We explore \textbf{synthesis} from specifications based on \textbf{linear types}.\\
+% \begin{itemize}
+% \item Linear types have been generally overlooked in synthesis
+% \item And are making their way into mainstream languages, like Haskell
+% \item This paves the way for synthesis of concurrent programs from Session Types
+% \end{itemize}
+\pause
+Linear types make for \textbf{great specifications}
+\begin{itemize}
+\item<1-2> Concisely specify how things are used to describe interesting programs
+\item<1-2> Greatly prune the search space
+  % \begin{itemize}
+  % \item We don't consider programs where linear propositions are used more than once!
+  % \end{itemize}
+\end{itemize}
+\pause
+We develop a framework for synthesis of linear programs\pause 
+  \begin{itemize}
+    \item<1-4> (Extending ILL with features like recursion and polymorphism)
+  \end{itemize}
+\pause
+And implement the framework as a standalone synthesizer and a GHC plugin
+% And we support that claim through a prototype standalone synthesizer\footnote{https://github.com/alt-romes/slfl} and a GHC type-hole plugin\footnote{https://github.com/alt-romes/ghc-linear-synthesis-plugin}
+\end{frame}
+
+\begin{frame}{Core language for Synthesis}
+
+What to put here
+
+\end{frame}
+
 \begin{frame}{So, how do we synthesize a (linear) program?}
-Synthesizing a program seems like a dauting task, but we can reduce it to the more well-known problem of proof-search\footnote{
-Furthermore, the connection between linear types and linear logic allows us to leverage the
-large body of literature on linear logic}.
+Synthesizing a program seems like a dauting task, but we can reduce it to the more well-known problem of proof-search
+% \footnote{Furthermore, the connection between linear types and linear logic
+% allows us to leverage the large body of literature on linear logic}
 \pause
 \begin{block}{Curry-Howard isomorphism}
 \begin{itemize}
@@ -131,7 +196,7 @@ large body of literature on linear logic}.
 \begin{itemize}
   \item Propositions are types\pause
   \item Proofs are programs\pause
-  \item \emph{(Bottom-up) proof-search is program-synthesis}
+  \item \emph{Proof-search is program-synthesis}
 \end{itemize}
 \end{itemize}
 \end{block}
@@ -139,157 +204,425 @@ large body of literature on linear logic}.
 If proofs are programs, constructing a proof is constructing a program!
 \end{frame}
 
-\begin{frame}{Synthesis as Proof Search (Example)}
-\only<1-2>{
-Consider this example program
+% \begin{frame}{Linear logic to linear types}
+
+% Curry-Howard gives a mapping between linear logic and our linear language
+% \pause
+% \only<1-2>{
+% \begin{itemize}
+% \item Propositions in linear logic map to linear types (e.g. $A \lolli B$)
+% \item Proofs in linear logic map to linear programs
+% \item Each language construct maps to an inference rule in the logic
+% \end{itemize}
+% }
+
+% \only<3->{
+
+% }
+% \end{frame}
+
+\begin{frame}{Synthesis as proof search (Example)}
+
+\only<1>{
+\begin{example}[Prove A $\lolli$ A]
 \[
-\begin{array}{l}
-\mathsf{id} : \forall \alpha.~\alpha\to\alpha\\
-\mathsf{id} = \Lambda \alpha.~\lambda (x{:}\alpha).~x
+\infer{?}{\cdot \vdash A \lolli A}
+\]
+\end{example}
+}
+
+\only<2>{
+\begin{example}[Prove A $\lolli$ A]
+\[
+\infer*[right=($\lolli I$)]
+{
+  \infer{?}{A \vdash A}
+}{\cdot \vdash A \lolli A}
+\]
+\end{example}
+}
+
+\only<3-4>{
+\begin{example}[Prove A $\lolli$ A]
+\[
+\infer*[right=($\lolli I$)]
+{
+  \infer*[right=($Init$)]{\,}{A \vdash A}
+}{\cdot \vdash A \lolli A}
+\]
+\end{example}
+}
+
+\only<5>{
+\begin{example}[Program from A $\lolli$ A]
+\[
+\begin{array}{ccc}
+\begin{array}{c}
+\infer*[right=($\lolli I$)]
+{
+  \infer*[right=($Init$)]{\,}{A \vdash A}
+}{\cdot \vdash A \lolli A}\end{array} & \Longrightarrow & \lambda x.~\_
 \end{array}
 \]
+\end{example}
 }
-\pause
-And its corresponding typing derivation
+
+\only<6>{
+\begin{example}[Program from A $\lolli$ A]
 \[
-\infer*[right=($\forall$\! I)]
+\begin{array}{ccc}
+\begin{array}{c}
+\infer*[right=($\lolli I$)]
 {
-\infer*[right=($\rightarrow$\! I)]
+  \infer*[right=($Init$)]{\,}{A \vdash A}
+}{\cdot \vdash A \lolli A}\end{array} & \Longrightarrow & \lambda x.~x
+\end{array}
+\]
+\end{example}
+}
+
+\only<4->{
+Through C.H. correspondence we can extract a program from this proof
+\begin{itemize}
+\item $Init$ maps to using a variable
+\item $\lolli I$ maps to introducing a $\lambda x.~e$
+\end{itemize}
+}
+
+\end{frame}
+
+%
+% \begin{frame}{Synthesis as Proof Search (Example)}
+% \only<1-2>{
+% Consider this example program
+% \[
+% \begin{array}{l}
+% \mathsf{id} : \forall \alpha.~\alpha\to\alpha\\
+% \mathsf{id} = \Lambda \alpha.~\lambda (x{:}\alpha).~x
+% \end{array}
+% \]
+% }
+% \pause
+% And its corresponding typing derivation
+% \[
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer*[right=($Var$)]
+% { }
+% {\alpha, x{:}\alpha \vdash x : \alpha}
+% }
+% {\alpha \vdash \lambda (x{:}\alpha).~x : \alpha \to \alpha}
+% }
+% {\cdot \vdash \Lambda \alpha.~\lambda (x{:}\alpha).~x : \forall \alpha.~\alpha\to\alpha}
+% \]
+% \end{frame}
+%
+% \begin{frame}{Synthesis as Proof Search (Example)}
+% \only<1>{
+% Let's start with the goal, and construct the proof bottom-up, applying the rules we can
+% }
+% \only<2>{
+% The only rule that constructs a scheme is ($\forall\!$ I)
+% }
+% \only<3>{
+% And the only rule that constructs a function is ($\rightarrow\!$ I)
+% }
+% \only<4>{
+% And then to prove $\alpha$ knowning $\alpha$ we use ($Var$)
+% }
+% \only<5-9>{
+% We could simultaneously construct terms, which are compact representations of proofs
+% }
+% \[
+% \only<1>{
+% \infer
+% { }
+% {\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<2>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer
+% { }
+% {\alpha \vdash \_ : \alpha \to \alpha}
+% }
+% {\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<3>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer
+% { }
+% {\alpha, x{:}\alpha \vdash \_ : \alpha}
+% }
+% {\alpha \vdash \_ : \alpha \to \alpha}
+% }
+% {\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<4>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer*[right=($Var$)]
+% { }
+% {\alpha, x{:}\alpha \vdash \_ : \alpha}
+% }
+% {\alpha \vdash \_ : \alpha \to \alpha}
+% }
+% {\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<5>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer*[right=($Var$)]
+% { }
+% {\alpha, x{:}\alpha \vdash \_ : \alpha}
+% }
+% {\alpha \vdash \_ : \alpha \to \alpha}
+% }
+% {\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<6>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer*[right=($Var$)]
+% { }
+% {\alpha, x{:}\alpha \vdash \_ : \alpha}
+% }
+% {\alpha \vdash \lambda (x{:}\alpha).~\_ : \alpha \to \alpha}
+% }
+% {\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<7>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer*[right=($Var$)]
+% { }
+% {\alpha, x{:}\alpha \vdash x : \alpha}
+% }
+% {\alpha \vdash \lambda (x{:}\alpha).~\_ : \alpha \to \alpha}
+% }
+% {\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<8>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer*[right=($Var$)]
+% { }
+% {\alpha, x{:}\alpha \vdash x : \alpha}
+% }
+% {\alpha \vdash \lambda (x{:}\alpha).~x : \alpha \to \alpha}
+% }
+% {\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
+% }
+% \only<9>{
+% \infer*[right=($\forall$\! I)]
+% {
+% \infer*[right=($\rightarrow$\! I)]
+% {
+% \infer*[right=($Var$)]
+% { }
+% {\alpha, x{:}\alpha \vdash x : \alpha}
+% }
+% {\alpha \vdash \lambda (x{:}\alpha).~x : \alpha \to \alpha}
+% }
+% {\cdot \vdash \Lambda \alpha.~\lambda (x{:}\alpha).~x : \forall \alpha.~\alpha\to\alpha}
+% }
+% \]
+% \end{frame}
+%
+
+\begin{frame}{Proof search, algorithmically}
+
+In practice, proof search is challenging (the examples were simple)
+\begin{itemize}
+\item How do we guarantee the linear usage of resources? (splitting contexts)
+\item Which rules should we apply at any given moment? (focusing)
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Focusing -- proof search discipline}
+The foundational technique we use for proof search is \emph{focusing}.\\
+The key idea is
+\pause
+\begin{itemize}
+\item Separating rules into ones that can be used immediately without losing provability\pause
+\item Applying them eagerly\pause
+\item \emph{Choose} from the others when no more ``immediate'' rules can be applied\pause
+\item \emph{Backtrack} to choice if proof fails
+\end{itemize}
+\pause
+This discipline guides proof-search in which rules should be applied when
+\end{frame}
+
+\begin{frame}{Focusing (Example)}
+\[
+\infer %*[right=($\lolli R$)]
 {
-\infer*[right=($Var$)]
-{ }
-{\alpha, x{:}\alpha \vdash x : \alpha}
+\only<2->{
+  \infer %*[right=($\tensor L$)]
+  {
+  \only<3->{
+    \infer %*[right=($\tensor R$)]
+    {
+    \only<3>{choice!}
+    \only<4>{
+      \infer
+      {fail}
+      {A \vdash B}
+      \and
+      \infer
+      {fail}
+      {B \vdash A}
+    }
+    \only<5>{
+      \infer
+      { }
+      {B \vdash B}
+      \and
+      \infer
+      { }
+      {A \vdash A}
+    }
+    }
+    {A,B \vdash B \tensor A}
+  }
+  }
+  {
+  A \tensor B \vdash B \tensor A
+  }
 }
-{\alpha \vdash \lambda (x{:}\alpha).~x : \alpha \to \alpha}
 }
-{\cdot \vdash \Lambda \alpha.~\lambda (x{:}\alpha).~x : \forall \alpha.~\alpha\to\alpha}
+{
+\cdot \vdash A \tensor B \lolli B \tensor A
+}
 \]
 \end{frame}
 
-\begin{frame}{Synthesis as Proof Search (Example)}
-\only<1>{
-Let's start with the goal, and construct the proof bottom-up, applying the rules we can
-}
-\only<2>{
-The only rule that constructs a scheme is ($\forall\!$ I)
-}
-\only<3>{
-And the only rule that constructs a function is ($\rightarrow\!$ I)
-}
-\only<4>{
-And then to prove $\alpha$ knowning $\alpha$ we use ($Var$)
-}
-\only<5-9>{
-We could simultaneously construct terms, which are compact representations of proofs
-}
-\[
-\only<1>{
-\infer
-{ }
-{\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<2>{
-\infer*[right=($\forall$\! I)]
-{
-\infer
-{ }
-{\alpha \vdash \_ : \alpha \to \alpha}
-}
-{\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<3>{
-\infer*[right=($\forall$\! I)]
-{
-\infer*[right=($\rightarrow$\! I)]
-{
-\infer
-{ }
-{\alpha, x{:}\alpha \vdash \_ : \alpha}
-}
-{\alpha \vdash \_ : \alpha \to \alpha}
-}
-{\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<4>{
-\infer*[right=($\forall$\! I)]
-{
-\infer*[right=($\rightarrow$\! I)]
-{
-\infer*[right=($Var$)]
-{ }
-{\alpha, x{:}\alpha \vdash \_ : \alpha}
-}
-{\alpha \vdash \_ : \alpha \to \alpha}
-}
-{\cdot \vdash \_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<5>{
-\infer*[right=($\forall$\! I)]
-{
-\infer*[right=($\rightarrow$\! I)]
-{
-\infer*[right=($Var$)]
-{ }
-{\alpha, x{:}\alpha \vdash \_ : \alpha}
-}
-{\alpha \vdash \_ : \alpha \to \alpha}
-}
-{\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<6>{
-\infer*[right=($\forall$\! I)]
-{
-\infer*[right=($\rightarrow$\! I)]
-{
-\infer*[right=($Var$)]
-{ }
-{\alpha, x{:}\alpha \vdash \_ : \alpha}
-}
-{\alpha \vdash \lambda (x{:}\alpha).~\_ : \alpha \to \alpha}
-}
-{\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<7>{
-\infer*[right=($\forall$\! I)]
-{
-\infer*[right=($\rightarrow$\! I)]
-{
-\infer*[right=($Var$)]
-{ }
-{\alpha, x{:}\alpha \vdash x : \alpha}
-}
-{\alpha \vdash \lambda (x{:}\alpha).~\_ : \alpha \to \alpha}
-}
-{\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<8>{
-\infer*[right=($\forall$\! I)]
-{
-\infer*[right=($\rightarrow$\! I)]
-{
-\infer*[right=($Var$)]
-{ }
-{\alpha, x{:}\alpha \vdash x : \alpha}
-}
-{\alpha \vdash \lambda (x{:}\alpha).~x : \alpha \to \alpha}
-}
-{\cdot \vdash \Lambda \alpha.~\_ : \forall \alpha.~\alpha\to\alpha}
-}
-\only<9>{
-\infer*[right=($\forall$\! I)]
-{
-\infer*[right=($\rightarrow$\! I)]
-{
-\infer*[right=($Var$)]
-{ }
-{\alpha, x{:}\alpha \vdash x : \alpha}
-}
-{\alpha \vdash \lambda (x{:}\alpha).~x : \alpha \to \alpha}
-}
-{\cdot \vdash \Lambda \alpha.~\lambda (x{:}\alpha).~x : \forall \alpha.~\alpha\to\alpha}
-}
-\]
+\begin{frame}{Beyond propositional logic}
+
+To synthesize more interesting programs (e.g. even map) we need more features\\
+\pause
+We extend our language with
+\begin{itemize}
+\item inductive datatypes,
+\item recursion,
+\item and polymorphism
+\end{itemize}
+
 \end{frame}
+
+\begin{frame}{Handling Polymorphism}
+
+\only<1>{
+\begin{example}
+\begin{code}
+f :: a -> (a -> b) -> b
+f x g = g x
+\end{code}
+\end{example}
+\begin{itemize}
+\item It's impossible to produce a polymorphic $b$ from nothing
+\item The only way is to apply the function to the argument
+\item Polymorphism further increases the expressiveness and preciseness of the goals
+\end{itemize}
+}
+
+\only<2>{
+Mostly, we also leverage the C.H. correspondence between polymorphism and first-order logic
+\begin{itemize}
+\item And integrate it in our focusing algorithm for synthesis
+\end{itemize}
+}
+\end{frame}
+
+\begin{frame}{Inductive datatypes and Recursion}
+
+Recursion is crucial to synthesize more interesting programs (e.g. map), but is also a source of difficulties
+In essence
+\pause
+\begin{itemize}
+\item Allow function being synthesized to occur in its own body\pause
+\item But we can't allow the trivial (incorrect) solution (e.g. $map = map$)\pause
+\item The proof-search itself must terminate, which isn't trivial with inductive datatypes\pause
+\end{itemize}
+
+We integrate recursion into our system as well
+
+\end{frame}
+
+\begin{frame}{Non-terminating proof (Example)}
+
+Consider
+\begin{code}
+data List = Nil | Cons List
+\end{code}
+\pause
+and goal
+\begin{code}
+x :: List
+\end{code}
+\pause
+if we (naively) always tried to construct list using |Cons|, we would never terminate
+\begin{code}
+x = Cons (Cons (Cons (Cons ...)))
+\end{code}
+
+\end{frame}
+
+\begin{frame}{Results}
+
+We ran our synthesis framework implementation on custom synthesis benchmarks,
+successfully synthesizing all goals performantly\\
+\pause
+And the coolest synth example is taken from Linear Haskell:\\
+\begin{code}
+newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
+write :: MArray a ⊸ (Int,a) -> MArray a
+read :: MArray a ⊸ Int -> (MArray a, Ur b)
+freeze :: MArray a ⊸ Ur (Array a)
+synth array :: Int -> [(Int,a)] -> Array a
+\end{code}
+\end{frame}
+
+\begin{frame}{Conclusion}
+\begin{itemize}
+\item Linear types make for good synthesis specifications\pause
+\item Linear types synthesis is efficient
+  \begin{itemize}
+  \item We leverage linear logic literature (focusing)
+  \item And never consider functions in which linear resources are not used linearly (pruning the space)
+  \end{itemize}
+\pause
+\item This is the short version, see the paper for more:
+  \begin{itemize}
+  \item Refinements
+  \item Hints
+  \item etc...
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{The End}
+\centering
+Obrigado!
+\end{frame}
+
+\appendix
 
 \begin{frame}{Constructing proofs algorithmically}
 Constructing proofs algorithmically in linear logic is hard, there's a lot of non-determinism
@@ -423,3 +756,5 @@ We explain how we handle that in the paper!
 \end{frame}
 
 \end{document}
+
+% vim: foldmethod=marker foldmarker=\\begin{frame},\\end{frame} foldenable
