@@ -58,6 +58,13 @@
     \item<2-> The search space of valid programs is very large
     \item<2-> We need to interpret user intent
   \end{itemize}
+  \pause
+  Specifications can be
+  \begin{itemize}
+  \item Natural language (ChatGPT)
+  \item Type-driven
+  \item Example-driven
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Type-driven program synthesis}
@@ -85,7 +92,7 @@ map :: (a -> b) -> [a] -> [b]
 \begin{example}[Wrong program synthesized]
 \begin{code}
 map :: (a -> b) -> [a] -> [b]
-map _ _ = []
+map f ls = []
 \end{code}
 \end{example}
 }
@@ -102,8 +109,8 @@ map _ _ = []
 \begin{code}
 map :: (a -> b) -> [a] -> [b]
 map f ls = case ls of
-  [] -> []
-  x : xs -> f x : map f xs
+  Nil -> Nil
+  Cons x xs -> Cons (f x) (map f xs)
 \end{code}
 \end{example}
 }
@@ -112,7 +119,7 @@ map f ls = case ls of
 \begin{itemize}
 \item We need goals to be more precise
 \item S.t. the correct map function follows unambiguously from its type
-\item<6> We argue linear types make for great specifications, concisely
+\item<6> We argue linear types make for good specifications, concisely
 restricting what the function does with the arguments
 \end{itemize}
 }
@@ -129,9 +136,10 @@ A linear function ($\lolli$) consumes its argument \emph{exactly once}
 \begin{example}[Bad!]
 \begin{code}
 map :: (a ⊸ b) -> [a] ⊸ [b]
-map _ _ = []
+map f ls = []
 \end{code}
 \end{example}
+(List is unused)
 }
 
 \only<3->{
@@ -139,8 +147,8 @@ map _ _ = []
 \begin{code}
 map :: (a ⊸ b) -> [a] ⊸ [b]
 map f ls = case ls of
-  [] -> []
-  x : xs -> f x : map f xs
+  Nil -> Nil
+  Cons x xs -> Cons (f x) (map f xs)
 \end{code}
 \end{example}
 
@@ -148,7 +156,7 @@ map f ls = case ls of
 \only<4>{
 Linear types concisely describe interesting functions
 \begin{itemize}
-\item<4-> They say exactly which that things \emph{must be used}
+\item<4-> They say exactly which arguments \emph{must be used}
 \end{itemize}
 }
 \end{frame}
@@ -161,7 +169,7 @@ We explore \textbf{synthesis} from specifications based on \textbf{linear types}
 % \item This paves the way for synthesis of concurrent programs from Session Types
 % \end{itemize}
 \pause
-Linear types make for \textbf{great specifications}
+Linear types make for \textbf{good specifications}
 \begin{itemize}
 \item<1-2> Concisely specify how things are used to describe interesting programs
 \item<1-2> Greatly prune the search space
@@ -172,7 +180,7 @@ Linear types make for \textbf{great specifications}
 \pause
 We develop a framework for synthesis of linear programs\pause 
   \begin{itemize}
-    \item<1-4> (Extending ILL with features like recursion and polymorphism)
+    \item<1-4> Extending a core linear language with features like recursion and polymorphism
   \end{itemize}
 \pause
 And implement the framework as a standalone synthesizer and a GHC plugin
@@ -181,12 +189,16 @@ And implement the framework as a standalone synthesizer and a GHC plugin
 
 \begin{frame}{Core language for Synthesis}
 
-What to put here
+The core language for synthesis we use is a pure functional linear calculus
+\begin{itemize}
+\item With linear functions ($\lolli$), pairs ($(x,y)$), ...
+\item No recursion, no datatypes, no polymorphism
+\end{itemize}
 
 \end{frame}
 
 \begin{frame}{So, how do we synthesize a (linear) program?}
-Synthesizing a program seems like a dauting task, but we can reduce it to the more well-known problem of proof-search
+Synthesizing a program seems like a daunting task, but we can reduce it to the more well-known problem of proof-search
 % \footnote{Furthermore, the connection between linear types and linear logic
 % allows us to leverage the large body of literature on linear logic}
 \pause
@@ -201,7 +213,8 @@ Synthesizing a program seems like a dauting task, but we can reduce it to the mo
 \end{itemize}
 \end{block}
 \pause
-If proofs are programs, constructing a proof is constructing a program!
+If proofs are programs and props are types, constructing a proof of a
+proposition is deriving a program of a given type.
 \end{frame}
 
 % \begin{frame}{Linear logic to linear types}
@@ -285,13 +298,12 @@ If proofs are programs, constructing a proof is constructing a program!
 Through C.H. correspondence we can extract a program from this proof
 \begin{itemize}
 \item $Init$ maps to using a variable
-\item $\lolli I$ maps to introducing a $\lambda x.~e$
+\item $\lolli I$ maps to introducing a function (i.e. lambda abstraction)
 \end{itemize}
 }
 
 \end{frame}
 
-%
 % \begin{frame}{Synthesis as Proof Search (Example)}
 % \only<1-2>{
 % Consider this example program
@@ -443,13 +455,12 @@ Through C.H. correspondence we can extract a program from this proof
 % }
 % \]
 % \end{frame}
-%
 
 \begin{frame}{Proof search, algorithmically}
 
 In practice, proof search is challenging (the examples were simple)
 \begin{itemize}
-\item How do we guarantee the linear usage of resources? (splitting contexts)
+\item How do we guarantee the linear usage of resources? (resource management)
 \item Which rules should we apply at any given moment? (focusing)
 \end{itemize}
 
@@ -460,13 +471,13 @@ The foundational technique we use for proof search is \emph{focusing}.\\
 The key idea is
 \pause
 \begin{itemize}
-\item Separating rules into ones that can be used immediately without losing provability\pause
-\item Applying them eagerly\pause
+\item Separating rules into ones that can be applied freely without affecting provability\pause
+\item Applying all such rules eagerly\pause
 \item \emph{Choose} from the others when no more ``immediate'' rules can be applied\pause
 \item \emph{Backtrack} to choice if proof fails
 \end{itemize}
 \pause
-This discipline guides proof-search in which rules should be applied when
+(Focusing is sound and complete wrt linear logic)
 \end{frame}
 
 \begin{frame}{Focusing (Example)}
@@ -474,10 +485,10 @@ This discipline guides proof-search in which rules should be applied when
 \infer %*[right=($\lolli R$)]
 {
 \only<2->{
-  \infer %*[right=($\tensor L$)]
+  \infer %*[right=($\wedge L$)]
   {
   \only<3->{
-    \infer %*[right=($\tensor R$)]
+    \infer %*[right=($\wedge R$)]
     {
     \only<3>{choice!}
     \only<4>{
@@ -499,16 +510,16 @@ This discipline guides proof-search in which rules should be applied when
       {A \vdash A}
     }
     }
-    {A,B \vdash B \tensor A}
+    {A,B \vdash B \wedge A}
   }
   }
   {
-  A \tensor B \vdash B \tensor A
+  A \wedge B \vdash B \wedge A
   }
 }
 }
 {
-\cdot \vdash A \tensor B \lolli B \tensor A
+\cdot \vdash A \wedge B \lolli B \wedge A
 }
 \]
 \end{frame}
@@ -537,13 +548,13 @@ f x g = g x
 \end{example}
 \begin{itemize}
 \item It's impossible to produce a polymorphic $b$ from nothing
-\item The only way is to apply the function to the argument
-\item Polymorphism further increases the expressiveness and preciseness of the goals
+\item The only way is to apply the function to the argument (parametricity!)
+\item Parametric polymorphism further increases the expressiveness and preciseness of the goals
 \end{itemize}
 }
 
 \only<2>{
-Mostly, we also leverage the C.H. correspondence between polymorphism and first-order logic
+Mostly, we also leverage the C.H. correspondence between polymorphism and second-order logic
 \begin{itemize}
 \item And integrate it in our focusing algorithm for synthesis
 \end{itemize}
@@ -552,11 +563,11 @@ Mostly, we also leverage the C.H. correspondence between polymorphism and first-
 
 \begin{frame}{Inductive datatypes and Recursion}
 
-Recursion is crucial to synthesize more interesting programs (e.g. map), but is also a source of difficulties
+Recursion is crucial to synthesize more interesting programs (e.g. map), but is also a source of difficulties.\\
 In essence
 \pause
 \begin{itemize}
-\item Allow function being synthesized to occur in its own body\pause
+\item Allow function name being synthesized to occur in its own body\pause
 \item But we can't allow the trivial (incorrect) solution (e.g. $map = map$)\pause
 \item The proof-search itself must terminate, which isn't trivial with inductive datatypes\pause
 \end{itemize}
@@ -569,7 +580,7 @@ We integrate recursion into our system as well
 
 Consider
 \begin{code}
-data List = Nil | Cons List
+data List = Nil | Cons Int List
 \end{code}
 \pause
 and goal
@@ -579,8 +590,10 @@ x :: List
 \pause
 if we (naively) always tried to construct list using |Cons|, we would never terminate
 \begin{code}
-x = Cons (Cons (Cons (Cons ...)))
+x = Cons 0 (Cons 0 (Cons 0 (Cons 0 ...)))
 \end{code}
+\pause
+(We solve this by not allowing datatypes to be created/destructed unrestrictedly)
 
 \end{frame}
 
@@ -597,6 +610,77 @@ read :: MArray a ⊸ Int -> (MArray a, Ur b)
 freeze :: MArray a ⊸ Ur (Array a)
 synth array :: Int -> [(Int,a)] -> Array a
 \end{code}
+\pause
+Resulting in:
+\begin{code}
+array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
+\end{code}
+\end{frame}
+
+\begin{frame}{Benchmarks}
+
+\begin{figure}[t]
+{\scriptsize
+\begin{center}
+    \begin{tabular}{ccccc}
+        \hline
+        Group & Goal & Avg. time $\pm\,\sigma$ & Keywords & Components \\
+        \hline
+        \pause
+        \multirow{4}{4em}{Linear Logic} & uncurry & $133\mu s\pm 4.9\mu s$ &&\\ 
+        %& distributivity & $179\mu s\pm 5.0\mu s$ && \\ 
+        & call by name & $196\mu s\pm 4.6\mu s$ && \\ 
+        & 0/1 & $294\mu s\pm 5.3\mu s$ && \\ 
+        \hline
+        \pause
+        \multirow{7}{4em}{List} & map & $288\mu s\pm 7.2\mu s$  && \\ 
+        & append & $292\mu s\pm 7.0\mu s$ & & \\ 
+        & foldl & $1.69ms\pm 5.3\mu s$ & \emph{choose 1} & \\ 
+        & foldr & $704\mu s\pm 10\mu s$ && \\ 
+        & concat & $505\mu s\pm 18\mu s$ && \\
+        %& uncons & $215\mu s\pm 15\mu s$ && \\
+        & reverse & $17.4ms\pm 515\mu s$ & \emph{reverse [1,2] == [2,1]} & \\ 
+        \hline
+        \pause
+        \multirow{2}{4em}{Maybe} & $>>=$ & $194\mu s\pm 5.3\mu s$ && \\ 
+        & maybe & $161\mu s\pm 4.8\mu s$&& \\
+        \hline
+        \multirow{7}{4em}{State} & runState & $190\mu s\pm 6.8\mu s$ && \\ 
+        & $>>=$ & $979\mu s\pm 23\mu s$ && \\
+        & $>>=$ & $\infty$ & \emph{using (runState)} & \\
+        & get & $133\mu s\pm 3.8\mu s$ && \\
+        & put & $146\mu s\pm 3.4\mu s$ && \\
+        & modify & $219\mu s\pm 4.9\mu s$ && \\
+        & evalState & $156\mu s\pm 4.0\mu s$ && \\
+        % \multirow{5}{4em}{Binary Tree} & singleton & 1s & yes & yes \\ 
+        % & insert & 1s & yes & unordered \\
+        % & map & 1s & yes & yes \\
+        % & append & 1s & yes & appends to rightmost leaf \\
+        % & join node & 1s & yes & joins at rightmost leaf \\
+        % \hline
+        % \multirow{7}{4em}{Map} & singleton & 1s & yes & yes \\ 
+        % & insert & 1s & yes & unordered \\
+        % & insertWithKey & 1s & yes & ignores function \\
+        % & union & 1s & yes & ignores keys \\
+        % & mapAccum & 1s & no & ?? \\
+        % & map & 1s & yes & yes \\
+        % & mapKeys & 1s & yes & yes \\
+        \hline
+        \pause
+        Misc & either & $197\mu s\pm 5.3\mu s$ && \\ 
+        \hline
+        \pause
+        \multirow{2}{4em}{Array} & & & \emph{depth 3} & \emph{freeze, foldl} \\
+        & array~\ref{sec:evaluation} & $80ms\pm 870\mu s$ & \emph{using (foldl),depth 3} & \emph{newMArray,write} \\
+        \hline
+        \pause
+        Refinements & add3 & $39ms\pm 1.1ms$ & & + \\
+        \hline
+    \end{tabular}
+  \end{center}
+}
+\end{figure}
+
 \end{frame}
 
 \begin{frame}{Conclusion}
