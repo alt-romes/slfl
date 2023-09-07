@@ -11,6 +11,7 @@
 \usepackage{multirow}
 \usepackage{verbatim}
 \usepackage{wrapfig}
+\usepackage{svg}
 \newenvironment{code}{\footnotesize\verbatim}{\endverbatim\normalsize}
 
 \usepackage{hyperref}
@@ -46,7 +47,20 @@
 \renewcommand{\Conid}[1]{\textcolor{OliveGreen}{\id{#1}}}
 
 \title{Functional Program Synthesis from Linear Types}
-\author{Rodrigo Mesquita}
+\author{Rodrigo Mesquita\\Bernardo Toninho}
+\titlegraphic{
+\[
+\begin{array}{cc}
+\begin{array}{c}
+\includegraphics[height=.8cm]{images/logo_fct_unl}\hspace{1cm}
+\end{array} &
+\begin{array}{c}
+\includegraphics[height=.7cm]{images/logo_novalincs.png}
+\end{array}
+\end{array}
+\]
+}
+
 
 \begin{document}
 
@@ -55,8 +69,7 @@
 \begin{frame}{Program synthesis}
   Program synthesis is about deriving programs from high-level specifications.
   \begin{itemize}
-    \item<2-> The search space of valid programs is very large
-    \item<2-> We need to interpret user intent
+  \item Means to increase programmer productivity (e.g. ChatGPT)
   \end{itemize}
   \pause
   Specifications can be
@@ -64,6 +77,12 @@
   \item Natural language (ChatGPT)
   \item Type-driven
   \item Example-driven
+  \end{itemize}
+  \pause
+  However
+  \begin{itemize}
+    \item<2-> The search space of valid programs is very large
+    \item<2-> We need to interpret user intent
   \end{itemize}
 \end{frame}
 
@@ -75,6 +94,7 @@ In \emph{type-driven} synthesis, the high-level specifications are (rich) types
   \begin{itemize}
   \item<2-> $(x:\mathsf{Int}) \to (y:\mathsf{Int}) \to \{z:\mathsf{Int} \mid z = x + y \}$ is very precise
   \end{itemize}
+\item<2-> Programs are correct by construction
 \end{itemize}
 \end{frame}
 
@@ -117,7 +137,7 @@ map f ls = case ls of
 
 \only<5->{
 \begin{itemize}
-\item We need goals to be more precise
+\item We need specifications to be more precise
 \item S.t. the correct map function follows unambiguously from its type
 \item<6> We argue linear types make for good specifications, concisely
 restricting what the function does with the arguments
@@ -183,18 +203,25 @@ We develop a framework for synthesis of linear programs\pause
     \item<1-4> Extending a core linear language with features like recursion and polymorphism
   \end{itemize}
 \pause
-And implement the framework as a standalone synthesizer and a GHC plugin
+And implement the framework as a standalone synthesizer and a plugin for the leading Haskell compiler (GHC)
 % And we support that claim through a prototype standalone synthesizer\footnote{https://github.com/alt-romes/slfl} and a GHC type-hole plugin\footnote{https://github.com/alt-romes/ghc-linear-synthesis-plugin}
 \end{frame}
 
-\begin{frame}{Core language for Synthesis}
-
-The core language for synthesis we use is a pure functional linear calculus
-\begin{itemize}
-\item With linear functions ($\lolli$), pairs ($(x,y)$), ...
-\item No recursion, no datatypes, no polymorphism
-\end{itemize}
-
+\begin{frame}{A glimpse of what we can do}
+Given a functional API to mutable arrays (trust me!):
+\begin{code}
+newMArray :: Int -> (MArray a ⊸ Ur b) ⊸ b
+write :: MArray a ⊸ (Int,a) -> MArray a
+read :: MArray a ⊸ Int -> (MArray a, Ur b)
+freeze :: MArray a ⊸ Ur (Array a)
+\end{code}
+\pause
+We can automatically synthesize a (correct by construction) pure array generator:
+\begin{code}
+synth array :: Int -> [(Int,a)] -> Array a
+array size pairs = newMArray size (\ma -> freeze (foldl write ma pairs))
+\end{code}
+This example was taken from Linear Haskell (where everything was written by hand!)
 \end{frame}
 
 \begin{frame}{So, how do we synthesize a (linear) program?}
@@ -206,15 +233,24 @@ Synthesizing a program seems like a daunting task, but we can reduce it to the m
 \begin{itemize}
 \item Fundamental connection between logic and programming languages
 \begin{itemize}
-  \item Propositions are types\pause
-  \item Proofs are programs\pause
+  \item Propositions are types
+  \item Proofs are programs
   \item \emph{Proof-search is program-synthesis}
 \end{itemize}
 \end{itemize}
 \end{block}
-\pause
 If proofs are programs and props are types, constructing a proof of a
 proposition is deriving a program of a given type.
+\end{frame}
+
+\begin{frame}{Core language for Synthesis}
+
+The core language for synthesis we use is a pure functional linear calculus
+\begin{itemize}
+\item With linear functions ($\lolli$), pairs ($(x,y)$), ...
+\item No recursion, no datatypes, no polymorphism
+\end{itemize}
+
 \end{frame}
 
 % \begin{frame}{Linear logic to linear types}
@@ -460,8 +496,8 @@ Through C.H. correspondence we can extract a program from this proof
 
 In practice, proof search is challenging (the examples were simple)
 \begin{itemize}
-\item How do we guarantee the linear usage of resources? (resource management)
 \item Which rules should we apply at any given moment? (focusing)
+\item How do we guarantee the linear usage of resources? (resource management)
 \end{itemize}
 
 \end{frame}
@@ -522,6 +558,12 @@ The key idea is
 \cdot \vdash A \wedge B \lolli B \wedge A
 }
 \]
+\only<6>{
+From the proof we automatically extract the correct program:
+\[
+\lambda p.~\textbf{let}~(x,y)=p~\textbf{in}~(y,x)
+\]
+}
 \end{frame}
 
 \begin{frame}{Beyond propositional logic}
